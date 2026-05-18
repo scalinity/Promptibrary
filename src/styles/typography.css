@@ -1,0 +1,147 @@
+/* ============================================================
+   Promptibrary — Typography
+   Three faces: Boska (display), Switzer (UI), JetBrains Mono.
+   No others. Ever.
+   ============================================================ */
+
+@import url("https://api.fontshare.com/v2/css?f[]=boska@400,500,700,400i&f[]=switzer@400,500,600&display=swap");
+
+/* === Additions beyond canonical design system ===
+   JetBrains Mono Variable is bundled locally per L0 prompt and spec §8.
+   Boska + Switzer continue from Fontshare CDN for V1; bundling them is a V2 polish item
+   (see docs/V2-CANDIDATES.md). */
+@font-face {
+  font-family: "JetBrains Mono Variable";
+  font-style: normal;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url("../assets/fonts/JetBrainsMono-VariableFont_wght.ttf") format("truetype-variations");
+}
+
+@font-face {
+  font-family: "JetBrains Mono Variable";
+  font-style: italic;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url("../assets/fonts/JetBrainsMono-Italic-VariableFont_wght.ttf") format("truetype-variations");
+}
+
+:root {
+  --font-display: "Boska", "Iowan Old Style", "Charter", Georgia, serif;
+  --font-ui:      "Switzer", "Helvetica Neue", -apple-system, system-ui, sans-serif;
+  --font-mono:    "JetBrains Mono", "JetBrains Mono Variable", ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+/* ---------- Scale (utility classes) ---------- */
+
+.t-display-xl {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 32px;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.t-display-l {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 26px;
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+}
+
+.t-display-m {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 22px;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+
+.t-display-s {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 18px;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+}
+
+.t-section {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 500;
+  font-size: 12px;
+  line-height: 1.2;
+  letter-spacing: 0.02em;
+  text-transform: lowercase;
+}
+
+.t-ui-l {
+  font-family: var(--font-ui);
+  font-weight: 400;
+  font-size: 15px;
+  line-height: 1.5;
+  letter-spacing: -0.005em;
+}
+
+.t-ui {
+  font-family: var(--font-ui);
+  font-weight: 400;
+  font-size: 13px;
+  line-height: 1.5;
+  letter-spacing: -0.005em;
+}
+
+.t-ui-s {
+  font-family: var(--font-ui);
+  font-weight: 400;
+  font-size: 12px;
+  line-height: 1.45;
+  letter-spacing: -0.005em;
+}
+
+.t-ui-xs {
+  font-family: var(--font-ui);
+  font-weight: 500;
+  font-size: 11px;
+  line-height: 1.3;
+  letter-spacing: 0;
+}
+
+.t-mono {
+  font-family: var(--font-mono);
+  font-weight: 400;
+  font-size: 12.5px;
+  line-height: 1.65;
+  letter-spacing: 0.01em;
+}
+
+.t-mono-s {
+  font-family: var(--font-mono);
+  font-weight: 400;
+  font-size: 11px;
+  line-height: 1.5;
+  letter-spacing: 0.01em;
+}
+
+.t-mono-xs {
+  font-family: var(--font-mono);
+  font-weight: 400;
+  font-size: 10.5px;
+  line-height: 1.4;
+  letter-spacing: 0.01em;
+}
+
+/* Instrument-panel feel: wider mono tracking */
+.t-mono-instrument {
+  letter-spacing: 0.04em;
+}
+
+/* ---------- Section label glyph ---------- */
+
+.section-label::before {
+  content: "§";
+  color: var(--ink-dim);
+  margin-right: 0.45em;
+  font-style: normal;
+}

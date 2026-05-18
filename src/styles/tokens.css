@@ -1,0 +1,79 @@
+/* ============================================================
+   Promptibrary — Design Tokens
+   Source of truth for color, geometry, spacing, motion.
+   All colors in OKLCH. Dark-mode only (V1).
+   ============================================================ */
+
+:root {
+  /* ---------- Surfaces (dark, faint blue-green undertone) ---------- */
+  --bg-deep:     oklch(0.135 0.012 220);  /* outer app, behind frame      */
+  --bg-base:     oklch(0.170 0.012 220);  /* primary surface              */
+  --bg-raised:   oklch(0.205 0.013 220);  /* cards, hovered rows          */
+  --bg-sunken:   oklch(0.110 0.012 220);  /* inputs, code blocks, status  */
+  --bg-terminal: oklch(0.095 0.010 220);  /* embedded terminal surface    */
+
+  /* ---------- Borders ---------- */
+  --border-subtle: oklch(0.24 0.012 220); /* hairlines, default 1px       */
+  --border-mid:    oklch(0.30 0.013 220); /* hover state on bordered els  */
+  --border-strong: oklch(0.40 0.014 220); /* deliberate emphasis          */
+
+  /* ---------- Ink (text) ---------- */
+  --ink-primary:   oklch(0.96 0.008 80);  /* primary text, slight warm    */
+  --ink-secondary: oklch(0.74 0.012 80);  /* secondary text               */
+  --ink-tertiary:  oklch(0.54 0.012 80);  /* labels, captions             */
+  --ink-dim:       oklch(0.38 0.012 80);  /* separators, disabled         */
+
+  /* ---------- Accent — sodium amber, the signature ---------- */
+  --accent:      oklch(0.82 0.16 75);
+  --accent-warm: oklch(0.88 0.14 70);                  /* hover / active   */
+  --accent-dim:  oklch(0.62 0.14 75);                  /* secondary use    */
+  --accent-deep: oklch(0.42 0.10 75);                  /* outlines         */
+  --accent-glow: oklch(0.82 0.16 75 / 0.30);           /* halo             */
+  --accent-tint: oklch(0.82 0.16 75 / 0.08);           /* selected bg      */
+
+  /* ---------- Status ---------- */
+  --status-running: oklch(0.78 0.18 145);  /* chartreuse — alive          */
+  --status-error:   oklch(0.68 0.22 25);   /* warm red                    */
+  --status-warn:    oklch(0.82 0.15 90);   /* amber-yellow                */
+  --status-error-dim: oklch(0.48 0.14 25); /* dimmed for diff/strikethru  */
+
+  /* ---------- Editorial paper warm (sparing — archival warmth) ---------- */
+  --paper-warm: oklch(0.92 0.045 80);
+
+  /* ---------- Terminal token tints ---------- */
+  --term-path: oklch(0.80 0.06 200);  /* teal-ish file paths              */
+
+  /* ---------- Geometry ---------- */
+  --r-xs: 3px;   /* pills, small tags                                     */
+  --r-sm: 5px;   /* buttons, secondary inputs                             */
+  --r-md: 8px;   /* cards, primary inputs                                 */
+  --r-lg: 12px;  /* outer frame                                           */
+
+  --hairline: 1px solid var(--border-subtle);
+
+  /* ---------- Spacing scale (4px base) ---------- */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-7: 32px;
+  --sp-8: 48px;
+  --sp-9: 64px;
+
+  /* ---------- Motion ---------- */
+  --motion-instant: 80ms ease-out;
+  --motion-snap:    120ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  --motion-glide:   200ms cubic-bezier(0.4, 0, 0.2, 1);
+  /* Keyframe durations — used directly in animation shorthand */
+  --motion-pulse-dur: 1800ms;
+  --motion-blink-dur: 1000ms;
+  --motion-glow-dur:  2400ms;
+
+  /* ---------- Chrome dimensions ---------- */
+  --topbar-h: 56px;
+  --statusbar-h: 30px;
+  --sidebar-w: 232px;
+  --list-w: 340px;
+}

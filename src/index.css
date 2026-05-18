@@ -1,0 +1,48 @@
+/* ============================================================
+   Promptibrary — Application stylesheet entry.
+   Tailwind v4 CSS-first config via @theme.
+   Imports the canonical Promptibrary design system CSS, then maps
+   the OKLCH tokens into Tailwind's theme so utilities can use them.
+   ============================================================ */
+
+@import "tailwindcss";
+
+@import "./styles/tokens.css";
+@import "./styles/typography.css";
+@import "./styles/base.css";
+
+@theme {
+  /* Surfaces */
+  --color-bg-deep: var(--bg-deep);
+  --color-bg-base: var(--bg-base);
+  --color-bg-raised: var(--bg-raised);
+  --color-bg-sunken: var(--bg-sunken);
+  --color-bg-terminal: var(--bg-terminal);
+
+  /* Borders */
+  --color-border-subtle: var(--border-subtle);
+  --color-border-mid: var(--border-mid);
+  --color-border-strong: var(--border-strong);
+
+  /* Ink */
+  --color-ink-primary: var(--ink-primary);
+  --color-ink-secondary: var(--ink-secondary);
+  --color-ink-tertiary: var(--ink-tertiary);
+  --color-ink-dim: var(--ink-dim);
+
+  /* Accent (sodium amber) */
+  --color-accent: var(--accent);
+  --color-accent-warm: var(--accent-warm);
+  --color-accent-dim: var(--accent-dim);
+  --color-accent-deep: var(--accent-deep);
+
+  /* Status */
+  --color-status-running: var(--status-running);
+  --color-status-error: var(--status-error);
+  --color-status-warn: var(--status-warn);
+
+  /* Typography */
+  --font-display: var(--font-display);
+  --font-ui: var(--font-ui);
+  --font-mono: var(--font-mono);
+}
