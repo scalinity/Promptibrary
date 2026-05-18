@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Radii & hairlines</title>
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../typography.css">
+<link rel="stylesheet" href="../base.css">
+<style>
+  body { padding: 28px; background: var(--bg-deep); width: 700px; }
+  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .cell {
+    background: var(--bg-base);
+    border: var(--hairline);
+    padding: 18px 16px 16px;
+    text-align: center;
+  }
+  .shape {
+    width: 96px; height: 60px;
+    background: var(--accent-tint);
+    border: 1px solid var(--accent-deep);
+    margin: 0 auto 12px;
+  }
+  .name { font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-primary); letter-spacing: 0.01em; }
+  .val  { font-family: var(--font-mono); font-size: 9.5px; color: var(--ink-tertiary); margin-top: 2px; }
+  .cell.outer { border-radius: var(--r-lg); }
+</style>
+</head>
+<body>
+  <div class="grid">
+    <div class="cell"><div class="shape" style="border-radius:var(--r-xs)"></div><div class="name">--r-xs</div><div class="val">3px · tags, pills</div></div>
+    <div class="cell"><div class="shape" style="border-radius:var(--r-sm)"></div><div class="name">--r-sm</div><div class="val">5px · buttons</div></div>
+    <div class="cell"><div class="shape" style="border-radius:var(--r-md)"></div><div class="name">--r-md</div><div class="val">8px · cards, inputs</div></div>
+    <div class="cell"><div class="shape" style="border-radius:var(--r-lg)"></div><div class="name">--r-lg</div><div class="val">12px · outer frame</div></div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Type — three faces</title>
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../typography.css">
+<link rel="stylesheet" href="../base.css">
+<style>
+  body { padding: 28px 32px; background: var(--bg-deep); width: 700px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+  .face {
+    border: var(--hairline);
+    border-radius: var(--r-md);
+    padding: 18px 18px 20px;
+    background: var(--bg-base);
+  }
+  .face .role {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ink-dim);
+    margin-bottom: 12px;
+  }
+  .face .big { color: var(--ink-primary); margin-bottom: 14px; }
+  .face .name { color: var(--ink-tertiary); font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.01em; }
+  .face .src { color: var(--ink-dim); font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.01em; margin-top: 2px; }
+</style>
+</head>
+<body>
+  <div class="grid">
+    <div class="face">
+      <div class="role">display</div>
+      <div class="big" style="font-family:var(--font-display); font-weight:500; font-size:36px; letter-spacing:-0.02em; line-height:1;">Aa</div>
+      <div class="big" style="font-family:var(--font-display); font-style:italic; font-weight:500; font-size:14px; color:var(--ink-tertiary)">§ archival</div>
+      <div class="name">Boska Variable</div>
+      <div class="src">400 · 500 · 500i · 700  —  Fontshare</div>
+    </div>
+    <div class="face">
+      <div class="role">ui / body</div>
+      <div class="big" style="font-family:var(--font-ui); font-weight:500; font-size:36px; letter-spacing:-0.01em; line-height:1;">Aa</div>
+      <div class="big" style="font-family:var(--font-ui); font-size:13px; color:var(--ink-secondary)">Buttons. Labels. Body.</div>
+      <div class="name">Switzer Variable</div>
+      <div class="src">400 · 500 · 600  —  Fontshare</div>
+    </div>
+    <div class="face">
+      <div class="role">mono</div>
+      <div class="big" style="font-family:var(--font-mono); font-size:36px; letter-spacing:0.01em; line-height:1;">Aa</div>
+      <div class="big" style="font-family:var(--font-mono); font-size:12.5px; color:var(--accent-warm); letter-spacing:0.01em;">{{variable}}</div>
+      <div class="name">JetBrains Mono</div>
+      <div class="src">400 · 500 · 400i  —  Google Fonts</div>
+    </div>
+  </div>
+</body>
+</html>

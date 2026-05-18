@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Prompt list rows</title>
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../typography.css">
+<link rel="stylesheet" href="../base.css">
+<link rel="stylesheet" href="../app.css">
+<style>
+  body { padding: 0; background: var(--bg-base); width: 700px; }
+  .wrap { border: var(--hairline); border-radius: var(--r-md); overflow: hidden; margin: 20px; }
+  .list-header { padding: 16px 16px 12px; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="list-header">
+      <span class="title">All prompts</span>
+      <span class="sort">recently used <span class="glyph">▾</span></span>
+    </div>
+    <div>
+      <div class="row selected">
+        <div class="row-title">Refactor streaming response handler</div>
+        <div class="row-tags"><span>bug-fix</span><span>backend</span></div>
+        <div class="row-meta"><span>edited 14:08</span><span class="dotsep">·</span><span>v12</span><span class="dotsep">·</span><span>4 vars</span></div>
+      </div>
+      <div class="row running">
+        <div class="row-title">Generate spec from PR description</div>
+        <div class="row-tags"><span>spec-gen</span><span>orchestration</span></div>
+        <div class="row-meta"><span>running · 2m 14s</span><span class="dotsep">·</span><span>v8</span></div>
+      </div>
+      <div class="row recent">
+        <div class="row-title">Bisect failing test to last green commit</div>
+        <div class="row-tags"><span>bug-fix</span><span>tests</span></div>
+        <div class="row-meta"><span>opened 13:42</span><span class="dotsep">·</span><span>v3</span></div>
+      </div>
+      <div class="row">
+        <div class="row-title">Migrate config from JSON to TOML</div>
+        <div class="row-tags"><span>refactor</span></div>
+        <div class="row-meta"><span>edited yesterday</span><span class="dotsep">·</span><span>v6</span></div>
+      </div>
+      <div class="row">
+        <div class="row-title">Three-agent orchestration: plan · build · verify</div>
+        <div class="row-tags"><span>orchestration</span><span>multi-agent</span></div>
+        <div class="row-meta"><span>edited Apr 04</span><span class="dotsep">·</span><span>v21</span></div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

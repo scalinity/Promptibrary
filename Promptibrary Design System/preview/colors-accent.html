@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Accent — Sodium Amber</title>
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../typography.css">
+<link rel="stylesheet" href="../base.css">
+<style>
+  body { padding: 24px; background: var(--bg-deep); width: 700px; }
+  .lede {
+    font-family: var(--font-display);
+    font-size: 22px;
+    letter-spacing: -0.015em;
+    color: var(--ink-primary);
+    margin: 0 0 4px;
+    font-weight: 500;
+  }
+  .lede em { color: var(--accent); font-style: italic; }
+  .sub {
+    font-family: var(--font-mono);
+    font-style: italic;
+    font-size: 10.5px;
+    color: var(--ink-tertiary);
+    letter-spacing: 0.01em;
+    margin-bottom: 18px;
+  }
+  .swatches { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; }
+  .sw {
+    border: var(--hairline);
+    border-radius: var(--r-md);
+    overflow: hidden;
+    background: var(--bg-base);
+  }
+  .sw .chip { height: 56px; }
+  .sw .chip.checker {
+    background:
+      linear-gradient(var(--accent-glow), var(--accent-glow)),
+      repeating-conic-gradient(var(--bg-base) 0 25%, var(--bg-raised) 0 50%) 0 0/12px 12px;
+  }
+  .sw .chip.checker2 {
+    background:
+      linear-gradient(var(--accent-tint), var(--accent-tint)),
+      repeating-conic-gradient(var(--bg-base) 0 25%, var(--bg-raised) 0 50%) 0 0/12px 12px;
+  }
+  .sw .meta { padding: 7px 9px 9px; border-top: var(--hairline); }
+  .sw .name { font-family: var(--font-mono); font-size: 10px; color: var(--ink-primary); letter-spacing: 0.01em; }
+  .sw .val { font-family: var(--font-mono); font-size: 9px; color: var(--ink-tertiary); margin-top: 2px; }
+</style>
+</head>
+<body>
+  <h1 class="lede">Sodium <em>amber</em>.</h1>
+  <div class="sub">// high-pressure street lamp at 3am — the signature</div>
+  <div class="swatches">
+    <div class="sw"><div class="chip" style="background:var(--accent)"></div><div class="meta"><div class="name">accent</div><div class="val">L .82 C .16</div></div></div>
+    <div class="sw"><div class="chip" style="background:var(--accent-warm)"></div><div class="meta"><div class="name">accent-warm</div><div class="val">hover</div></div></div>
+    <div class="sw"><div class="chip" style="background:var(--accent-dim)"></div><div class="meta"><div class="name">accent-dim</div><div class="val">secondary</div></div></div>
+    <div class="sw"><div class="chip" style="background:var(--accent-deep)"></div><div class="meta"><div class="name">accent-deep</div><div class="val">outlines</div></div></div>
+    <div class="sw"><div class="chip checker"></div><div class="meta"><div class="name">accent-glow</div><div class="val">α 0.30 halo</div></div></div>
+    <div class="sw"><div class="chip checker2"></div><div class="meta"><div class="name">accent-tint</div><div class="val">α 0.08 select</div></div></div>
+  </div>
+</body>
+</html>

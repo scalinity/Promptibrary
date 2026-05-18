@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Library + Run · Promptibrary</title>
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../typography.css">
+<link rel="stylesheet" href="../base.css">
+<link rel="stylesheet" href="../app.css">
+<style>
+  body { display: grid; place-items: center; min-height: 100vh; padding: 24px; }
+</style>
+</head>
+<body>
+<div class="grain"></div>
+<div class="app-frame" data-screen-label="02 Library Run">
+
+  <div class="topbar">
+    <div class="brand">
+      <span class="brand-name">Promptibrary<span class="dot">.</span></span>
+      <span class="brand-tag">// agentic operator console</span>
+    </div>
+    <div class="center">
+      <div class="search">
+        <span class="glyph">⌕</span>
+        <input placeholder="search prompts, tags, history…">
+        <span class="kbd">⌘K</span>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="btn">import <span class="kbd">⌘I</span></button>
+      <button class="btn">new <span class="kbd">⌘N</span></button>
+      <button class="icon-btn" aria-label="Settings">⚙</button>
+    </div>
+  </div>
+
+  <div class="workspace">
+    <aside class="sidebar">
+      <div class="nav-item"><span class="glyph">⌖</span>All prompts<span class="count">142</span></div>
+      <div class="nav-item"><span class="glyph">★</span>Pinned<span class="count">8</span></div>
+      <div class="nav-item active"><span class="glyph">↺</span>Recent<span class="count">24</span></div>
+      <div class="nav-item"><span class="glyph">⊟</span>Archived<span class="count">31</span></div>
+
+      <div class="side-section">tags</div>
+      <div class="tag-side"><span class="swatch" style="background:var(--accent)"></span>bug-fix<span class="count">38</span></div>
+      <div class="tag-side"><span class="swatch" style="background:var(--status-running)"></span>refactor<span class="count">22</span></div>
+      <div class="tag-side"><span class="swatch" style="background:var(--paper-warm)"></span>spec-gen<span class="count">14</span></div>
+      <div class="tag-side"><span class="swatch" style="background:var(--accent-dim)"></span>orchestration<span class="count">9</span></div>
+      <div class="tag-side"><span class="swatch" style="background:var(--status-warn)"></span>scratch<span class="count">17</span></div>
+      <div class="tag-side"><span class="swatch" style="background:var(--term-path)"></span>tests<span class="count">19</span></div>
+
+      <div class="side-section">smart</div>
+      <div class="nav-item"><span class="glyph">⌕</span>Last 24h<span class="count">6</span></div>
+      <div class="nav-item"><span class="glyph">⌕</span>Untagged<span class="count">12</span></div>
+    </aside>
+
+    <section class="list-pane">
+      <div class="list-header">
+        <span class="title">Recent</span>
+        <span class="sort">last opened <span class="glyph">▾</span></span>
+      </div>
+      <div class="list-rows">
+        <div class="row selected running">
+          <div class="row-title">Refactor streaming response handler</div>
+          <div class="row-tags"><span>bug-fix</span><span>backend</span></div>
+          <div class="row-meta"><span style="color:var(--status-running)">running · 2m 14s</span><span class="dotsep">·</span><span>v12</span></div>
+        </div>
+        <div class="row">
+          <div class="row-title">Generate spec from PR description</div>
+          <div class="row-tags"><span>spec-gen</span><span>orchestration</span></div>
+          <div class="row-meta"><span>opened 14:06</span><span class="dotsep">·</span><span>v8</span></div>
+        </div>
+        <div class="row recent">
+          <div class="row-title">Bisect failing test to last green commit</div>
+          <div class="row-tags"><span>bug-fix</span><span>tests</span></div>
+          <div class="row-meta"><span>opened 13:42</span><span class="dotsep">·</span><span>v3</span></div>
+        </div>
+        <div class="row">
+          <div class="row-title">Migrate config from JSON to TOML</div>
+          <div class="row-tags"><span>refactor</span></div>
+          <div class="row-meta"><span>opened yesterday</span><span class="dotsep">·</span><span>v6</span></div>
+        </div>
+        <div class="row">
+          <div class="row-title">Plan · build · verify (three-agent loop)</div>
+          <div class="row-tags"><span>orchestration</span><span>multi-agent</span></div>
+          <div class="row-meta"><span>opened yesterday</span><span class="dotsep">·</span><span>v21</span></div>
+        </div>
+        <div class="row">
+          <div class="row-title">Write failing test from a bug report</div>
+          <div class="row-tags"><span>bug-fix</span><span>tests</span></div>
+          <div class="row-meta"><span>opened Apr 02</span><span class="dotsep">·</span><span>v4</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- DETAIL PANE: RUN STATE -->
+    <section class="detail-pane" style="background:var(--bg-terminal)">
+      <div class="run-header" style="background:var(--bg-base)">
+        <div class="run-top">
+          <div class="run-title-wrap">
+            <div class="run-dot"></div>
+            <div class="run-title">Refactor streaming response handler</div>
+          </div>
+          <div class="run-actions">
+            <button class="btn"><span style="font-family:var(--font-mono); color:var(--ink-dim); margin-right:2px">⌘[</span> compose</button>
+            <button class="btn">copy log</button>
+            <button class="btn-stop">stop <span class="kbd">⌘.</span></button>
+          </div>
+        </div>
+        <div class="run-meta">
+          <span class="state-running">RUNNING</span>
+          <span style="color:var(--ink-dim)">·</span>
+          <span>elapsed <span class="num">2m 14s</span></span>
+          <span style="color:var(--ink-dim)">·</span>
+          <span>tokens <span class="num">38,412</span></span>
+          <span style="color:var(--ink-dim)">·</span>
+          <span>turns <span class="num">7</span></span>
+          <span style="color:var(--ink-dim)">·</span>
+          <span>tools <span class="num">14</span></span>
+        </div>
+        <div class="run-config-strip" style="margin-top:12px">
+          <span class="pair"><span class="k">repo</span><span class="v">~/code/aurora</span></span>
+          <span class="pair"><span class="k">branch</span><span class="v">main</span></span>
+          <span class="pair"><span class="k">model</span><span class="v">sonnet-4.5</span></span>
+          <span class="pair"><span class="k">mcp</span><span class="v">playwright</span></span>
+          <span class="pair"><span class="k">shell</span><span class="v">zsh</span></span>
+          <span class="pair"><span class="k">vars</span><span class="v">4 resolved</span></span>
+        </div>
+      </div>
+
+      <div class="terminal">
+        <span class="term-line sys">session <span class="h">aurora-stream-fix</span> · model <span class="h">sonnet-4.5</span> · started <span class="num">14:08:22</span></span>
+        <span class="term-line think">reading repo layout — focusing on <span class="path">src/lib/stream/</span> per the prompt's constraint</span>
+        <span class="term-line tool">read_file(path=<span class="path">src/lib/stream/handler.ts</span>, lines=<span class="num">1-142</span>)</span>
+        <span class="term-line tool">grep(pattern=<span class="h">"keepalive"</span>, path=<span class="path">src/lib</span>) → <span class="num">3</span> hits</span>
+        <span class="term-line tool">read_file(path=<span class="path">src/lib/stream/handler.test.ts</span>, lines=<span class="num">38-60</span>)</span>
+        <span class="term-sep"></span>
+        <span class="term-line diag">reproduced. failure isolated to commit <span class="h">a98e3</span> — chunked-encoding swap dropped the trailing CRLF on empty chunks. consumer reads forever.</span>
+        <span class="term-line think">planning a 12-line patch; preserving back-pressure via existing AbortSignal — no new deps, no test deletion.</span>
+        <span class="term-line tool">write_file(path=<span class="path">src/lib/stream/handler.ts</span>, +<span class="num">14</span>/-<span class="num">6</span>)</span>
+        <span class="term-line tool">bash(cmd=<span class="h">"pnpm test stream"</span>) → <span class="num">218</span>/<span class="num">218</span> in <span class="num">3.4s</span></span>
+        <span class="term-line verif">unit tests pass — <span class="num">218</span>/<span class="num">218</span>. linter clean. typecheck clean.</span>
+        <span class="term-sep"></span>
+        <span class="term-line think">verifying back-pressure under a slow consumer using the existing soak harness…</span>
+        <span class="term-line tool">bash(cmd=<span class="h">"pnpm soak --slow 2000ms --window 30s"</span>)</span>
+        <span class="term-line sys">awaiting tool output<span class="term-cursor">▍</span></span>
+      </div>
+    </section>
+  </div>
+
+  <div class="statusbar">
+    <span class="dot running"></span><span class="state running">RUNNING</span>
+    <span class="pair"><span class="k">vault</span><span class="v">~/prompts</span></span>
+    <span class="pair"><span class="k">model</span><span class="v">sonnet-4.5</span></span>
+    <span class="pair"><span class="k">turn</span><span class="v">7</span></span>
+    <span class="pair"><span class="k">tok</span><span class="v">38,412</span></span>
+    <span class="right">
+      <span class="pair"><span class="k">elapsed</span><span class="v">2m 14s</span></span>
+      <span class="sep">·</span>
+      <span class="kbd">⌘.</span> stop
+      <span class="sep">·</span>
+      <span class="kbd">⌘[</span> compose
+    </span>
+  </div>
+</div>
+</body>
+</html>

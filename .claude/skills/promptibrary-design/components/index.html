@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Components — Promptibrary</title>
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../typography.css">
+<link rel="stylesheet" href="../base.css">
+<link rel="stylesheet" href="../app.css">
+<style>
+  body { padding: 0; }
+  .doc-head {
+    padding: 56px 64px 36px;
+    border-bottom: var(--hairline);
+    background: var(--bg-deep);
+    position: relative;
+  }
+  .doc-head h1 {
+    margin: 0 0 8px;
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: 44px;
+    letter-spacing: -0.025em;
+    color: var(--ink-primary);
+  }
+  .doc-head h1 .dot { color: var(--accent); }
+  .doc-head .lede {
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    color: var(--ink-tertiary);
+    letter-spacing: 0.01em;
+    max-width: 660px;
+    line-height: 1.65;
+  }
+
+  .doc-section {
+    padding: 48px 64px 16px;
+  }
+  .doc-section h2 {
+    margin: 0 0 28px;
+    font-family: var(--font-display);
+    font-style: italic;
+    font-weight: 500;
+    font-size: 18px;
+    color: var(--ink-tertiary);
+    text-transform: lowercase;
+    letter-spacing: 0.02em;
+    padding-bottom: 12px;
+    border-bottom: var(--hairline);
+  }
+  .doc-section h2::before { content: "§"; color: var(--ink-dim); margin-right: 10px; font-style: normal; }
+
+  .demos {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+    gap: 20px;
+  }
+  .demo-card {
+    background: var(--bg-base);
+    border: var(--hairline);
+    border-radius: var(--r-md);
+    padding: 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+  .demo-card .demo-title {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ink-dim);
+  }
+  .demo-card .demo-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  .demo-card pre {
+    margin: 0;
+    background: var(--bg-sunken);
+    border: var(--hairline);
+    border-radius: var(--r-sm);
+    padding: 10px 12px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--ink-secondary);
+    letter-spacing: 0.01em;
+    overflow: auto;
+  }
+  .demo-card pre .c { color: var(--ink-dim); }
+  .demo-card pre .a { color: var(--accent-warm); }
+</style>
+</head>
+<body>
+<div class="grain"></div>
+
+<div class="doc-head">
+  <h1>Components<span class="dot">.</span></h1>
+  <div class="lede">
+    // every primitive in the system, every state on display.<br>
+    // open any state in the design-system tab for an isolated swatch.<br>
+    // for tailwind v4: paste the <span style="color:var(--accent-warm)">/* tailwind: ... */</span> hint from each css block.
+  </div>
+</div>
+
+<div class="doc-section">
+  <h2>buttons</h2>
+  <div class="demos">
+    <div class="demo-card">
+      <div class="demo-title">default · all states</div>
+      <div class="demo-row">
+        <button class="btn">Edit</button>
+        <button class="btn" data-state="hover">Edit (hover)</button>
+        <button class="btn" data-state="active">Edit (active)</button>
+        <button class="btn" disabled>Edit (disabled)</button>
+      </div>
+<pre><span class="c">/* tailwind: */</span>
+<span class="a">h-[30px] px-3 border border-[var(--border-subtle)]</span>
+<span class="a">rounded-[var(--r-sm)] text-[var(--ink-secondary)]</span>
+<span class="a">hover:border-[var(--border-mid)] hover:text-[var(--ink-primary)]</span></pre>
+    </div>
+
+    <div class="demo-card">
+      <div class="demo-title">launch · primary</div>
+      <div class="demo-row">
+        <button class="btn-launch">Launch <span class="kbd-inline">⌘↵</span></button>
+        <button class="btn-launch" data-state="hover">Launch (hover)</button>
+        <button class="btn-launch" disabled>Launch (disabled)</button>
+      </div>
+<pre><span class="c">/* tailwind: */</span>
+<span class="a">h-[34px] px-4 bg-[var(--accent)] font-mono uppercase</span>
+<span class="a">tracking-[0.06em] hover:bg-[var(--accent-warm)]</span>
+<span class="a">hover:shadow-[0_0_0_4px_var(--accent-glow)]</span></pre>
+    </div>
+
+    <div class="demo-card">
+      <div class="demo-title">stop · danger</div>
+      <div class="demo-row">
+        <button class="btn-stop">Stop <span class="kbd">⌘.</span></button>
+        <button class="btn-stop" data-state="hover">Stop (hover)</button>
+      </div>
+    </div>
+
+    <div class="demo-card">
+      <div class="demo-title">icon button</div>
+      <div class="demo-row">
+        <button class="icon-btn" aria-label="Copy">⎘</button>
+        <button class="icon-btn" data-state="hover">↗</button>
+        <button class="icon-btn">⌚</button>
+        <button class="icon-btn" disabled>⊘</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="doc-section">
+  <h2>inputs</h2>
+  <div class="demos">
+    <div class="demo-card">
+      <div class="demo-title">input · rest / focus / error</div>
+      <div style="display:flex; flex-direction:column; gap:10px">
+        <input class="input" value="claude-sonnet-4-5">
+        <input class="input" data-state="focus" value="claude-sonnet-4-5">
+        <input class="input" data-state="error" value="invalid: ~/nope">
+      </div>
+    </div>
+    <div class="demo-card">
+      <div class="demo-title">input · empty-required (pulses)</div>
+      <input class="input empty-required" placeholder="failing_test:src/lib/stream.test.ts:42">
+      <pre><span class="c">// applies the --motion-glow keyframe</span>
+.input.empty-required {
+  animation: pb-glow 2400ms ease-in-out infinite;
+}</pre>
+    </div>
+    <div class="demo-card">
+      <div class="demo-title">select &amp; pickers</div>
+      <div style="display:flex; flex-direction:column; gap:10px">
+        <div class="select-wrap"><select class="select"><option>sonnet-4.5</option></select></div>
+        <div class="picker"><span class="glyph">⊟</span><span class="path">~/code/aurora</span></div>
+        <div class="picker empty"><span class="glyph">⎙</span><span class="path">choose a file…</span></div>
+      </div>
+    </div>
+    <div class="demo-card">
+      <div class="demo-title">textarea</div>
+      <textarea class="textarea">Reproduce on main; bisect to a98e3.</textarea>
+    </div>
+  </div>
+</div>
+
+<div class="doc-section">
+  <h2>small surfaces</h2>
+  <div class="demos">
+    <div class="demo-card">
+      <div class="demo-title">tag chip</div>
+      <div class="demo-row">
+        <span class="tag">bug-fix</span>
+        <span class="tag">refactor</span>
+        <span class="tag">spec-gen</span>
+        <span class="tag">orchestration</span>
+        <span class="tag">tests</span>
+      </div>
+    </div>
+    <div class="demo-card">
+      <div class="demo-title">kbd badge</div>
+      <div class="demo-row">
+        <span class="kbd">⌘K</span>
+        <span class="kbd">⌘↵</span>
+        <span class="kbd">⌘.</span>
+        <span class="kbd">⌘[</span>
+        <span class="kbd">esc</span>
+        <span class="kbd">↑</span>
+        <span class="kbd">↓</span>
+      </div>
+    </div>
+    <div class="demo-card">
+      <div class="demo-title">boolean toggle</div>
+      <div class="demo-row">
+        <button class="toggle on"><span class="glyph">⏵</span>on</button>
+        <button class="toggle"><span class="glyph">⏸</span>off</button>
+      </div>
+    </div>
+    <div class="demo-card">
+      <div class="demo-title">tooltip</div>
+      <span class="tooltip">launch run · <span class="kbd" style="margin-left:2px">⌘↵</span></span>
+    </div>
+  </div>
+</div>
+
+<div class="doc-section">
+  <h2>menu</h2>
+  <div class="demos">
+    <div class="demo-card">
+      <div class="demo-title">dropdown</div>
+      <div class="menu" style="width: 240px">
+        <div class="menu-label">prompt</div>
+        <div class="menu-item"><span class="glyph">↗</span>Open in editor<span class="kbd">⌘E</span></div>
+        <div class="menu-item" data-state="hover"><span class="glyph">⎘</span>Duplicate<span class="kbd">⌘D</span></div>
+        <div class="menu-item"><span class="glyph">⌘</span>Rename<span class="kbd">⌘R</span></div>
+        <div class="menu-sep"></div>
+        <div class="menu-item"><span class="glyph">⊟</span>Move to tag…</div>
+        <div class="menu-item"><span class="glyph">⊘</span>Archive</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="doc-section">
+  <h2>list row · all states</h2>
+  <div class="demos" style="grid-template-columns:1fr">
+    <div class="demo-card" style="padding: 0">
+      <div class="row"><div class="row-title">Default · no spine</div><div class="row-tags"><span>refactor</span></div><div class="row-meta"><span>edited yesterday</span><span class="dotsep">·</span><span>v6</span></div></div>
+      <div class="row recent"><div class="row-title">Recent · paper-warm 50% spine</div><div class="row-tags"><span>bug-fix</span><span>tests</span></div><div class="row-meta"><span>opened 13:42</span><span class="dotsep">·</span><span>v3</span></div></div>
+      <div class="row selected"><div class="row-title">Selected · accent gradient + solid spine</div><div class="row-tags"><span>bug-fix</span><span>backend</span></div><div class="row-meta"><span>edited 14:08</span><span class="dotsep">·</span><span>v12</span></div></div>
+      <div class="row running"><div class="row-title">Running · chartreuse pulsing spine</div><div class="row-tags"><span>spec-gen</span></div><div class="row-meta"><span style="color:var(--status-running)">running · 2m 14s</span></div></div>
+    </div>
+  </div>
+</div>
+
+<div class="doc-section" style="padding-bottom: 80px">
+  <h2>pitfalls</h2>
+  <div class="demos">
+    <div class="demo-card">
+      <div class="demo-title">don't · accent-warm on bg-base for body</div>
+      <div style="font-family:var(--font-ui); font-size:13px; color:var(--accent-warm); padding:10px 12px; background:var(--bg-base); border:var(--hairline); border-radius:var(--r-sm)">
+        This body text fails AAA contrast — reserve --accent-warm for hover &amp; highlights.
+      </div>
+    </div>
+    <div class="demo-card">
+      <div class="demo-title">do · ink-secondary for body</div>
+      <div style="font-family:var(--font-ui); font-size:13px; color:var(--ink-secondary); padding:10px 12px; background:var(--bg-base); border:var(--hairline); border-radius:var(--r-sm)">
+        This body text reads at 7.4:1 on bg-base.
+      </div>
+    </div>
+    <div class="demo-card">
+      <div class="demo-title">don't · accent on bg-deep at small sizes</div>
+      <div style="font-family:var(--font-mono); font-size:9px; color:var(--accent); padding:10px 12px; background:var(--bg-deep); border:var(--hairline); border-radius:var(--r-sm)">
+        tracking too tight, hue too saturated — eyes bounce.
+      </div>
+    </div>
+    <div class="demo-card">
+      <div class="demo-title">do · accent only for status / single highlights</div>
+      <div style="font-family:var(--font-mono); font-size:11px; padding:10px 12px; background:var(--bg-deep); border:var(--hairline); border-radius:var(--r-sm); color:var(--ink-tertiary)">
+        elapsed <span style="color:var(--accent-warm)">2m 14s</span> · turns <span style="color:var(--accent-warm)">7</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

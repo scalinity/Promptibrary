@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Menu &amp; tooltip</title>
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../typography.css">
+<link rel="stylesheet" href="../base.css">
+<link rel="stylesheet" href="../app.css">
+<style>
+  body { padding: 24px 28px; background: var(--bg-deep); width: 700px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: flex-start; }
+  .cell { background: var(--bg-base); border: var(--hairline); border-radius: var(--r-md); padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+  .label { font-family: var(--font-mono); font-size: 9.5px; color: var(--ink-dim); letter-spacing: 0.08em; text-transform: uppercase; }
+  .menu { width: 240px; }
+</style>
+</head>
+<body>
+  <div class="grid">
+    <div class="cell">
+      <div class="label">dropdown menu</div>
+      <div class="menu">
+        <div class="menu-label">prompt</div>
+        <div class="menu-item"><span class="glyph">↗</span>Open in editor<span class="kbd">⌘E</span></div>
+        <div class="menu-item" data-state="hover"><span class="glyph">⎘</span>Duplicate<span class="kbd">⌘D</span></div>
+        <div class="menu-item"><span class="glyph">⌘</span>Rename<span class="kbd">⌘R</span></div>
+        <div class="menu-sep"></div>
+        <div class="menu-item"><span class="glyph">⊟</span>Move to tag…</div>
+        <div class="menu-item"><span class="glyph">⊘</span>Archive</div>
+      </div>
+    </div>
+    <div class="cell">
+      <div class="label">tooltip</div>
+      <div style="display:flex; flex-direction:column; align-items:flex-start; gap:6px">
+        <button class="icon-btn">↗</button>
+        <span class="tooltip">open source · ⌘↗</span>
+      </div>
+
+      <div class="label" style="margin-top:8px">tooltip — keyboard hint</div>
+      <div style="display:flex; align-items:center; gap:8px">
+        <span class="tooltip">launch run · <span class="kbd" style="margin-left:2px">⌘↵</span></span>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

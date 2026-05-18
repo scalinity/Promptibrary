@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Prompt body block</title>
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../typography.css">
+<link rel="stylesheet" href="../base.css">
+<link rel="stylesheet" href="../app.css">
+<style>
+  body { padding: 22px 26px; background: var(--bg-base); width: 700px; }
+</style>
+</head>
+<body>
+  <div class="prompt-block">
+    <div class="prompt-bar">
+      <span class="section-label">prompt</span>
+      <div class="prompt-actions">
+        <button><span class="glyph">✎</span>edit</button>
+        <button><span class="glyph">⌚</span>history</button>
+        <button><span class="glyph">⎘</span>copy</button>
+      </div>
+    </div>
+    <pre class="prompt-body"><span class="comment"># Refactor — streaming response handler</span>
+
+<span class="kw">Role.</span> You are a senior engineer pairing on <span class="var-inline">{{repo}}</span> at <span class="var-inline">{{branch}}</span>.
+
+<span class="kw">Goal.</span> Reproduce the failure in <span class="var-inline">{{failing_test}}</span>, then bisect to the
+introducing commit. The fix should preserve back-pressure on the consumer
+side and not break the existing keepalive flag.
+
+<span class="kw">Constraints.</span>
+  · Touch only files under src/lib/stream/
+  · Add or modify tests — never delete green tests
+  · No new dependencies
+
+<span class="kw">Output.</span> A unified diff plus a one-paragraph rationale.</pre>
+  </div>
+</body>
+</html>

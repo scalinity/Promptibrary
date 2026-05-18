@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Display — Boska</title>
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../typography.css">
+<link rel="stylesheet" href="../base.css">
+<style>
+  body { padding: 24px 28px; background: var(--bg-base); width: 700px; }
+  .row { display: grid; grid-template-columns: 56px 1fr 110px; align-items: baseline; gap: 18px; padding: 10px 0; border-bottom: 1px solid var(--border-subtle); }
+  .row:last-child { border-bottom: none; }
+  .tag { font-family: var(--font-mono); font-size: 10px; color: var(--ink-dim); letter-spacing: 0.06em; text-transform: uppercase; }
+  .meta { font-family: var(--font-mono); font-size: 10px; color: var(--ink-tertiary); text-align: right; letter-spacing: 0.01em; }
+  .specimen { color: var(--ink-primary); }
+  .header {
+    font-family: var(--font-display);
+    font-style: italic;
+    font-size: 12px;
+    color: var(--ink-tertiary);
+    text-transform: lowercase;
+    margin-bottom: 10px;
+    letter-spacing: 0.02em;
+  }
+  .header::before { content: "§"; color: var(--ink-dim); margin-right: 6px; font-style: normal; }
+</style>
+</head>
+<body>
+  <div class="header">display — boska variable</div>
+  <div class="row">
+    <div class="tag">XL</div>
+    <div class="specimen t-display-xl">The library is empty.</div>
+    <div class="meta">32 / 1.10</div>
+  </div>
+  <div class="row">
+    <div class="tag">L</div>
+    <div class="specimen t-display-l">Refactor the streaming response handler.</div>
+    <div class="meta">26 / 1.15</div>
+  </div>
+  <div class="row">
+    <div class="tag">M</div>
+    <div class="specimen t-display-m">Promptibrary<span style="color:var(--accent)">.</span></div>
+    <div class="meta">22 / 1.20</div>
+  </div>
+  <div class="row">
+    <div class="tag">S</div>
+    <div class="specimen t-display-s">All prompts · 142</div>
+    <div class="meta">18 / 1.25</div>
+  </div>
+  <div class="row">
+    <div class="tag">SEC</div>
+    <div class="specimen t-section" style="color:var(--ink-tertiary)"><span style="color:var(--ink-dim)">§ </span>variables</div>
+    <div class="meta">12 it / .02em</div>
+  </div>
+</body>
+</html>

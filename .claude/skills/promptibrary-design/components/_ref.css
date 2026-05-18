@@ -1,0 +1,76 @@
+/* Component reference page styling — shared across all components/*.html */
+
+body {
+  padding: 32px 40px 80px;
+  background: var(--bg-deep);
+  min-height: 100vh;
+}
+
+.ref-head {
+  margin-bottom: 28px;
+  padding-bottom: 18px;
+  border-bottom: var(--hairline);
+}
+.ref-head h1 {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 28px;
+  letter-spacing: -0.015em;
+  color: var(--ink-primary);
+  margin: 0 0 6px;
+}
+.ref-head p {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.01em;
+  color: var(--ink-tertiary);
+  margin: 0;
+  max-width: 720px;
+}
+
+.ref-section { margin-bottom: 36px; }
+.ref-section > h2 {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 500;
+  font-size: 13px;
+  text-transform: lowercase;
+  letter-spacing: 0.02em;
+  color: var(--ink-tertiary);
+  margin: 0 0 16px;
+}
+.ref-section > h2::before { content: "§"; color: var(--ink-dim); margin-right: 8px; font-style: normal; }
+
+.ref-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+.ref-cell {
+  background: var(--bg-base);
+  border: var(--hairline);
+  border-radius: var(--r-md);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 100px;
+}
+.ref-cell.center { align-items: center; justify-content: center; }
+.ref-cell .state-label {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-dim);
+}
+.ref-cell .demo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.ref-grid.dense { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+.ref-grid.wide  { grid-template-columns: 1fr 1fr; }
+.ref-grid.full  { grid-template-columns: 1fr; }

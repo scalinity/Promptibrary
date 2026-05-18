@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Buttons</title>
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../typography.css">
+<link rel="stylesheet" href="../base.css">
+<link rel="stylesheet" href="../app.css">
+<style>
+  body { padding: 26px 28px; background: var(--bg-deep); width: 700px; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .cell {
+    background: var(--bg-base);
+    border: var(--hairline);
+    border-radius: var(--r-md);
+    padding: 16px 16px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .label { font-family: var(--font-mono); font-size: 9.5px; color: var(--ink-dim); letter-spacing: 0.08em; text-transform: uppercase; }
+</style>
+</head>
+<body>
+  <div class="grid">
+    <div class="cell">
+      <div class="label">default · rest</div>
+      <button class="btn">Edit prompt <span class="kbd">E</span></button>
+    </div>
+    <div class="cell">
+      <div class="label">default · hover</div>
+      <button class="btn" data-state="hover">Edit prompt <span class="kbd">E</span></button>
+    </div>
+    <div class="cell">
+      <div class="label">default · disabled</div>
+      <button class="btn" disabled>Edit prompt</button>
+    </div>
+
+    <div class="cell">
+      <div class="label">launch · primary</div>
+      <button class="btn-launch">Launch <span class="kbd-inline">⌘↵</span></button>
+    </div>
+    <div class="cell">
+      <div class="label">launch · hover (glow)</div>
+      <button class="btn-launch" data-state="hover">Launch <span class="kbd-inline">⌘↵</span></button>
+    </div>
+    <div class="cell">
+      <div class="label">launch · disabled</div>
+      <button class="btn-launch" disabled>Launch</button>
+    </div>
+
+    <div class="cell">
+      <div class="label">stop · rest</div>
+      <button class="btn-stop">Stop run <span class="kbd">⌘.</span></button>
+    </div>
+    <div class="cell">
+      <div class="label">stop · hover</div>
+      <button class="btn-stop" data-state="hover">Stop run <span class="kbd">⌘.</span></button>
+    </div>
+    <div class="cell">
+      <div class="label">icon buttons</div>
+      <div style="display:flex; gap:6px">
+        <button class="icon-btn" aria-label="Copy">⎘</button>
+        <button class="icon-btn" data-state="hover" aria-label="History">⎘</button>
+        <button class="icon-btn" aria-label="More">⋯</button>
+        <button class="icon-btn" aria-label="Open">↗</button>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

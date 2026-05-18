@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Tags, toggles, kbd</title>
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../typography.css">
+<link rel="stylesheet" href="../base.css">
+<link rel="stylesheet" href="../app.css">
+<style>
+  body { padding: 24px 28px; background: var(--bg-deep); width: 700px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .cell { background: var(--bg-base); border: var(--hairline); border-radius: var(--r-md); padding: 14px 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+  .label { font-family: var(--font-mono); font-size: 9.5px; color: var(--ink-dim); letter-spacing: 0.08em; text-transform: uppercase; }
+  .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+</style>
+</head>
+<body>
+  <div class="grid">
+    <div class="cell">
+      <div class="label">tag chips</div>
+      <div class="row">
+        <span class="tag">bug-fix</span>
+        <span class="tag">refactor</span>
+        <span class="tag">spec-gen</span>
+        <span class="tag">scratch</span>
+      </div>
+    </div>
+    <div class="cell">
+      <div class="label">kbd badges</div>
+      <div class="row">
+        <span class="kbd">⌘K</span>
+        <span class="kbd">⌘↵</span>
+        <span class="kbd">⌘.</span>
+        <span class="kbd">esc</span>
+      </div>
+    </div>
+    <div class="cell">
+      <div class="label">toggle · on</div>
+      <div class="row">
+        <button class="toggle on"><span class="glyph">⏵</span>on</button>
+        <span style="font-family:var(--font-mono); font-size:10.5px; color:var(--ink-tertiary)">strict mode</span>
+      </div>
+    </div>
+    <div class="cell">
+      <div class="label">toggle · off</div>
+      <div class="row">
+        <button class="toggle"><span class="glyph">⏸</span>off</button>
+        <span style="font-family:var(--font-mono); font-size:10.5px; color:var(--ink-tertiary)">verifier loop</span>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

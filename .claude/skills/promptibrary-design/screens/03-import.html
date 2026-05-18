@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Import · Promptibrary</title>
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../typography.css">
+<link rel="stylesheet" href="../base.css">
+<link rel="stylesheet" href="../app.css">
+<style>
+  body { display: grid; place-items: center; min-height: 100vh; padding: 24px; }
+
+  .import-modal { width: 720px; }
+  .import-modal .modal-body { padding: 0; display: flex; flex-direction: column; }
+  .import-stage {
+    padding: 20px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    border-bottom: var(--hairline);
+  }
+  .stage-bar {
+    display: flex;
+    gap: 18px;
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    letter-spacing: 0.04em;
+    color: var(--ink-dim);
+    text-transform: lowercase;
+  }
+  .stage-bar .step { display: inline-flex; align-items: center; gap: 6px; }
+  .stage-bar .step .n { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; border: 1px solid var(--border-subtle); color: var(--ink-dim); }
+  .stage-bar .step.done { color: var(--ink-secondary); }
+  .stage-bar .step.done .n { border-color: var(--accent-deep); color: var(--accent); background: var(--accent-tint); }
+  .stage-bar .step.now { color: var(--accent-warm); }
+  .stage-bar .step.now .n { border-color: var(--accent); color: var(--bg-base); background: var(--accent); }
+  .stage-bar .sep { color: var(--ink-dim); align-self: center; }
+
+  .url-row { display: grid; grid-template-columns: 1fr auto; gap: 10px; }
+
+  .source-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    border: 1px solid var(--accent-deep);
+    border-radius: var(--r-xs);
+    background: var(--accent-tint);
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: var(--accent-warm);
+    letter-spacing: 0.02em;
+    align-self: flex-start;
+  }
+  .source-badge .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--status-running); box-shadow: 0 0 6px var(--status-running); animation: pb-dot-glow 1800ms ease-in-out infinite; }
+
+  .extract-line {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--ink-tertiary);
+    letter-spacing: 0.01em;
+    padding-left: 22px;
+    position: relative;
+  }
+  .extract-line::before { content: "∿"; position: absolute; left: 0; color: var(--accent-dim); }
+
+  .candidates {
+    max-height: 290px;
+    overflow: auto;
+  }
+  .cand {
+    display: grid;
+    grid-template-columns: 20px 1fr auto;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px 24px;
+    border-bottom: var(--hairline);
+    cursor: pointer;
+  }
+  .cand:hover { background: var(--bg-base); }
+  .cand .check {
+    width: 14px; height: 14px;
+    border: 1px solid var(--border-mid);
+    border-radius: 3px;
+    margin-top: 3px;
+  }
+  .cand.on .check { background: var(--accent); border-color: var(--accent); color: var(--bg-base); display: grid; place-items: center; font-family: var(--font-mono); font-size: 10px; }
+  .cand.on .check::after { content: "✓"; color: oklch(0.18 0.02 80); }
+  .cand .title { font-family: var(--font-ui); font-weight: 500; font-size: 13.5px; color: var(--ink-primary); margin-bottom: 4px; }
+  .cand .preview { font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-tertiary); letter-spacing: 0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cand .meta { font-family: var(--font-mono); font-size: 10px; color: var(--ink-dim); letter-spacing: 0.04em; text-transform: lowercase; align-self: center; }
+</style>
+</head>
+<body>
+<div class="grain"></div>
+
+<!-- BACKGROUND APP (dimmed, behind modal) -->
+<div class="app-frame" data-screen-label="03 Import" style="filter: brightness(0.5) saturate(0.7);">
+  <div class="topbar">
+    <div class="brand"><span class="brand-name">Promptibrary<span class="dot">.</span></span><span class="brand-tag">// agentic operator console</span></div>
+    <div class="center"><div class="search"><span class="glyph">⌕</span><input placeholder="search prompts, tags, history…"><span class="kbd">⌘K</span></div></div>
+    <div class="actions"><button class="btn">import <span class="kbd">⌘I</span></button><button class="btn">new <span class="kbd">⌘N</span></button></div>
+  </div>
+  <div class="workspace">
+    <aside class="sidebar"></aside>
+    <section class="list-pane"></section>
+    <section class="detail-pane"></section>
+  </div>
+  <div class="statusbar"><span class="dot"></span><span class="state">READY</span></div>
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay">
+  <div class="modal import-modal">
+    <div class="modal-header">
+      <h2 class="modal-title">Import prompts from link</h2>
+      <button class="icon-btn" aria-label="Close">✕</button>
+    </div>
+
+    <div class="modal-body">
+
+      <div class="import-stage">
+        <div class="stage-bar">
+          <span class="step done"><span class="n">1</span>source</span>
+          <span class="sep">→</span>
+          <span class="step now"><span class="n">2</span>extracting</span>
+          <span class="sep">→</span>
+          <span class="step"><span class="n">3</span>review</span>
+          <span class="sep">→</span>
+          <span class="step"><span class="n">4</span>save</span>
+        </div>
+
+        <div class="url-row">
+          <input class="input" value="https://gist.github.com/dario/9c2af3a8b1e7-claude-prompts.md">
+          <button class="btn">change</button>
+        </div>
+
+        <div style="display:flex; gap:10px; flex-wrap:wrap">
+          <span class="source-badge"><span class="dot"></span>detected · github gist · markdown</span>
+          <span class="source-badge" style="border-color:var(--border-subtle); background:transparent; color:var(--ink-tertiary)">9 candidate prompts</span>
+        </div>
+
+        <div class="extract-line">extracting with sonnet-4.5 · turn 3/6 · parsing fenced blocks &amp; inferring variable types…</div>
+      </div>
+
+      <div class="candidates">
+        <div class="cand on">
+          <div class="check"></div>
+          <div>
+            <div class="title">Refactor streaming response handler</div>
+            <div class="preview">Role. You are a senior engineer pairing on {{repo}} at {{branch}}. Goal. Reproduce…</div>
+          </div>
+          <div class="meta">4 vars · 218w</div>
+        </div>
+        <div class="cand on">
+          <div class="check"></div>
+          <div>
+            <div class="title">Bisect failing test to last green commit</div>
+            <div class="preview">Goal. Find the introducing commit for {{failing_test}} on {{branch}}. Use git bisect…</div>
+          </div>
+          <div class="meta">3 vars · 142w</div>
+        </div>
+        <div class="cand">
+          <div class="check"></div>
+          <div>
+            <div class="title">Generate spec from PR description</div>
+            <div class="preview">Read the PR at {{pr_url}}. Draft a one-page spec with goals, non-goals, open questions…</div>
+          </div>
+          <div class="meta">2 vars · 96w</div>
+        </div>
+        <div class="cand on">
+          <div class="check"></div>
+          <div>
+            <div class="title">Plan · build · verify (three-agent loop)</div>
+            <div class="preview">Spawn three sub-agents. Planner reads {{spec_path}}; Builder writes; Verifier runs tests…</div>
+          </div>
+          <div class="meta">5 vars · 412w</div>
+        </div>
+        <div class="cand">
+          <div class="check"></div>
+          <div>
+            <div class="title">Write failing test from a bug report</div>
+            <div class="preview">Given {{bug_report}}, write the minimum failing test that demonstrates the regression…</div>
+          </div>
+          <div class="meta">1 var · 88w</div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="modal-footer">
+      <span style="margin-right:auto; font-family:var(--font-mono); font-size:10.5px; color:var(--ink-tertiary); letter-spacing:0.02em">3 of 5 selected · will be tagged <span class="tag" style="margin:0 4px">imported</span></span>
+      <button class="btn">cancel</button>
+      <button class="btn-launch" style="height:30px; padding:0 14px; font-size:11px">save 3 prompts</button>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

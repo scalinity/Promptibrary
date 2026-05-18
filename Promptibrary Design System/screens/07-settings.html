@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Settings · Promptibrary</title>
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../typography.css">
+<link rel="stylesheet" href="../base.css">
+<link rel="stylesheet" href="../app.css">
+<style>
+  body { display: grid; place-items: center; min-height: 100vh; padding: 24px; }
+  .settings-side { padding: 16px 10px 20px; }
+  .settings-scroll {
+    flex: 1;
+    overflow: auto;
+    padding: 0 40px 40px;
+    display: flex;
+    flex-direction: column;
+    gap: 40px;
+  }
+  .settings-header {
+    padding: 26px 40px 20px;
+    border-bottom: var(--hairline);
+  }
+  .settings-header h1 {
+    margin: 0 0 6px;
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: 28px;
+    letter-spacing: -0.02em;
+    color: var(--ink-primary);
+  }
+  .settings-header p {
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--ink-tertiary);
+    letter-spacing: 0.01em;
+  }
+  .sec-title {
+    font-family: var(--font-display);
+    font-style: italic;
+    font-weight: 500;
+    font-size: 13px;
+    color: var(--ink-tertiary);
+    text-transform: lowercase;
+    letter-spacing: 0.02em;
+    margin-bottom: 18px;
+  }
+  .sec-title::before { content: "§"; color: var(--ink-dim); margin-right: 8px; font-style: normal; }
+
+  .field-row {
+    display: grid;
+    grid-template-columns: 180px 1fr;
+    gap: 28px;
+    align-items: baseline;
+    padding: 14px 0;
+    border-bottom: 1px dashed var(--border-subtle);
+  }
+  .field-row:last-child { border-bottom: none; }
+  .field-row .label {
+    font-family: var(--font-ui);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--ink-primary);
+    letter-spacing: -0.005em;
+  }
+  .field-row .help {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: var(--ink-tertiary);
+    letter-spacing: 0.01em;
+    margin-top: 4px;
+  }
+  .field-row .control { display: flex; flex-direction: column; gap: 6px; }
+
+  .key-row {
+    display: grid;
+    grid-template-columns: 1fr 84px 84px;
+    gap: 8px;
+    align-items: center;
+  }
+  .secret {
+    background: var(--bg-sunken);
+    border: var(--hairline);
+    border-radius: var(--r-md);
+    padding: 9px 12px;
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    color: var(--ink-secondary);
+    letter-spacing: 0.06em;
+  }
+  .side-link {
+    display: block;
+    padding: 8px 12px;
+    border-radius: var(--r-sm);
+    color: var(--ink-secondary);
+    font-family: var(--font-ui);
+    font-size: 13px;
+    cursor: pointer;
+    border-left: 2px solid transparent;
+  }
+  .side-link:hover { color: var(--ink-primary); background: var(--bg-raised); }
+  .side-link.active { color: var(--ink-primary); background: var(--accent-tint); border-left-color: var(--accent); border-radius: 0 var(--r-sm) var(--r-sm) 0; padding-left: 10px; }
+</style>
+</head>
+<body>
+<div class="grain"></div>
+<div class="app-frame" data-screen-label="07 Settings">
+
+  <div class="topbar">
+    <div class="brand"><span class="brand-name">Promptibrary<span class="dot">.</span></span><span class="brand-tag">// agentic operator console</span></div>
+    <div class="center"><div class="search"><span class="glyph">⌕</span><input placeholder="search prompts, tags, history…"><span class="kbd">⌘K</span></div></div>
+    <div class="actions"><button class="btn">import <span class="kbd">⌘I</span></button><button class="btn">new <span class="kbd">⌘N</span></button><button class="icon-btn" aria-label="Settings" style="color:var(--accent)">⚙</button></div>
+  </div>
+
+  <div class="workspace">
+    <aside class="sidebar settings-side">
+      <div class="side-section">settings</div>
+      <div class="side-link active">vault</div>
+      <div class="side-link">defaults</div>
+      <div class="side-link">api keys</div>
+      <div class="side-link">extraction</div>
+      <div class="side-link">telemetry</div>
+      <div class="side-link">appearance</div>
+      <div class="side-link">advanced</div>
+    </aside>
+
+    <section class="detail-pane" style="grid-column: span 2;">
+      <div class="settings-header">
+        <h1>Settings</h1>
+        <p>~/Library/Application Support/Promptibrary · v0.4.2 (canary) · darwin-arm64</p>
+      </div>
+
+      <div class="settings-scroll">
+
+        <section>
+          <div class="sec-title">vault</div>
+          <div class="field-row">
+            <div>
+              <div class="label">Active vault</div>
+              <div class="help">folder containing prompt files &amp; git history</div>
+            </div>
+            <div class="control">
+              <div class="picker"><span class="glyph">⊟</span><span class="path">~/prompts</span></div>
+              <div class="help">142 prompts · git rev <span style="color:var(--accent-warm)">e3c41a8</span> · synced 2m ago</div>
+            </div>
+          </div>
+          <div class="field-row">
+            <div>
+              <div class="label">Auto-sync</div>
+              <div class="help">push commits to the remote after every save</div>
+            </div>
+            <div class="control">
+              <div style="display:flex; gap:8px"><button class="toggle on"><span class="glyph">⏵</span>on</button> <span style="font-family:var(--font-mono); font-size:10.5px; color:var(--ink-tertiary); align-self:center">→ origin/main</span></div>
+            </div>
+          </div>
+          <div class="field-row">
+            <div>
+              <div class="label">Backup vaults</div>
+              <div class="help">read-only references; used as fallback for ⌘K search</div>
+            </div>
+            <div class="control">
+              <div class="picker"><span class="glyph">⊟</span><span class="path">~/work/agents</span></div>
+            </div>
+          </div>
+        </section>
+
+        <section>
+          <div class="sec-title">defaults</div>
+          <div class="field-row">
+            <div><div class="label">Model</div><div class="help">used when a prompt has no override</div></div>
+            <div class="control"><div class="select-wrap"><select class="select"><option>claude-sonnet-4-5</option><option>claude-opus-4-1</option><option>claude-haiku-4-5</option></select></div></div>
+          </div>
+          <div class="field-row">
+            <div><div class="label">Shell</div><div class="help">subprocess shell for tool calls</div></div>
+            <div class="control"><div class="select-wrap"><select class="select"><option>zsh</option><option>bash</option><option>fish</option></select></div></div>
+          </div>
+          <div class="field-row">
+            <div><div class="label">MCP servers</div><div class="help">enabled by default for new runs</div></div>
+            <div class="control"><div style="display:flex; gap:6px"><span class="tag">playwright</span><span class="tag">filesystem</span><span class="tag">github</span><span style="font-family:var(--font-mono); font-size:10.5px; color:var(--ink-dim); align-self:center">+ add…</span></div></div>
+          </div>
+        </section>
+
+        <section>
+          <div class="sec-title">api keys</div>
+          <div class="field-row">
+            <div><div class="label">Anthropic</div><div class="help">stored in macOS keychain · com.promptibrary.anthropic</div></div>
+            <div class="control"><div class="key-row"><div class="secret">••••••••••••••••••••••••••</div><button class="btn">reveal</button><button class="btn">rotate</button></div></div>
+          </div>
+          <div class="field-row">
+            <div><div class="label">GitHub (extraction)</div><div class="help">read-only, used by the importer</div></div>
+            <div class="control"><div class="key-row"><div class="secret">••••••••••••••</div><button class="btn">reveal</button><button class="btn">rotate</button></div></div>
+          </div>
+        </section>
+
+        <section>
+          <div class="sec-title">extraction</div>
+          <div class="field-row">
+            <div><div class="label">Extractor model</div><div class="help">parses imported markdown / html into prompts</div></div>
+            <div class="control"><div class="select-wrap"><select class="select"><option>sonnet-4.5</option><option>haiku-4.5</option></select></div></div>
+          </div>
+          <div class="field-row">
+            <div><div class="label">Confidence threshold</div><div class="help">candidates below this score are hidden by default</div></div>
+            <div class="control"><input class="input" value="0.72"></div>
+          </div>
+        </section>
+
+        <section>
+          <div class="sec-title">telemetry</div>
+          <div class="field-row">
+            <div><div class="label">Local-only metrics</div><div class="help">never leaves your machine. used for ⌕ ranking.</div></div>
+            <div class="control"><button class="toggle on"><span class="glyph">⏵</span>on</button></div>
+          </div>
+          <div class="field-row">
+            <div><div class="label">Crash reports</div><div class="help">anonymous; symbolicated locally before upload</div></div>
+            <div class="control"><button class="toggle"><span class="glyph">⏸</span>off</button></div>
+          </div>
+        </section>
+
+      </div>
+    </section>
+  </div>
+
+  <div class="statusbar">
+    <span class="dot"></span><span class="state">SETTINGS</span>
+    <span class="pair"><span class="k">vault</span><span class="v">~/prompts</span></span>
+    <span class="pair"><span class="k">vers</span><span class="v">v0.4.2-canary</span></span>
+    <span class="right">
+      <span class="pair"><span class="k">unsaved</span><span class="v" style="color:var(--accent-warm)">2 changes</span></span>
+      <span class="sep">·</span>
+      <span class="kbd">⌘S</span> save
+      <span class="sep">·</span>
+      <span class="kbd">esc</span> close
+    </span>
+  </div>
+</div>
+</body>
+</html>

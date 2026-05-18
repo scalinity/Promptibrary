@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Terminal surface</title>
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../typography.css">
+<link rel="stylesheet" href="../base.css">
+<link rel="stylesheet" href="../app.css">
+<style>
+  body { padding: 0; background: var(--bg-base); width: 700px; }
+  .term-wrap { margin: 18px; border: var(--hairline); border-radius: var(--r-md); overflow: hidden; }
+  .terminal { padding: 16px 22px; min-height: 290px; }
+</style>
+</head>
+<body>
+  <div class="term-wrap">
+    <div class="terminal">
+      <span class="term-line sys">session <span class="h">aurora-stream-fix</span> · model <span class="h">sonnet-4.5</span> · started <span class="num">14:08:22</span></span>
+      <span class="term-line think">reading repo layout — focusing on <span class="path">src/lib/stream/</span></span>
+      <span class="term-line tool">read_file(path=<span class="path">src/lib/stream/handler.ts</span>, lines=<span class="num">1-142</span>)</span>
+      <span class="term-line tool">grep(pattern=<span class="h">"keepalive"</span>, path=<span class="path">src/lib</span>) → <span class="num">3</span> hits</span>
+      <span class="term-sep"></span>
+      <span class="term-line diag">reproduced. failure isolated to commit <span class="h">a98e3</span> — chunked-encoding swap dropped the trailing CRLF on empty chunks.</span>
+      <span class="term-line think">planning a 12-line patch; preserving back-pressure via existing AbortSignal.</span>
+      <span class="term-line tool">write_file(path=<span class="path">src/lib/stream/handler.ts</span>, +<span class="num">14</span>/-<span class="num">6</span>)</span>
+      <span class="term-line verif">tests pass — <span class="num">218</span>/<span class="num">218</span>. linter clean.</span>
+      <span class="term-line sys">awaiting next instruction<span class="term-cursor">▍</span></span>
+    </div>
+  </div>
+</body>
+</html>

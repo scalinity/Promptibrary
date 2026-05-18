@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Status & paper-warm</title>
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../typography.css">
+<link rel="stylesheet" href="../base.css">
+<style>
+  body { padding: 24px; background: var(--bg-deep); width: 700px; }
+  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .card {
+    background: var(--bg-base);
+    border: var(--hairline);
+    border-radius: var(--r-md);
+    overflow: hidden;
+  }
+  .chip { height: 80px; display: flex; align-items: flex-end; padding: 10px 12px; }
+  .badge {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    border-radius: 3px;
+    background: oklch(0.135 0.012 220 / 0.55);
+    color: oklch(0.96 0.008 80);
+  }
+  .meta { padding: 9px 12px 11px; border-top: var(--hairline); }
+  .name { font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-primary); }
+  .val { font-family: var(--font-mono); font-size: 9.5px; color: var(--ink-tertiary); margin-top: 2px; }
+</style>
+</head>
+<body>
+  <div class="grid">
+    <div class="card">
+      <div class="chip" style="background:var(--status-running)"><span class="badge">RUNNING</span></div>
+      <div class="meta"><div class="name">status-running</div><div class="val">chartreuse — alive</div></div>
+    </div>
+    <div class="card">
+      <div class="chip" style="background:var(--status-error)"><span class="badge">ERROR</span></div>
+      <div class="meta"><div class="name">status-error</div><div class="val">warm red</div></div>
+    </div>
+    <div class="card">
+      <div class="chip" style="background:var(--status-warn)"><span class="badge">WARN</span></div>
+      <div class="meta"><div class="name">status-warn</div><div class="val">amber-yellow</div></div>
+    </div>
+    <div class="card">
+      <div class="chip" style="background:var(--paper-warm)"><span class="badge" style="color:oklch(0.18 0.02 80); background:oklch(0.92 0.045 80 / 0.5)">EDITORIAL</span></div>
+      <div class="meta"><div class="name">paper-warm</div><div class="val">archival warmth</div></div>
+    </div>
+  </div>
+</body>
+</html>

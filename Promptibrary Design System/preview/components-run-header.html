@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Run header &amp; config strip</title>
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../typography.css">
+<link rel="stylesheet" href="../base.css">
+<link rel="stylesheet" href="../app.css">
+<style>
+  body { padding: 0; background: var(--bg-base); width: 700px; }
+  .wrap { margin: 18px; border: var(--hairline); border-radius: var(--r-md); overflow: hidden; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="run-header" style="padding: 18px 22px 16px">
+      <div class="run-top">
+        <div class="run-title-wrap">
+          <div class="run-dot"></div>
+          <div class="run-title">Refactor streaming response handler</div>
+        </div>
+        <div class="run-actions">
+          <button class="btn"><span style="font-family:var(--font-mono); color:var(--ink-dim)">⌘[</span> compose</button>
+          <button class="btn">copy log</button>
+          <button class="btn-stop">stop <span class="kbd">⌘.</span></button>
+        </div>
+      </div>
+      <div class="run-meta">
+        <span class="state-running">RUNNING</span>
+        <span style="color:var(--ink-dim)">·</span>
+        <span>elapsed <span class="num">2m 14s</span></span>
+        <span style="color:var(--ink-dim)">·</span>
+        <span>tokens <span class="num">38,412</span></span>
+        <span style="color:var(--ink-dim)">·</span>
+        <span>turns <span class="num">7</span></span>
+      </div>
+      <div class="run-config-strip" style="margin-top:12px">
+        <span class="pair"><span class="k">repo</span><span class="v">~/code/aurora</span></span>
+        <span class="pair"><span class="k">branch</span><span class="v">main</span></span>
+        <span class="pair"><span class="k">model</span><span class="v">sonnet-4.5</span></span>
+        <span class="pair"><span class="k">mcp</span><span class="v">playwright</span></span>
+        <span class="pair"><span class="k">shell</span><span class="v">zsh</span></span>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Topbar &amp; search</title>
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../typography.css">
+<link rel="stylesheet" href="../base.css">
+<link rel="stylesheet" href="../app.css">
+<style>
+  body { padding: 0; background: var(--bg-deep); width: 700px; }
+  .wrap { margin: 16px; border: var(--hairline); border-radius: var(--r-md); overflow: hidden; }
+  .topbar { grid-template-columns: 1fr 1.2fr auto; padding: 0 16px; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div class="brand">
+        <span class="brand-name">Promptibrary<span class="dot">.</span></span>
+        <span class="brand-tag">// agentic operator console</span>
+      </div>
+      <div class="center">
+        <div class="search">
+          <span class="glyph">⌕</span>
+          <input placeholder="search prompts, tags, history…">
+          <span class="kbd">⌘K</span>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="btn">import <span class="kbd">⌘I</span></button>
+        <button class="btn">new <span class="kbd">⌘N</span></button>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

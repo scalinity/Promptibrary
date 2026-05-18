@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>UI — Switzer</title>
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../typography.css">
+<link rel="stylesheet" href="../base.css">
+<style>
+  body { padding: 24px 28px; background: var(--bg-base); width: 700px; }
+  .row { display: grid; grid-template-columns: 56px 1fr 110px; align-items: baseline; gap: 18px; padding: 10px 0; border-bottom: 1px solid var(--border-subtle); }
+  .row:last-child { border-bottom: none; }
+  .tag { font-family: var(--font-mono); font-size: 10px; color: var(--ink-dim); letter-spacing: 0.06em; text-transform: uppercase; }
+  .meta { font-family: var(--font-mono); font-size: 10px; color: var(--ink-tertiary); text-align: right; letter-spacing: 0.01em; }
+  .header {
+    font-family: var(--font-display);
+    font-style: italic;
+    font-size: 12px;
+    color: var(--ink-tertiary);
+    text-transform: lowercase;
+    margin-bottom: 10px;
+    letter-spacing: 0.02em;
+  }
+  .header::before { content: "§"; color: var(--ink-dim); margin-right: 6px; font-style: normal; }
+</style>
+</head>
+<body>
+  <div class="header">ui / body — switzer variable</div>
+  <div class="row">
+    <div class="tag">L</div>
+    <div class="t-ui-l" style="color:var(--ink-primary)">Resolves into a fresh Claude Code session.</div>
+    <div class="meta">15 / 1.50</div>
+  </div>
+  <div class="row">
+    <div class="tag">M</div>
+    <div class="t-ui" style="color:var(--ink-primary)">Catalogue prompts like a librarian, launch them like an operator.</div>
+    <div class="meta">13 / 1.50</div>
+  </div>
+  <div class="row">
+    <div class="tag">S</div>
+    <div class="t-ui-s" style="color:var(--ink-secondary)">14 prompts · 3 tags · last opened Thu, 14:08</div>
+    <div class="meta">12 / 1.45</div>
+  </div>
+  <div class="row">
+    <div class="tag">XS</div>
+    <div class="t-ui-xs" style="color:var(--ink-tertiary)">REPO · MODEL · MCP · SHELL</div>
+    <div class="meta">11 / 500</div>
+  </div>
+</body>
+</html>

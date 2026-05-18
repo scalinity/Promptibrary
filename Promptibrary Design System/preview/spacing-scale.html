@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Spacing scale</title>
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../typography.css">
+<link rel="stylesheet" href="../base.css">
+<style>
+  body { padding: 28px; background: var(--bg-base); width: 700px; }
+  .scale { display: flex; flex-direction: column; gap: 8px; }
+  .step { display: grid; grid-template-columns: 36px 1fr 64px; align-items: center; gap: 12px; }
+  .step .name { font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-secondary); letter-spacing: 0.01em; }
+  .step .val  { font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-tertiary); letter-spacing: 0.01em; text-align: right; }
+  .bar { height: 14px; background: var(--accent-tint); border: 1px solid var(--accent-deep); border-radius: 2px; }
+</style>
+</head>
+<body>
+  <div class="scale">
+    <div class="step"><div class="name">--sp-1</div><div><div class="bar" style="width:4px"></div></div><div class="val">4px</div></div>
+    <div class="step"><div class="name">--sp-2</div><div><div class="bar" style="width:8px"></div></div><div class="val">8px</div></div>
+    <div class="step"><div class="name">--sp-3</div><div><div class="bar" style="width:12px"></div></div><div class="val">12px</div></div>
+    <div class="step"><div class="name">--sp-4</div><div><div class="bar" style="width:16px"></div></div><div class="val">16px</div></div>
+    <div class="step"><div class="name">--sp-5</div><div><div class="bar" style="width:20px"></div></div><div class="val">20px</div></div>
+    <div class="step"><div class="name">--sp-6</div><div><div class="bar" style="width:24px"></div></div><div class="val">24px</div></div>
+    <div class="step"><div class="name">--sp-7</div><div><div class="bar" style="width:32px"></div></div><div class="val">32px</div></div>
+    <div class="step"><div class="name">--sp-8</div><div><div class="bar" style="width:48px"></div></div><div class="val">48px</div></div>
+    <div class="step"><div class="name">--sp-9</div><div><div class="bar" style="width:64px"></div></div><div class="val">64px</div></div>
+  </div>
+</body>
+</html>

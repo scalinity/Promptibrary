@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Library + Compose · Promptibrary</title>
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../typography.css">
+<link rel="stylesheet" href="../base.css">
+<link rel="stylesheet" href="../app.css">
+<style>
+  body { display: grid; place-items: center; min-height: 100vh; padding: 24px; }
+</style>
+</head>
+<body>
+<div class="grain"></div>
+<div class="app-frame" data-screen-label="01 Library Compose">
+
+  <!-- TOP BAR -->
+  <div class="topbar">
+    <div class="brand">
+      <span class="brand-name">Promptibrary<span class="dot">.</span></span>
+      <span class="brand-tag">// agentic operator console</span>
+    </div>
+    <div class="center">
+      <div class="search">
+        <span class="glyph">⌕</span>
+        <input placeholder="search prompts, tags, history…">
+        <span class="kbd">⌘K</span>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="btn">import <span class="kbd">⌘I</span></button>
+      <button class="btn">new <span class="kbd">⌘N</span></button>
+      <button class="icon-btn" aria-label="Settings">⚙</button>
+    </div>
+  </div>
+
+  <!-- WORKSPACE -->
+  <div class="workspace">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <div class="nav-item active"><span class="glyph">⌖</span>All prompts<span class="count">142</span></div>
+      <div class="nav-item"><span class="glyph">★</span>Pinned<span class="count">8</span></div>
+      <div class="nav-item"><span class="glyph">↺</span>Recent<span class="count">24</span></div>
+      <div class="nav-item"><span class="glyph">⊟</span>Archived<span class="count">31</span></div>
+
+      <div class="side-section">tags</div>
+      <div class="tag-side"><span class="swatch" style="background:var(--accent)"></span>bug-fix<span class="count">38</span></div>
+      <div class="tag-side"><span class="swatch" style="background:var(--status-running)"></span>refactor<span class="count">22</span></div>
+      <div class="tag-side"><span class="swatch" style="background:var(--paper-warm)"></span>spec-gen<span class="count">14</span></div>
+      <div class="tag-side"><span class="swatch" style="background:var(--accent-dim)"></span>orchestration<span class="count">9</span></div>
+      <div class="tag-side"><span class="swatch" style="background:var(--status-warn)"></span>scratch<span class="count">17</span></div>
+      <div class="tag-side"><span class="swatch" style="background:var(--term-path)"></span>tests<span class="count">19</span></div>
+
+      <div class="side-section">vaults</div>
+      <div class="nav-item"><span class="glyph">⊟</span>~/prompts<span class="count">142</span></div>
+      <div class="nav-item"><span class="glyph">⊟</span>~/work/agents<span class="count">31</span></div>
+    </aside>
+
+    <!-- LIST PANE -->
+    <section class="list-pane">
+      <div class="list-header">
+        <span class="title">All prompts</span>
+        <span class="sort">recently used <span class="glyph">▾</span></span>
+      </div>
+      <div class="list-rows">
+        <div class="row selected">
+          <div class="row-title">Refactor streaming response handler</div>
+          <div class="row-tags"><span>bug-fix</span><span>backend</span></div>
+          <div class="row-meta"><span>edited 14:08</span><span class="dotsep">·</span><span>v12</span><span class="dotsep">·</span><span>4 vars</span></div>
+        </div>
+        <div class="row running">
+          <div class="row-title">Generate spec from PR description</div>
+          <div class="row-tags"><span>spec-gen</span><span>orchestration</span></div>
+          <div class="row-meta"><span>running · 2m 14s</span><span class="dotsep">·</span><span>v8</span></div>
+        </div>
+        <div class="row recent">
+          <div class="row-title">Bisect failing test to last green commit</div>
+          <div class="row-tags"><span>bug-fix</span><span>tests</span></div>
+          <div class="row-meta"><span>opened 13:42</span><span class="dotsep">·</span><span>v3</span></div>
+        </div>
+        <div class="row">
+          <div class="row-title">Migrate config from JSON to TOML</div>
+          <div class="row-tags"><span>refactor</span></div>
+          <div class="row-meta"><span>edited yesterday</span><span class="dotsep">·</span><span>v6</span></div>
+        </div>
+        <div class="row">
+          <div class="row-title">Plan · build · verify (three-agent loop)</div>
+          <div class="row-tags"><span>orchestration</span><span>multi-agent</span></div>
+          <div class="row-meta"><span>edited Apr 04</span><span class="dotsep">·</span><span>v21</span></div>
+        </div>
+        <div class="row">
+          <div class="row-title">Write failing test from a bug report</div>
+          <div class="row-tags"><span>bug-fix</span><span>tests</span></div>
+          <div class="row-meta"><span>edited Apr 02</span><span class="dotsep">·</span><span>v4</span></div>
+        </div>
+        <div class="row">
+          <div class="row-title">Inline a single-use util &amp; delete the file</div>
+          <div class="row-tags"><span>refactor</span></div>
+          <div class="row-meta"><span>edited Mar 28</span><span class="dotsep">·</span><span>v2</span></div>
+        </div>
+        <div class="row">
+          <div class="row-title">Draft a CHANGELOG entry from git log</div>
+          <div class="row-tags"><span>scratch</span></div>
+          <div class="row-meta"><span>edited Mar 24</span><span class="dotsep">·</span><span>v1</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- DETAIL PANE -->
+    <section class="detail-pane">
+      <div class="detail-scroll">
+        <header class="detail-header">
+          <div class="detail-crumb">prompts <span class="sep">›</span> bug-fix <span class="sep">›</span> stream-handler</div>
+          <h1 class="detail-title">Refactor streaming response handler</h1>
+          <div class="detail-strip">
+            <span class="src">github.com/aurora/aurora-stream<span style="color:var(--ink-dim); margin-left:8px">/issues/418</span></span>
+            <span class="stats">
+              <span><span class="num">v12</span> versions</span>
+              <span><span class="num">37</span> launches</span>
+              <span>last <span class="num">14:08</span></span>
+            </span>
+          </div>
+          <div class="tag-row">
+            <span class="tag">bug-fix</span>
+            <span class="tag">backend</span>
+            <span class="tag">stream</span>
+            <span class="tag">verifier-loop</span>
+          </div>
+        </header>
+
+        <!-- VARIABLES -->
+        <section>
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px">
+            <span class="section-label">variables</span>
+            <span style="font-family:var(--font-mono); font-size:10.5px; color:var(--ink-dim); letter-spacing:0.04em">4 fields · 2 required</span>
+          </div>
+          <div class="var-grid">
+            <div class="var-field">
+              <div class="var-label"><span class="name">repo</span><span class="type">PATH</span><span class="req">*</span></div>
+              <div class="picker"><span class="glyph">⊟</span><span class="path">~/code/aurora</span></div>
+            </div>
+            <div class="var-field">
+              <div class="var-label"><span class="name">branch</span><span class="type">REF</span><span class="opt">— optional</span></div>
+              <input class="input" value="main">
+            </div>
+            <div class="var-field wide">
+              <div class="var-label"><span class="name">failing_test</span><span class="type">GLOB</span><span class="req">*</span></div>
+              <input class="input empty-required" placeholder="src/lib/stream/handler.test.ts:42">
+            </div>
+            <div class="var-field wide">
+              <div class="var-label"><span class="name">extra_context</span><span class="type">TEXT</span><span class="opt">— optional</span></div>
+              <textarea class="textarea">Started failing after a98e3 (chunked-encoding swap). Repro requires the --keepalive flag and a slow producer.</textarea>
+            </div>
+          </div>
+        </section>
+
+        <!-- PROMPT BODY -->
+        <section class="prompt-block">
+          <div class="prompt-bar">
+            <span class="section-label">prompt</span>
+            <div class="prompt-actions">
+              <button><span class="glyph">✎</span>edit</button>
+              <button><span class="glyph">⌚</span>history</button>
+              <button><span class="glyph">⎘</span>copy</button>
+            </div>
+          </div>
+          <pre class="prompt-body"><span class="comment"># Refactor — streaming response handler</span>
+
+<span class="kw">Role.</span> You are a senior engineer pairing on <span class="var-inline">{{repo}}</span> at <span class="var-inline">{{branch}}</span>.
+
+<span class="kw">Goal.</span> Reproduce the failure in <span class="var-inline">{{failing_test}}</span>, then bisect to the
+introducing commit. The fix should preserve back-pressure on the consumer
+side and not break the existing keepalive flag.
+
+<span class="kw">Constraints.</span>
+  · Touch only files under src/lib/stream/
+  · Add or modify tests — never delete green tests
+  · No new dependencies
+
+<span class="kw">Output.</span> A unified diff plus a one-paragraph rationale.
+
+<span class="kw">Context.</span> <span class="var-inline">{{extra_context}}</span></pre>
+        </section>
+      </div>
+
+      <!-- LAUNCH ROW -->
+      <div class="launch-row">
+        <div class="launch-config">
+          <span class="pair"><span class="k">repo</span><span class="v">~/code/aurora</span></span>
+          <span class="pair"><span class="k">model</span><span class="v">sonnet-4.5</span></span>
+          <span class="pair"><span class="k">mcp</span><span class="v">playwright</span></span>
+          <span class="pair"><span class="k">shell</span><span class="v">zsh</span></span>
+        </div>
+        <button class="btn-launch">Launch <span class="kbd-inline">⌘↵</span></button>
+      </div>
+    </section>
+  </div>
+
+  <!-- STATUS BAR -->
+  <div class="statusbar">
+    <span class="dot"></span><span class="state">READY</span>
+    <span class="pair"><span class="k">vault</span><span class="v">~/prompts</span></span>
+    <span class="pair"><span class="k">model</span><span class="v">sonnet-4.5</span></span>
+    <span class="pair"><span class="k">prompts</span><span class="v">142</span></span>
+    <span class="right">
+      <span class="pair"><span class="k">last run</span><span class="v">14:08 · refactor-stream</span></span>
+      <span class="sep">·</span>
+      <span class="kbd">⌘K</span> search
+      <span class="sep">·</span>
+      <span class="kbd">⌘N</span> new
+    </span>
+  </div>
+</div>
+</body>
+</html>

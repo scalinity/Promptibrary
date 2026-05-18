@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sidebar — nav, sections, tags</title>
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../typography.css">
+<link rel="stylesheet" href="../base.css">
+<link rel="stylesheet" href="../app.css">
+<style>
+  body { padding: 20px 24px; background: var(--bg-deep); width: 700px; }
+  .grid { display: grid; grid-template-columns: 232px 232px 1fr; gap: 18px; align-items: flex-start; }
+  .panel { background: var(--bg-base); border: var(--hairline); border-radius: var(--r-md); padding: 10px 8px 14px; }
+  .label { font-family: var(--font-mono); font-size: 9.5px; color: var(--ink-dim); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 8px; padding-left: 6px; }
+</style>
+</head>
+<body>
+  <div class="grid">
+    <div>
+      <div class="label">nav items</div>
+      <div class="panel">
+        <div class="nav-item"><span class="glyph">⌖</span>All prompts<span class="count">142</span></div>
+        <div class="nav-item active"><span class="glyph">★</span>Pinned<span class="count">8</span></div>
+        <div class="nav-item"><span class="glyph">↺</span>Recent<span class="count">24</span></div>
+        <div class="nav-item"><span class="glyph">⊟</span>Archived<span class="count">31</span></div>
+      </div>
+    </div>
+    <div>
+      <div class="label">tag swatches</div>
+      <div class="panel">
+        <div class="side-section">tags</div>
+        <div class="tag-side"><span class="swatch" style="background:var(--accent)"></span>bug-fix<span class="count">38</span></div>
+        <div class="tag-side"><span class="swatch" style="background:var(--status-running)"></span>refactor<span class="count">22</span></div>
+        <div class="tag-side"><span class="swatch" style="background:var(--paper-warm)"></span>spec-gen<span class="count">14</span></div>
+        <div class="tag-side"><span class="swatch" style="background:var(--accent-dim)"></span>orchestration<span class="count">9</span></div>
+        <div class="tag-side"><span class="swatch" style="background:var(--status-warn)"></span>scratch<span class="count">17</span></div>
+      </div>
+    </div>
+    <div>
+      <div class="label">section header</div>
+      <div class="panel">
+        <div class="side-section">vaults</div>
+        <div class="nav-item"><span class="glyph">⊟</span>~/prompts<span class="count">142</span></div>
+        <div class="nav-item"><span class="glyph">⊟</span>~/work/agents<span class="count">31</span></div>
+        <div class="side-section">smart</div>
+        <div class="nav-item"><span class="glyph">⌕</span>Last 24h<span class="count">6</span></div>
+        <div class="nav-item"><span class="glyph">⌕</span>Untagged<span class="count">12</span></div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

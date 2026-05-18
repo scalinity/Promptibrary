@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>History / diff · Promptibrary</title>
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../typography.css">
+<link rel="stylesheet" href="../base.css">
+<link rel="stylesheet" href="../app.css">
+<style>
+  body { display: grid; place-items: center; min-height: 100vh; padding: 24px; }
+  .diff-modal { width: 1080px; max-width: 96vw; height: 720px; }
+  .diff-modal .modal-body { padding: 0; display: grid; grid-template-columns: 260px 1fr; overflow: hidden; min-height: 0; }
+
+  .versions {
+    border-right: var(--hairline);
+    overflow: auto;
+    background: var(--bg-base);
+  }
+  .v-row {
+    position: relative;
+    padding: 12px 14px 12px 18px;
+    border-bottom: var(--hairline);
+    cursor: pointer;
+  }
+  .v-row::before {
+    content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+    background: transparent;
+  }
+  .v-row.selected { background: var(--accent-tint); }
+  .v-row.selected::before { background: var(--accent); }
+  .v-row .v-tag {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--accent-warm);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .v-row .v-msg {
+    font-family: var(--font-ui);
+    font-size: 12.5px;
+    color: var(--ink-primary);
+    letter-spacing: -0.005em;
+    margin-bottom: 4px;
+  }
+  .v-row .v-meta {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--ink-tertiary);
+    letter-spacing: 0.01em;
+  }
+  .v-row .v-meta .add { color: var(--status-running); }
+  .v-row .v-meta .del { color: var(--status-error); }
+  .v-row:hover { background: var(--bg-raised); }
+  .v-row.selected:hover { background: var(--accent-tint); }
+
+  .diff-pane {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    overflow: hidden;
+  }
+  .diff-head {
+    padding: 16px 22px 14px;
+    border-bottom: var(--hairline);
+    display: flex; justify-content: space-between; align-items: baseline;
+  }
+  .diff-head h3 {
+    margin: 0;
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: 17px;
+    letter-spacing: -0.01em;
+    color: var(--ink-primary);
+  }
+  .diff-head .meta { font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-tertiary); letter-spacing: 0.04em; }
+  .toolbar {
+    display: flex; gap: 8px; padding: 10px 22px;
+    border-bottom: var(--hairline);
+    background: var(--bg-sunken);
+  }
+  .seg {
+    display: inline-flex;
+    border: var(--hairline);
+    border-radius: var(--r-xs);
+    overflow: hidden;
+  }
+  .seg button {
+    padding: 4px 10px;
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: var(--ink-tertiary);
+    letter-spacing: 0.02em;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    transition: background var(--motion-instant), color var(--motion-snap);
+  }
+  .seg button.on { color: var(--accent); background: var(--accent-tint); }
+  .seg button:not(.on):hover { color: var(--ink-primary); }
+
+  .diff-body {
+    flex: 1;
+    overflow: auto;
+    background: var(--bg-sunken);
+    padding: 14px 22px 22px;
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    line-height: 1.65;
+    letter-spacing: 0.01em;
+  }
+  .hunk-head {
+    color: var(--ink-tertiary);
+    font-style: italic;
+    margin: 12px 0 6px;
+    border-top: 1px dashed var(--border-subtle);
+    padding-top: 8px;
+  }
+  .hunk-head:first-child { border-top: none; padding-top: 0; margin-top: 0; }
+  .ln { display: block; padding: 1px 8px; border-radius: 2px; white-space: pre-wrap; }
+  .ln .gut { display: inline-block; width: 22px; color: var(--ink-dim); margin-right: 8px; text-align: right; }
+  .ln.ctx { color: var(--ink-secondary); }
+  .ln.add { background: oklch(0.78 0.18 145 / 0.06); color: var(--accent-warm); }
+  .ln.add .gut { color: var(--accent); }
+  .ln.add::before { content: "+ "; color: var(--accent); }
+  .ln.del { background: oklch(0.68 0.22 25 / 0.06); color: oklch(0.78 0.16 25); text-decoration: line-through; text-decoration-color: oklch(0.48 0.14 25); text-decoration-thickness: 1px; }
+  .ln.del .gut { color: oklch(0.58 0.16 25); }
+  .ln.del::before { content: "− "; color: oklch(0.78 0.16 25); text-decoration: none; }
+  .ln.ctx::before { content: "  "; }
+</style>
+</head>
+<body>
+<div class="grain"></div>
+
+<div class="app-frame" data-screen-label="05 History" style="filter: brightness(0.5) saturate(0.7);">
+  <div class="topbar"><div class="brand"><span class="brand-name">Promptibrary<span class="dot">.</span></span><span class="brand-tag">// agentic operator console</span></div><div class="center"><div class="search"><span class="glyph">⌕</span><input><span class="kbd">⌘K</span></div></div><div class="actions"><button class="btn">import</button></div></div>
+  <div class="workspace"><aside class="sidebar"></aside><section class="list-pane"></section><section class="detail-pane"></section></div>
+  <div class="statusbar"><span class="dot"></span><span class="state">READY</span></div>
+</div>
+
+<div class="modal-overlay">
+  <div class="modal diff-modal">
+    <div class="modal-header">
+      <h2 class="modal-title">History · refactor / stream-handler</h2>
+      <div style="display:flex; gap:8px; align-items:center">
+        <span style="font-family:var(--font-mono); font-size:10.5px; color:var(--ink-tertiary); letter-spacing:0.02em">12 versions · since mar 04</span>
+        <button class="icon-btn" aria-label="Close">✕</button>
+      </div>
+    </div>
+    <div class="modal-body">
+      <div class="versions">
+        <div class="v-row selected">
+          <div class="v-tag">v12 · current</div>
+          <div class="v-msg">tighten verifier-loop output spec</div>
+          <div class="v-meta">thu 14:02 · <span class="add">+8</span> / <span class="del">−3</span></div>
+        </div>
+        <div class="v-row">
+          <div class="v-tag">v11</div>
+          <div class="v-msg">add keepalive constraint</div>
+          <div class="v-meta">wed 18:11 · <span class="add">+4</span> / <span class="del">−0</span></div>
+        </div>
+        <div class="v-row">
+          <div class="v-tag">v10</div>
+          <div class="v-msg">forbid new deps</div>
+          <div class="v-meta">tue 10:48 · <span class="add">+2</span> / <span class="del">−1</span></div>
+        </div>
+        <div class="v-row">
+          <div class="v-tag">v9</div>
+          <div class="v-msg">split goal &amp; constraints sections</div>
+          <div class="v-meta">mon 16:30 · <span class="add">+11</span> / <span class="del">−7</span></div>
+        </div>
+        <div class="v-row">
+          <div class="v-tag">v8</div>
+          <div class="v-msg">narrow scope to src/lib/stream/</div>
+          <div class="v-meta">apr 12 · <span class="add">+3</span> / <span class="del">−2</span></div>
+        </div>
+        <div class="v-row">
+          <div class="v-tag">v7</div>
+          <div class="v-msg">drop chained-prompt experiment</div>
+          <div class="v-meta">apr 09 · <span class="add">+1</span> / <span class="del">−14</span></div>
+        </div>
+        <div class="v-row">
+          <div class="v-tag">v6</div>
+          <div class="v-msg">add failing_test variable</div>
+          <div class="v-meta">apr 04 · <span class="add">+5</span> / <span class="del">−0</span></div>
+        </div>
+        <div class="v-row">
+          <div class="v-tag">v5</div>
+          <div class="v-msg">…</div>
+          <div class="v-meta">mar 28 · <span class="add">+9</span> / <span class="del">−2</span></div>
+        </div>
+      </div>
+
+      <div class="diff-pane">
+        <div class="diff-head">
+          <h3>v11 → v12</h3>
+          <span class="meta">+8 / −3 · 4s ago</span>
+        </div>
+        <div class="toolbar">
+          <div class="seg">
+            <button class="on">unified</button>
+            <button>split</button>
+          </div>
+          <div class="seg" style="margin-left:auto">
+            <button>copy patch</button>
+            <button>revert</button>
+          </div>
+        </div>
+        <div class="diff-body">
+          <div class="hunk-head">@@ Constraints, lines 14-22 @@</div>
+<span class="ln ctx"><span class="gut">14</span>  · Touch only files under src/lib/stream/</span>
+<span class="ln ctx"><span class="gut">15</span>  · Add or modify tests — never delete green tests</span>
+<span class="ln del"><span class="gut">16</span>  · No new dependencies (vendor it instead).</span>
+<span class="ln add"><span class="gut">16</span>  · No new dependencies</span>
+<span class="ln add"><span class="gut">17</span>  · Preserve the existing keepalive flag's behaviour</span>
+<span class="ln ctx"><span class="gut">18</span></span>
+          <div class="hunk-head">@@ Output, lines 24-31 @@</div>
+<span class="ln del"><span class="gut">24</span>Output. A diff and a short note.</span>
+<span class="ln add"><span class="gut">24</span>Output. A unified diff plus a one-paragraph rationale.</span>
+<span class="ln add"><span class="gut">25</span></span>
+<span class="ln add"><span class="gut">26</span>Verifier. After applying, the agent MUST run:</span>
+<span class="ln add"><span class="gut">27</span>  · pnpm test stream</span>
+<span class="ln add"><span class="gut">28</span>  · pnpm soak --slow 2000ms --window 30s</span>
+<span class="ln add"><span class="gut">29</span>and refuse to declare success unless both pass.</span>
+<span class="ln del"><span class="gut">31</span></span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

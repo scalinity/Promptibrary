@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Operator status line</title>
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../typography.css">
+<link rel="stylesheet" href="../base.css">
+<link rel="stylesheet" href="../app.css">
+<style>
+  body { padding: 0; background: var(--bg-deep); width: 700px; }
+  .stack { padding: 18px 14px; display: flex; flex-direction: column; gap: 12px; }
+  .frame { border: var(--hairline); border-radius: var(--r-md); overflow: hidden; }
+  .label { font-family: var(--font-mono); font-size: 9.5px; color: var(--ink-dim); letter-spacing: 0.08em; text-transform: uppercase; padding: 0 4px 6px; }
+</style>
+</head>
+<body>
+  <div class="stack">
+    <div>
+      <div class="label">idle</div>
+      <div class="frame">
+        <div class="statusbar">
+          <span class="dot"></span><span class="state">READY</span>
+          <span class="pair"><span class="k">vault</span><span class="v">~/prompts</span></span>
+          <span class="pair"><span class="k">model</span><span class="v">sonnet-4.5</span></span>
+          <span class="pair"><span class="k">prompts</span><span class="v">142</span></span>
+          <span class="right">
+            <span class="pair"><span class="k">last run</span><span class="v">14:08</span></span>
+            <span class="sep">·</span>
+            <span class="kbd">⌘K</span> search
+          </span>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="label">running</div>
+      <div class="frame">
+        <div class="statusbar">
+          <span class="dot running"></span><span class="state running">RUNNING</span>
+          <span class="pair"><span class="k">vault</span><span class="v">~/prompts</span></span>
+          <span class="pair"><span class="k">model</span><span class="v">sonnet-4.5</span></span>
+          <span class="pair"><span class="k">turn</span><span class="v">7</span></span>
+          <span class="pair"><span class="k">tok</span><span class="v">38,412</span></span>
+          <span class="right">
+            <span class="pair"><span class="k">elapsed</span><span class="v">2m 14s</span></span>
+            <span class="sep">·</span>
+            <span class="kbd">⌘.</span> stop
+          </span>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="label">error</div>
+      <div class="frame">
+        <div class="statusbar">
+          <span class="dot error"></span><span class="state error">DISCONNECTED</span>
+          <span class="pair"><span class="k">vault</span><span class="v">~/prompts</span></span>
+          <span class="pair"><span class="k">claude</span><span class="v" style="color:var(--status-error)">not on PATH</span></span>
+          <span class="right">
+            <span class="kbd">⌘,</span> settings
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Inputs</title>
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../typography.css">
+<link rel="stylesheet" href="../base.css">
+<link rel="stylesheet" href="../app.css">
+<style>
+  body { padding: 26px 28px; background: var(--bg-deep); width: 700px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .cell { background: var(--bg-base); border: var(--hairline); border-radius: var(--r-md); padding: 14px 14px 16px; display:flex; flex-direction: column; gap: 8px; }
+  .label { font-family: var(--font-mono); font-size: 9.5px; color: var(--ink-dim); letter-spacing: 0.08em; text-transform: uppercase; }
+</style>
+</head>
+<body>
+  <div class="grid">
+    <div class="cell">
+      <div class="label">input · rest</div>
+      <input class="input" value="claude-sonnet-4-5">
+    </div>
+    <div class="cell">
+      <div class="label">input · focus</div>
+      <input class="input" data-state="focus" value="claude-sonnet-4-5">
+    </div>
+    <div class="cell">
+      <div class="label">input · empty-required (pulses)</div>
+      <input class="input empty-required" placeholder="repo path required">
+    </div>
+    <div class="cell">
+      <div class="label">input · error</div>
+      <input class="input" data-state="error" value="invalid path: ~/nope">
+    </div>
+    <div class="cell">
+      <div class="label">select</div>
+      <div class="select-wrap"><select class="select"><option>sonnet-4.5</option><option>opus-4.1</option></select></div>
+    </div>
+    <div class="cell">
+      <div class="label">folder picker</div>
+      <div class="picker"><span class="glyph">⊟</span><span class="path">~/code/aurora</span></div>
+    </div>
+    <div class="cell">
+      <div class="label">file picker · empty</div>
+      <div class="picker empty"><span class="glyph">⎙</span><span class="path">choose a spec file…</span></div>
+    </div>
+    <div class="cell">
+      <div class="label">textarea</div>
+      <textarea class="textarea" rows="2">Reproduce on main; bisect to a98e3.</textarea>
+    </div>
+  </div>
+</body>
+</html>

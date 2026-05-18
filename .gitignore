@@ -1,0 +1,53 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+out/
+build/
+src-tauri/target/
+src-tauri/gen/
+
+# Test artifacts
+coverage/
+playwright-report/
+test-results/
+playwright/.cache/
+.playwright-mcp/
+
+# Vite/Vitest cache
+.vite/
+.vitest-cache/
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+*.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor state
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# AI session artifacts
+.cursor/
+.aider*
+docs/superpowers/
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Temp
+*.tmp
+*.pid
+
+# Rust
+src-tauri/Cargo.lock.bak

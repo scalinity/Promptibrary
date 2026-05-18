@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Empty library · Promptibrary</title>
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../typography.css">
+<link rel="stylesheet" href="../base.css">
+<link rel="stylesheet" href="../app.css">
+<style>
+  body { display: grid; place-items: center; min-height: 100vh; padding: 24px; }
+
+  .empty-detail {
+    grid-column: span 2;
+    display: grid;
+    place-items: center;
+    padding: 60px;
+    position: relative;
+  }
+
+  .empty-card {
+    max-width: 560px;
+    text-align: left;
+    display: flex;
+    flex-direction: column;
+    gap: 26px;
+  }
+
+  .empty-rule {
+    width: 56px;
+    height: 1px;
+    background: var(--accent);
+    opacity: 0.7;
+  }
+
+  .empty-pre {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: var(--ink-tertiary);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .empty-headline {
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: 56px;
+    line-height: 1.05;
+    letter-spacing: -0.025em;
+    color: var(--ink-primary);
+    margin: 0;
+  }
+  .empty-headline em {
+    color: var(--accent);
+    font-style: italic;
+  }
+  .empty-headline .dot { color: var(--accent); }
+
+  .empty-sub {
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    line-height: 1.6;
+    color: var(--ink-secondary);
+    letter-spacing: 0.01em;
+    margin: 0;
+    max-width: 440px;
+  }
+
+  .empty-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 6px;
+  }
+  .empty-actions .btn,
+  .empty-actions .btn-launch { height: 36px; padding: 0 16px; font-size: 12px; }
+
+  .empty-hints {
+    display: flex;
+    gap: 18px;
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: var(--ink-dim);
+    letter-spacing: 0.04em;
+  }
+  .empty-hints .hint { display: inline-flex; align-items: center; gap: 6px; }
+
+  /* faint stack of card-catalogue lines as decoration */
+  .empty-decor {
+    position: absolute;
+    right: 60px; top: 60px; bottom: 60px;
+    width: 220px;
+    pointer-events: none;
+    opacity: 0.6;
+  }
+  .empty-decor .line {
+    border-top: 1px solid var(--border-subtle);
+    height: 24px;
+  }
+  .empty-decor .line:nth-child(odd) { margin-left: 24px; }
+  .empty-decor .line:nth-child(3n) { margin-left: 56px; }
+  .empty-decor .glyph {
+    position: absolute;
+    right: 0;
+    font-family: var(--font-display);
+    font-style: italic;
+    font-weight: 500;
+    font-size: 240px;
+    color: oklch(0.82 0.16 75 / 0.05);
+    line-height: 0.8;
+    bottom: -40px;
+    user-select: none;
+  }
+</style>
+</head>
+<body>
+<div class="grain"></div>
+<div class="app-frame" data-screen-label="08 Empty library">
+
+  <div class="topbar">
+    <div class="brand"><span class="brand-name">Promptibrary<span class="dot">.</span></span><span class="brand-tag">// agentic operator console</span></div>
+    <div class="center"><div class="search"><span class="glyph">⌕</span><input placeholder="search prompts, tags, history…" disabled><span class="kbd">⌘K</span></div></div>
+    <div class="actions"><button class="btn">import <span class="kbd">⌘I</span></button><button class="btn">new <span class="kbd">⌘N</span></button><button class="icon-btn" aria-label="Settings">⚙</button></div>
+  </div>
+
+  <div class="workspace">
+    <aside class="sidebar">
+      <div class="nav-item active"><span class="glyph">⌖</span>All prompts<span class="count">0</span></div>
+      <div class="nav-item"><span class="glyph">★</span>Pinned<span class="count">0</span></div>
+      <div class="nav-item"><span class="glyph">⌚</span>History<span class="count">0</span></div>
+      <div class="nav-item"><span class="glyph">⊟</span>Archived<span class="count">0</span></div>
+
+      <div class="side-section">tags</div>
+      <div style="padding:6px 10px; font-family:var(--font-mono); font-size:10.5px; color:var(--ink-dim); font-style:italic; letter-spacing:0.01em">no tags yet</div>
+
+      <div class="side-section">vault</div>
+      <div class="nav-item"><span class="glyph">⊟</span>~/prompts<span class="count">empty</span></div>
+    </aside>
+
+    <section class="empty-detail">
+      <div class="empty-decor">
+        <span class="glyph">§</span>
+      </div>
+      <div class="empty-card">
+        <div class="empty-rule"></div>
+        <div class="empty-pre">a clean catalogue</div>
+        <h1 class="empty-headline">The library is <em>empty<span class="dot">.</span></em></h1>
+        <p class="empty-sub">
+          // start by importing the prompts you already keep in
+          a gist, a notes app, or a project README.<br>
+          // or write a new launch profile from scratch.
+        </p>
+        <div class="empty-actions">
+          <button class="btn-launch">Import from link <span class="kbd-inline">⌘I</span></button>
+          <button class="btn">New prompt <span class="kbd">⌘N</span></button>
+        </div>
+        <div class="empty-hints">
+          <span class="hint"><span class="kbd">⌘K</span> search anything</span>
+          <span class="hint"><span class="kbd">⌘,</span> settings</span>
+          <span class="hint"><span class="kbd">?</span> shortcuts</span>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="statusbar">
+    <span class="dot"></span><span class="state">READY</span>
+    <span class="pair"><span class="k">vault</span><span class="v">~/prompts</span></span>
+    <span class="pair"><span class="k">prompts</span><span class="v">0</span></span>
+    <span class="pair"><span class="k">model</span><span class="v">sonnet-4.5</span></span>
+    <span class="right">
+      <span class="pair"><span class="k">first run</span><span class="v">welcome.</span></span>
+      <span class="sep">·</span>
+      <span class="kbd">⌘I</span> import
+    </span>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Brand mark</title>
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../typography.css">
+<link rel="stylesheet" href="../base.css">
+<style>
+  body { padding: 36px 32px; background: var(--bg-deep); width: 700px; }
+  .stack { display: flex; flex-direction: column; gap: 22px; align-items: flex-start; }
+  .brand-row { display: inline-flex; align-items: baseline; gap: 10px; }
+  .name { font-family: var(--font-display); font-weight: 500; letter-spacing: -0.02em; color: var(--ink-primary); }
+  .name .dot { color: var(--accent); }
+  .tag  { font-family: var(--font-mono); font-style: italic; color: var(--ink-tertiary); letter-spacing: 0.02em; }
+  .small .name { font-size: 22px; } .small .tag { font-size: 10.5px; }
+  .med .name   { font-size: 28px; } .med .tag   { font-size: 11px; }
+  .large .name { font-size: 38px; } .large .tag { font-size: 12.5px; }
+  .lockup { display: inline-flex; align-items: center; gap: 14px; padding: 18px 22px; background: var(--bg-base); border: var(--hairline); border-radius: var(--r-md); }
+  .mark {
+    width: 32px; height: 32px;
+    border-radius: 6px;
+    border: 1px solid var(--accent-deep);
+    display: grid; place-items: center;
+    background: linear-gradient(180deg, var(--bg-raised), var(--bg-sunken));
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 19px;
+    color: var(--accent);
+    letter-spacing: -0.02em;
+    line-height: 1;
+  }
+  .mark::after { content: "."; color: var(--accent); }
+</style>
+</head>
+<body>
+  <div class="stack">
+    <div class="lockup">
+      <div class="mark">P</div>
+      <div class="brand-row large"><span class="name">Promptibrary<span class="dot">.</span></span><span class="tag">// agentic operator console</span></div>
+    </div>
+    <div class="brand-row med"><span class="name">Promptibrary<span class="dot">.</span></span><span class="tag">// agentic operator console</span></div>
+    <div class="brand-row small"><span class="name">Promptibrary<span class="dot">.</span></span><span class="tag">// agentic operator console</span></div>
+  </div>
+</body>
+</html>

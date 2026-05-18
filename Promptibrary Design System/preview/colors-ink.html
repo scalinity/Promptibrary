@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Ink — text scale</title>
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../typography.css">
+<link rel="stylesheet" href="../base.css">
+<style>
+  body { padding: 24px; background: var(--bg-base); width: 700px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .row {
+    display: grid;
+    grid-template-columns: 16px 1fr auto;
+    gap: 14px;
+    align-items: center;
+    padding: 14px 16px;
+    border: var(--hairline);
+    border-radius: var(--r-md);
+    background: var(--bg-deep);
+  }
+  .dot { width: 12px; height: 12px; border-radius: 2px; border: 1px solid var(--border-subtle); }
+  .specimen { font-family: var(--font-ui); font-size: 15px; letter-spacing: -0.005em; }
+  .meta { font-family: var(--font-mono); font-size: 10px; color: var(--ink-dim); letter-spacing: 0.01em; text-align: right; }
+  .meta .name { color: var(--ink-tertiary); }
+</style>
+</head>
+<body>
+  <div class="grid">
+    <div class="row">
+      <div class="dot" style="background:var(--ink-primary)"></div>
+      <div class="specimen" style="color:var(--ink-primary)">Primary text — used for body copy &amp; titles.</div>
+      <div class="meta"><div class="name">ink-primary</div><div>L .96</div></div>
+    </div>
+    <div class="row">
+      <div class="dot" style="background:var(--ink-secondary)"></div>
+      <div class="specimen" style="color:var(--ink-secondary)">Secondary text — supporting prose and meta.</div>
+      <div class="meta"><div class="name">ink-secondary</div><div>L .74</div></div>
+    </div>
+    <div class="row">
+      <div class="dot" style="background:var(--ink-tertiary)"></div>
+      <div class="specimen" style="color:var(--ink-tertiary)">Tertiary — labels, captions, sort menus.</div>
+      <div class="meta"><div class="name">ink-tertiary</div><div>L .54</div></div>
+    </div>
+    <div class="row">
+      <div class="dot" style="background:var(--ink-dim)"></div>
+      <div class="specimen" style="color:var(--ink-dim)">Dim — separators, disabled, comment glyphs.</div>
+      <div class="meta"><div class="name">ink-dim</div><div>L .38</div></div>
+    </div>
+  </div>
+</body>
+</html>

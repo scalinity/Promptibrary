@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Variable fields</title>
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../typography.css">
+<link rel="stylesheet" href="../base.css">
+<link rel="stylesheet" href="../app.css">
+<style>
+  body { padding: 22px 26px; background: var(--bg-base); width: 700px; }
+  .section-label { font-size: 12px; }
+  .header-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+</style>
+</head>
+<body>
+  <div class="header-row">
+    <span class="section-label">variables</span>
+    <span style="font-family:var(--font-mono); font-size:10.5px; color:var(--ink-dim); letter-spacing:0.04em">4 fields · 2 required</span>
+  </div>
+  <div class="var-grid">
+    <div class="var-field">
+      <div class="var-label"><span class="name">repo</span><span class="type">PATH</span><span class="req">*</span></div>
+      <div class="picker"><span class="glyph">⊟</span><span class="path">~/code/aurora</span></div>
+    </div>
+    <div class="var-field">
+      <div class="var-label"><span class="name">branch</span><span class="type">REF</span><span class="opt">— optional</span></div>
+      <input class="input" value="main">
+    </div>
+    <div class="var-field wide">
+      <div class="var-label"><span class="name">failing_test</span><span class="type">GLOB</span><span class="req">*</span></div>
+      <input class="input empty-required" placeholder="src/lib/stream.test.ts:42">
+    </div>
+    <div class="var-field wide">
+      <div class="var-label"><span class="name">extra_context</span><span class="type">TEXT</span><span class="opt">— optional</span></div>
+      <textarea class="textarea">Started failing after a98e3 (chunked-encoding swap). Repro requires --keepalive flag.</textarea>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Promptibrary screens — index</title>
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../typography.css">
+<link rel="stylesheet" href="../base.css">
+<style>
+  body { padding: 36px 48px 80px; background: var(--bg-deep); }
+  h1 { font-family: var(--font-display); font-weight: 500; font-size: 32px; letter-spacing: -0.02em; color: var(--ink-primary); margin: 0 0 6px; }
+  .lede { font-family: var(--font-mono); font-size: 12px; color: var(--ink-tertiary); letter-spacing: 0.01em; margin-bottom: 32px; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+  .card {
+    background: var(--bg-base);
+    border: var(--hairline);
+    border-radius: var(--r-md);
+    overflow: hidden;
+    text-decoration: none;
+    display: block;
+    transition: border-color var(--motion-snap);
+  }
+  .card:hover { border-color: var(--border-mid); }
+  .card .thumb {
+    aspect-ratio: 1360/880;
+    background: var(--bg-deep);
+    border-bottom: var(--hairline);
+    position: relative;
+    overflow: hidden;
+  }
+  .card .thumb iframe {
+    border: none;
+    width: 1360px;
+    height: 880px;
+    transform: scale(0.27);
+    transform-origin: top left;
+    pointer-events: none;
+  }
+  .card .meta { padding: 14px 16px 16px; }
+  .card .num {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+  .card .title {
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: 17px;
+    letter-spacing: -0.01em;
+    color: var(--ink-primary);
+    margin: 4px 0 2px;
+  }
+  .card .desc { font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-tertiary); letter-spacing: 0.01em; }
+</style>
+</head>
+<body>
+  <div class="grain"></div>
+  <h1>Screens</h1>
+  <div class="lede">// nine full-fidelity 1360×880 references covering the product's lifecycle</div>
+  <div class="grid">
+    <a class="card" href="01-library-compose.html"><div class="thumb"><iframe src="01-library-compose.html"></iframe></div><div class="meta"><div class="num">01</div><div class="title">Library + Compose</div><div class="desc">default state — sidebar · list · variables · prompt · launch</div></div></a>
+    <a class="card" href="02-library-run.html"><div class="thumb"><iframe src="02-library-run.html"></iframe></div><div class="meta"><div class="num">02</div><div class="title">Library + Run</div><div class="desc">terminal pane, scanlines, pulse indicators</div></div></a>
+    <a class="card" href="03-import.html"><div class="thumb"><iframe src="03-import.html"></iframe></div><div class="meta"><div class="num">03</div><div class="title">Import from link</div><div class="desc">URL → extraction → candidate picker</div></div></a>
+    <a class="card" href="04-past-run.html"><div class="thumb"><iframe src="04-past-run.html"></iframe></div><div class="meta"><div class="num">04</div><div class="title">Past run viewer</div><div class="desc">read-only transcript with outcome badge</div></div></a>
+    <a class="card" href="05-history-diff.html"><div class="thumb"><iframe src="05-history-diff.html"></iframe></div><div class="meta"><div class="num">05</div><div class="title">History · diff</div><div class="desc">version list + unified diff in mono</div></div></a>
+    <a class="card" href="06-command-palette.html"><div class="thumb"><iframe src="06-command-palette.html"></iframe></div><div class="meta"><div class="num">06</div><div class="title">Command palette</div><div class="desc">prompts, actions, tags · accent spine on active</div></div></a>
+    <a class="card" href="07-settings.html"><div class="thumb"><iframe src="07-settings.html"></iframe></div><div class="meta"><div class="num">07</div><div class="title">Settings</div><div class="desc">§ sections · keychain reveals · toggles</div></div></a>
+    <a class="card" href="08-empty.html"><div class="thumb"><iframe src="08-empty.html"></iframe></div><div class="meta"><div class="num">08</div><div class="title">Empty library</div><div class="desc">editorial first-run · single Boska headline</div></div></a>
+    <a class="card" href="09-disconnected.html"><div class="thumb"><iframe src="09-disconnected.html"></iframe></div><div class="meta"><div class="num">09</div><div class="title">Disconnected</div><div class="desc">missing claude on PATH · diagnostic card</div></div></a>
+  </div>
+</body>
+</html>
