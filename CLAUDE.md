@@ -77,6 +77,25 @@ Keep it readable when opened in a browser — minimal styling is fine, but it sh
 
 **Every piece of work gets a Linear ticket before you start it.** Features, bug fixes, refactors, doc updates, dependency bumps, CI changes, spec corrections — all of it. No silent commits.
 
+### Linear coordinates (don't go searching — they're here)
+
+- **Team:** `Scalinity` (key `SCA`) — pass `team: "Scalinity"` to `mcp__linear-server__save_issue`.
+- **Project:** `Promptibrary` (slug `promptibrary-a74809f89842`) — pass `project: "Promptibrary"`.
+- **Layer parent issues** (use as `parentId` when filing sub-issues):
+
+  | Layer | Parent ID | Title | Status |
+  |---|---|---|---|
+  | L0 | `SCA-543` | L0 — Foundations | filed |
+  | L1 | — | L1 — Vault and Variables | **not yet filed** |
+  | L2 | — | L2 — IPC and Frontend Shell | **not yet filed** |
+  | L3 | — | L3 — Launch Pipeline | **not yet filed** |
+  | L4 | — | L4 — Extraction | **not yet filed** |
+  | L5 | — | L5 — Polish and Ship | **not yet filed** |
+
+  When you start a new layer, file the parent ticket first, then update this table in the same commit as the first sub-issue's work.
+
+- **Labels — reality check.** The taxonomy this file prescribes (`feature` / `bug` / `refactor` / `docs` / `infra` / `chore`, plus `L0`–`L5`) is **not yet provisioned** in the SCA team. Existing SCA tickets ship with `labels: []`. Until the labels are created, match existing convention and file without labels. If you provision them via `mcp__linear-server__create_issue_label`, update this note in the same commit.
+
 ### Workflow
 
 1. **Before starting work**, create a Linear ticket via the Linear MCP. Required fields:
