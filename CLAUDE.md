@@ -37,6 +37,42 @@ Each `Prompts/L*.md` declares an **In scope** list and an **Out of scope** list.
 
 ---
 
+## Implementation notes log
+
+Maintain a running `docs/implementation-notes.html` documenting anything the human reviewer needs to know that **isn't already captured by the spec, a Linear ticket, or a commit message**. This is the "things you should know" channel — decisions, deviations, and tradeoffs that don't have an obvious home elsewhere.
+
+### What goes in it
+
+- **Decisions made under-spec**: the spec was silent or ambiguous, you chose a path, here's what and why.
+- **Deviations from the spec**: you had to do X instead of Y; reference the spec section, explain why, link the reconciling commit/ticket if any.
+- **Tradeoffs**: chose simplicity over completeness, perf over readability, etc. — note what was given up.
+- **Surprises**: an API behaved differently than expected, a crate version didn't have a documented feature, a CLI flag was renamed.
+- **Workarounds**: temporary hacks with a "remove when X" condition. Each gets a follow-up ticket ID inline.
+
+### What does NOT go in it
+
+- Spec-conformant work (the spec already says it).
+- Bug fixes (the commit + ticket say it).
+- Layer-scoped observations that go in `docs/notes/L<n>-observations.md` (those stay there).
+- Anything sensitive (keys, paths with PII, internal URLs).
+
+### Format
+
+Single HTML file, append-only, newest entries at the top. Each entry:
+
+```html
+<article data-date="YYYY-MM-DD" data-layer="L<n>" data-ticket="<TICKET-ID>">
+  <h3>Short title</h3>
+  <p><strong>Context:</strong> what you were doing.</p>
+  <p><strong>Decision / change / tradeoff:</strong> what you did and why.</p>
+  <p><strong>Impact:</strong> what this means going forward, what to revisit, when.</p>
+</article>
+```
+
+Keep it readable when opened in a browser — minimal styling is fine, but it should be scannable, not a wall of text. Update it the same commit as the change it documents; never batch retroactively.
+
+---
+
 ## Linear ticket discipline
 
 **Every piece of work gets a Linear ticket before you start it.** Features, bug fixes, refactors, doc updates, dependency bumps, CI changes, spec corrections — all of it. No silent commits.
