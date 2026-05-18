@@ -24,6 +24,15 @@ Per the L0 prompt: JetBrains Mono Variable is bundled locally; Boska Variable an
 
 The working directory and GitHub repo name are `Promptibary` (a typo that predated L0). Product/binary/spec spelling is `Promptibrary` (with the `r`). No code change in L0; flag as a V2 candidate if the user wants to rename the repo.
 
+### 2026-05-18 — Four files added beyond literal spec §3
+
+The following files exist in the L0 scaffold but are not literally enumerated in spec §3. Each is justified and documented in-file:
+
+1. `src/shared/ui/button.tsx` — wrapper re-export per spec §3's wrapper-layer pattern. Required by the L0 prompt's ESLint boundary smoke test ("fix it by re-exporting through `src/shared/ui/button.tsx`").
+2. `src/shared/lib/utils.ts` — shadcn convention. `components.json` aliases `utils` to `@/shared/lib/utils` per the L0 prompt requirement; the existing `src/shared/lib/cn.ts` re-exports from it.
+3. `src/shared/types/enums.ts` — shared enum types (`LaunchDestination`, `ClaudeModelId`, etc.) that the other typed files import. Spec §4 declares these enums but doesn't name a host file; consolidating them avoids duplication.
+4. `src/__tests__/smoke.test.ts` — Vitest smoke test mandated by L0 prompt ("Vitest: src/__tests__/smoke.test.ts").
+
 ### 2026-05-18 — `src/shared/ui/button.tsx` added as wrapper (not literally in spec §3)
 
 Spec §3 lists the `shared/ui/shadcn/` directory for shadcn primitives and a row of wrapper components (app-shell, sidebar, topbar, etc.) but does not literally enumerate `button.tsx` as a wrapper file. The L0 prompt explicitly requires it ("fix it by re-exporting through `src/shared/ui/button.tsx`"). I treated this as a justified extension of §3's wrapper-layer pattern. The ESLint `no-restricted-imports` boundary is verified to catch a direct `@/shared/ui/shadcn/button` import in a feature component, and the wrapper at `@/shared/ui/button` passes.

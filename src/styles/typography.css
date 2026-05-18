@@ -4,7 +4,8 @@
    No others. Ever.
    ============================================================ */
 
-@import url("https://api.fontshare.com/v2/css?f[]=boska@400,500,700,400i&f[]=switzer@400,500,600&display=swap");
+/* The Fontshare CDN @import for Boska + Switzer lives at the top of
+   `src/index.css` so it precedes every CSS rule (PostCSS requirement). */
 
 /* === Additions beyond canonical design system ===
    JetBrains Mono Variable is bundled locally per L0 prompt and spec §8.
