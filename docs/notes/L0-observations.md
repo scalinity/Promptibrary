@@ -24,6 +24,10 @@ Per the L0 prompt: JetBrains Mono Variable is bundled locally; Boska Variable an
 
 The working directory and GitHub repo name are `Promptibary` (a typo that predated L0). Product/binary/spec spelling is `Promptibrary` (with the `r`). No code change in L0; flag as a V2 candidate if the user wants to rename the repo.
 
+### 2026-05-18 — `src/shared/ui/button.tsx` added as wrapper (not literally in spec §3)
+
+Spec §3 lists the `shared/ui/shadcn/` directory for shadcn primitives and a row of wrapper components (app-shell, sidebar, topbar, etc.) but does not literally enumerate `button.tsx` as a wrapper file. The L0 prompt explicitly requires it ("fix it by re-exporting through `src/shared/ui/button.tsx`"). I treated this as a justified extension of §3's wrapper-layer pattern. The ESLint `no-restricted-imports` boundary is verified to catch a direct `@/shared/ui/shadcn/button` import in a feature component, and the wrapper at `@/shared/ui/button` passes.
+
 ### 2026-05-18 — `tauri build` in CI requires Linux system dependencies
 
 The spec's CI matrix builds on both `macos-14` and `ubuntu-24.04`. Ubuntu Tauri 2.x builds need apt packages (`libwebkit2gtk-4.1-dev`, `build-essential`, `curl`, `wget`, `file`, `libxdo-dev`, `libssl-dev`, `libayatana-appindicator3-dev`, `librsvg2-dev`). The L0 CI workflow installs these on the Ubuntu runner.
