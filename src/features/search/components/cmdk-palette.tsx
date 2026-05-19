@@ -193,7 +193,8 @@ export function CmdKPalette(): React.JSX.Element {
           <button
             type="button"
             onClick={toggleSemantic}
-            title="Toggle semantic search (currently text-only — embedding model lands in a follow-up)"
+            disabled
+            title="Semantic search lands with the embedding model (V2-deferred per docs/notes/L5-observations.md) — Cmd-K is text-only for V1"
             aria-pressed={semantic}
             style={{
               fontFamily: "var(--font-mono)",
@@ -205,7 +206,8 @@ export function CmdKPalette(): React.JSX.Element {
               border: "1px solid var(--border-subtle)",
               borderRadius: "var(--r-xs)",
               padding: "2px 8px",
-              cursor: "pointer",
+              cursor: "not-allowed",
+              opacity: 0.55,
             }}
           >
             sem
