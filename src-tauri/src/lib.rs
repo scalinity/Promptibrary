@@ -38,7 +38,7 @@ pub fn run() {
             // commands::vault
             commands::vault::select_vault,
             commands::vault::validate_vault,
-            commands::vault::scan_vault,
+            commands::vault::scan_vault_cmd,
             commands::vault::rebuild_index,
             commands::vault::get_vault_status,
             // commands::prompts
@@ -46,7 +46,7 @@ pub fn run() {
             commands::prompts::get_prompt,
             commands::prompts::create_prompt,
             commands::prompts::update_prompt,
-            commands::prompts::archive_prompt,
+            commands::prompts::archive_prompt_cmd,
             commands::prompts::delete_prompt,
             commands::prompts::export_prompt,
             // commands::variables
