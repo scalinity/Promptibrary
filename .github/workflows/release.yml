@@ -45,6 +45,14 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
+      # SCA-744: every uses: pinned to a major-version tag. Dependabot
+      # (config in .github/dependabot.yml) opens PRs as new versions
+      # ship; pinning to full SHAs is a follow-up once Dependabot lands
+      # the first round of SHA-locked PRs. Today we accept moving major
+      # tags as the V1 ceiling — they're more secure than `@main` /
+      # `@master` (no force-push at the major tag) but less secure than
+      # full SHAs. The remaining gap is closed when Dependabot's
+      # `versioning-strategy: lockfile-only` rotates SHAs on a cadence.
       - uses: actions/checkout@v4
 
       - name: Install Linux Tauri system deps
@@ -63,8 +71,6 @@ jobs:
             librsvg2-dev
 
       - uses: pnpm/action-setup@v4
-        with:
-          version: 10
 
       - uses: actions/setup-node@v4
         with:
@@ -77,8 +83,6 @@ jobs:
 
       - name: Cargo cache
         uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri -> target
 
       - run: pnpm install --frozen-lockfile
 
