@@ -42,6 +42,9 @@ pub struct YouTubeSource {
     pub author: Option<String>,
     pub fetched_at: Option<DateTime<Utc>>,
     pub content_hash: Option<String>,
+    // TODO(L4): video_id must be non-empty when constructed. Introduce a
+    // `VideoId(String)` newtype with a `try_new` validator (or `serde(deserialize_with = ...)`)
+    // once the L4 fetcher lands so empty strings can't slip through.
     pub video_id: String,
     pub channel_name: Option<String>,
     pub transcript_language: Option<String>,
@@ -56,6 +59,9 @@ pub struct XTwitterSource {
     pub author: Option<String>,
     pub fetched_at: Option<DateTime<Utc>>,
     pub content_hash: Option<String>,
+    // TODO(L4): same non-empty invariant as `YouTubeSource::video_id` — wrap
+    // as `PostId(String)` newtype with construction validation when the L4
+    // X/Twitter fetcher lands.
     pub post_id: String,
     pub username: Option<String>,
     pub thread_post_ids: Vec<String>,

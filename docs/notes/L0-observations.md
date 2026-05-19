@@ -37,6 +37,14 @@ The following files exist in the L0 scaffold but are not literally enumerated in
 
 Spec §3 lists the `shared/ui/shadcn/` directory for shadcn primitives and a row of wrapper components (app-shell, sidebar, topbar, etc.) but does not literally enumerate `button.tsx` as a wrapper file. The L0 prompt explicitly requires it ("fix it by re-exporting through `src/shared/ui/button.tsx`"). I treated this as a justified extension of §3's wrapper-layer pattern. The ESLint `no-restricted-imports` boundary is verified to catch a direct `@/shared/ui/shadcn/button` import in a feature component, and the wrapper at `@/shared/ui/button` passes.
 
+### 2026-05-18 — Playwright E2E targets the Vite dev server, not the Tauri binary (SCA-582)
+
+`playwright.config.ts` points at `http://localhost:1420` so the title smoke test exercises the Vite-served HTML, not the actual Tauri window. This means the IPC layer is **not** exercised by E2E in L0. Real Tauri-window E2E requires `tauri-driver` + a Selenium/WebDriver runner (or `@tauri-apps/cli`'s `webdriver` command). L2 should swap the Playwright config (or replace with `webdriverio`) to drive `target/debug/promptibrary` directly so route navigation and `invoke()` calls are part of the test surface.
+
+### 2026-05-18 — `no-restricted-imports` override scope is broader than necessary (SCA-583)
+
+`eslint.config.js` disables the shadcn import boundary for everything under `src/shared/ui/**`. Only two files live there today (`button.tsx` wrapper and `shadcn/button.tsx`), so the loose scope is harmless. Once L2 lands more shadcn wrappers, tighten the exemption to `src/shared/ui/*.tsx` only (depth-1) so files inside `src/shared/ui/<subdir>/` re-impose the boundary — otherwise future wrappers can accidentally import from each other's shadcn primitives.
+
 ### 2026-05-18 — `tauri build` in CI requires Linux system dependencies
 
 The spec's CI matrix builds on both `macos-14` and `ubuntu-24.04`. Ubuntu Tauri 2.x builds need apt packages (`libwebkit2gtk-4.1-dev`, `build-essential`, `curl`, `wget`, `file`, `libxdo-dev`, `libssl-dev`, `libayatana-appindicator3-dev`, `librsvg2-dev`). The L0 CI workflow installs these on the Ubuntu runner.
