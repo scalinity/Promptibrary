@@ -215,7 +215,24 @@ export const detectSourceTyped: typeof Real.detectSourceTyped = (url) => {
 };
 
 export const fetchSourcePreview: typeof Real.fetchSourcePreview = ({ url }) => {
-  // Lazy import to avoid pulling the fixture bundle into prod builds.
+  // URL-based failure injection lets visual specs reach the paywall and
+  // transcript-unavailable states without per-spec mock surgery.
+  if (url.includes("paywalled")) {
+    return ok({
+      outcome: "failed",
+      failure: {
+        kind: "paywall_likely",
+        preview:
+          "Members only — subscribe to read the rest of this article. Promptibrary detected a paywall.",
+      },
+    });
+  }
+  if (url.includes("notranscript")) {
+    return ok({
+      outcome: "failed",
+      failure: { kind: "transcript_unavailable" },
+    });
+  }
   return import("../../../tests/fixtures/visual/sources").then((mod) =>
     ok(mod.fetchedSourceFixtureFor(url)),
   );
