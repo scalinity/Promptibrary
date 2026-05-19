@@ -1210,4 +1210,39 @@ mod tests {
         assert_eq!(res[0].name, "ops");
         assert_eq!(res[0].usage_count, 2);
     }
+
+    /// SCA-755 invariant: the static cmdk action + route catalogs
+    /// are duplicated in `src/shared/api/ipc.mock.ts` (so visual
+    /// tests show realistic mixed-kind results). A change here MUST
+    /// be paired with the same change there, or the mock-real
+    /// contract drifts. This snapshot test pins the Rust expectation
+    /// — any backend-side modification fails the test, which forces
+    /// the contributor to either restore the catalog or update both
+    /// sides (and review the visual baselines that depend on it).
+    #[test]
+    fn cmdk_action_catalog_snapshot() {
+        let items = cmdk_actions("");
+        let ids: Vec<&str> = items.iter().map(|r| r.id.as_str()).collect();
+        assert_eq!(
+            ids,
+            vec![
+                "new-prompt",
+                "import-url",
+                "rebuild-index",
+                "run-diagnostics",
+                "reveal-vault",
+                "repair-orphans",
+            ]
+        );
+    }
+
+    #[test]
+    fn cmdk_route_catalog_snapshot() {
+        let items = cmdk_routes("");
+        let ids: Vec<&str> = items.iter().map(|r| r.id.as_str()).collect();
+        // SCA-738: catalog pruned to the three routes registered in
+        // src/router.tsx. SCA-755 pins the set so future router
+        // additions can be reconciled deliberately.
+        assert_eq!(ids, vec!["library", "import", "settings"]);
+    }
 }
