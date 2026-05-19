@@ -28,6 +28,20 @@ pub enum ClaudeModelId {
     Opus,
 }
 
+impl ClaudeModelId {
+    /// Wire form used when sending the model field across IPC or to the
+    /// Anthropic Messages API. Matches the `#[serde(rename = "…")]`
+    /// attributes above.
+    pub fn as_wire(self) -> &'static str {
+        match self {
+            Self::ClaudeSonnet46 => "claude-sonnet-4-6",
+            Self::ClaudeOpus47 => "claude-opus-4-7",
+            Self::Sonnet => "sonnet",
+            Self::Opus => "opus",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum ClaudePermissionMode {
