@@ -20,10 +20,6 @@ Rust was not present on the dev machine. Installed `stable-aarch64-apple-darwin`
 
 Per the L0 prompt: JetBrains Mono Variable is bundled locally; Boska Variable and Switzer Variable load from the Fontshare CDN for now. Local bundling of those two families is a V2 polish item.
 
-### 2026-05-18 — Repository name is `Promptibary` (no `r`) but product is `Promptibrary`
-
-The working directory and GitHub repo name are `Promptibary` (a typo that predated L0). Product/binary/spec spelling is `Promptibrary` (with the `r`). No code change in L0; flag as a V2 candidate if the user wants to rename the repo.
-
 ### 2026-05-18 — Four files added beyond literal spec §3
 
 The following files exist in the L0 scaffold but are not literally enumerated in spec §3. Each is justified and documented in-file:
@@ -70,5 +66,4 @@ L1 review (SCA-585) is the right place to triage that work formally. The L0 revi
 
 ## V2 punch list (also in `docs/V2-CANDIDATES.md`)
 
-- Rename GitHub repo `Promptibary` → `Promptibrary`.
 - Bundle Boska + Switzer locally instead of CDN.

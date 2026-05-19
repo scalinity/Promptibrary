@@ -4,7 +4,7 @@ version = "0.0.0"
 description = "Promptibrary — agentic-coding operator console for Claude Code."
 authors = ["Scalinity"]
 license = "UNLICENSED"
-repository = "https://github.com/scalinity/Promptibary"
+repository = "https://github.com/scalinity/Promptibrary"
 edition = "2021"
 rust-version = "1.77"
 
