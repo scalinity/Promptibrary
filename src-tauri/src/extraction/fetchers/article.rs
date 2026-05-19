@@ -571,15 +571,31 @@ fn extract_jsonld_string(doc: &Html, path: &[&str]) -> Option<String> {
 
 fn traverse_path(value: &serde_json::Value, path: &[&str]) -> Option<String> {
     let mut current = value;
-    for &p in path {
-        current = current.get(p)?;
+    for (i, &p) in path.iter().enumerate() {
+        // SCA-714: support the common JSON-LD shape where intermediate
+        // keys point at arrays (e.g. `author: [{"name": "Alice"}]`).
+        // When we encounter an array, look at its first element and
+        // resume the path traversal there. If the leaf itself is an
+        // array, we still handle it in the match below.
+        if let serde_json::Value::Array(items) = current {
+            current = items.first()?;
+        }
+        // The final segment can return the array directly (handled
+        // below) — only descend by key for non-leaf segments.
+        if i < path.len() {
+            current = current.get(p)?;
+        }
     }
     match current {
         serde_json::Value::String(s) => Some(s.clone()),
         serde_json::Value::Array(items) => items.first().and_then(|v| match v {
             serde_json::Value::String(s) => Some(s.clone()),
+            // Array of objects like [{"name": "Alice"}] — pull the
+            // immediate `name` field rather than recursing the full path
+            // (the path's last segment is the key we just landed on).
             serde_json::Value::Object(_) => v
-                .get(*path.last().unwrap_or(&""))
+                .get("name")
+                .or_else(|| v.get(*path.last().unwrap_or(&"")))
                 .and_then(|v| v.as_str().map(str::to_string)),
             _ => None,
         }),
@@ -747,6 +763,20 @@ mod tests {
             p.published_at_rfc3339.as_deref(),
             Some("2026-05-19T10:00:00Z")
         );
+    }
+
+    #[test]
+    fn jsonld_author_array_of_objects() {
+        // SCA-714: the common JSON-LD shape uses `author: [{"name":…}]`.
+        let html = r#"
+            <html><head>
+              <script type="application/ld+json">
+              {"@type":"NewsArticle","author":[{"name":"Alice"}],"datePublished":"2026-05-19T10:00:00Z"}
+              </script>
+            </head><body><article><p>x</p></article></body></html>
+        "#;
+        let p = parse(html);
+        assert_eq!(p.author.as_deref(), Some("Alice"));
     }
 
     #[test]
