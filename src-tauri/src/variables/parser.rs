@@ -667,6 +667,22 @@ pub fn set_source(v: &mut Variable, s: VariableSource) {
     }
 }
 
+/// Merge a parser-discovered Variable record with its frontmatter
+/// declaration.
+///
+/// **Order semantics (SCA-613):** the merged variable takes the
+/// frontmatter's `order` field, not the parser's lexical position. This
+/// is intentional per spec §5 — the frontmatter is the authoritative
+/// source for UI ordering so the prompt author can sort their form
+/// independently of how the variable refs happen to appear in the body
+/// (e.g. "show `target_file` first even though it's referenced last in
+/// the prompt").
+///
+/// If a frontmatter variable lacks an explicit `order`, serde defaults
+/// the field to `0`, which collapses all such variables to the top of
+/// the UI. Authors who want lexical ordering should omit the variable
+/// entry from frontmatter; the parser-discovered Variable (with
+/// `source = Parsed` and lexical `order`) is then used directly.
 fn merge_frontmatter(parsed: Variable, fm: Variable) -> Variable {
     match (parsed, fm) {
         (Variable::File(_), Variable::File(fm)) => Variable::File(FileVariable {
