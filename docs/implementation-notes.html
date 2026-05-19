@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Promptibrary — implementation notes</title>
+<style>
+  body {
+    font: 14px/1.6 -apple-system, "Helvetica Neue", system-ui, sans-serif;
+    max-width: 80ch;
+    margin: 32px auto;
+    padding: 0 24px;
+    color: #1d1d1f;
+    background: #fafafa;
+  }
+  h1 { font-size: 22px; margin: 0 0 4px; font-weight: 600; letter-spacing: -0.02em; }
+  .lede { color: #6b6b6b; margin: 0 0 32px; }
+  article {
+    background: #fff;
+    border: 1px solid #e5e5e5;
+    border-radius: 8px;
+    padding: 18px 22px;
+    margin-bottom: 16px;
+  }
+  article h3 { font-size: 15px; margin: 0 0 10px; font-weight: 600; }
+  article p { margin: 4px 0; font-size: 13.5px; }
+  article p strong { color: #444; }
+  article header { font-family: ui-monospace, monospace; font-size: 11px; color: #888; margin-bottom: 6px; }
+  code { background: #f0f0f0; padding: 1px 5px; border-radius: 3px; font-size: 12px; font-family: ui-monospace, monospace; }
+</style>
+</head>
+<body>
+
+<h1>Promptibrary — implementation notes</h1>
+<p class="lede">Things the reviewer should know that the spec, Linear tickets, and commit messages don't already capture.</p>
+
+<article data-date="2026-05-18" data-layer="L2" data-ticket="SCA-621">
+  <header>2026-05-18 · L2 · SCA-621</header>
+  <h3>L2 imports the canonical <code>app.css</code> by reference, not by re-implementing patterns inline</h3>
+  <p><strong>Context:</strong> the L2 layer prompt says "use <code>Promptibrary Design System/app.css</code> only as a reference… port patterns into proper components instead." Two readings of "port": re-implement every <code>.row</code>, <code>.btn</code>, <code>.topbar</code>, <code>.sidebar</code>, <code>.statusbar</code> in Tailwind utilities inside React components; OR import the canonical CSS once and have React components <em>use</em> those class names, which is the design-system contract.</p>
+  <p><strong>Decision / change / tradeoff:</strong> took the second reading. <code>src/styles/app.css</code> is a copy of the canonical design-system file, imported after <code>tokens.css</code> / <code>typography.css</code> / <code>base.css</code> per the documented load order. React components render the canonical class names (<code>className="row selected"</code>, <code>className="btn-launch"</code>, etc.). Tailwind utilities are used for layout glue around those classes when the canonical CSS doesn't cover it (drawer position, row meta layout in the chrome).</p>
+  <p><strong>Impact:</strong> the React app stays visually identical to the design-system mockups by construction. If the canonical CSS ever drifts (intentional design change), updating both the design-system file and <code>src/styles/app.css</code> is one mechanical copy. Visual regression baselines (when captured) lock that in. Risk: a designer-only change to the canonical file gets missed if no one re-copies; mitigate by adding a small <code>scripts/sync-design-system.mjs</code> later (queued, not in L2).</p>
+</article>
+
+<article data-date="2026-05-18" data-layer="L2" data-ticket="SCA-621">
+  <header>2026-05-18 · L2 · SCA-621</header>
+  <h3>CodeMirror variable chips are byte-offset-based for L2; UTF-16 alignment with the Rust parser lands when refs feed the variable-reference panel</h3>
+  <p><strong>Context:</strong> spec §5 mandates byte and UTF-16 offset parity between the parser and the editor. The L2 surface only renders chips via <code>Decoration.replace</code>; it does not (yet) drive selection / cursor placement from parser refs.</p>
+  <p><strong>Decision / change / tradeoff:</strong> for L2, chip placement is computed inline from a regex over the doc string (CodeMirror operates in UTF-16, regex operates in UTF-16, parity is automatic). The async <code>parseVariables</code> probe is debounced 200ms and used only for error surfacing in the editor's corner. When the variable-reference panel and click-to-focus wiring land (queued), UTF-16 offsets from the parser will drive selection — not byte offsets.</p>
+  <p><strong>Impact:</strong> chip rendering ships now without a round-trip dependency. The byte-vs-UTF-16 invariant is still verified by the L1 parser tests; the front-end will adopt parser offsets when the surfaces that need them (click → focus, selection sync) are built. Watch for: emoji prefix in a body — parser returns UTF-16 offsets that don't equal the regex match offset if the L1 path normalizes width differently. Add a fixture for this when the variable-reference panel lands.</p>
+</article>
+
+<article data-date="2026-05-18" data-layer="L2" data-ticket="SCA-621">
+  <header>2026-05-18 · L2 · SCA-621</header>
+  <h3>Vite default safari target bumped 13 → 16</h3>
+  <p><strong>Context:</strong> the L0 scaffold set <code>build.target: "safari13"</code>. CodeMirror 6 and <code>@uiw/react-codemirror</code> ship modern JS that includes destructuring patterns esbuild can't lower past safari14.</p>
+  <p><strong>Decision / change / tradeoff:</strong> raised the default to <code>safari16</code>. Tauri's bundled WKWebView on macOS 12+ already supports it; the cross-platform fallback (Windows = chrome105) is unchanged.</p>
+  <p><strong>Impact:</strong> Tauri V1 ships only macOS, and Tauri 2.x's macOS minimum is 11+ (WKWebView 14.1+), so this is invisible to users. If we add a Linux build target later and a system webview turns out to be older, revisit. Tracked: no follow-up needed unless the platform matrix expands.</p>
+</article>
+
+</body>
+</html>

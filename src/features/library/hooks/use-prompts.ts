@@ -1,7 +1,17 @@
-// Query hook fetching prompt list via list_prompts.
+// Prompts query hook — wraps `listPrompts` IPC with TanStack Query.
 //
-// L0 scaffold — hook stub. Real implementation in a later layer.
+// The library route uses this for the row list AND to seed the sidebar
+// counts (via the route-level effect). FTS-backed search is L5; the L2
+// surface filters client-side.
 
-export function usePrompts(): never {
-  throw new Error('usePrompts is not implemented yet (L0 scaffold).');
+import { useQuery } from "@tanstack/react-query";
+
+import { listPrompts } from "@/shared/api/ipc";
+import { promptKeys } from "@/shared/api/queryKeys";
+
+export function usePrompts(includeArchived = false) {
+  return useQuery({
+    queryKey: promptKeys.list({ includeArchived }),
+    queryFn: () => listPrompts({ includeArchived }),
+  });
 }

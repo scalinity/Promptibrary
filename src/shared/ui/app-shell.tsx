@@ -1,7 +1,30 @@
-// Top-level app chrome wrapper (sidebar + topbar + outlet).
+// AppShell — three-pane chrome (topbar / workspace / status bar).
 //
-// L0 scaffold — component stub. Real implementation in a later layer.
+// Mirrors the `.app-frame` layout from `Promptibrary Design System/app.css`.
+// Renders the persistent chrome and slots route content into the workspace.
 
-export function AppShell(): null {
-  return null;
+import { Topbar } from "./topbar";
+import { Sidebar } from "./sidebar";
+import { StatusLine } from "./status-line";
+
+export interface AppShellProps {
+  children: React.ReactNode;
+}
+
+export function AppShell({ children }: AppShellProps): React.JSX.Element {
+  return (
+    <>
+      <div className="grain" aria-hidden="true" />
+      <div className="app-frame">
+        <Topbar />
+        <div className="workspace">
+          <Sidebar />
+          <div className="route-outlet" style={{ display: "contents" }}>
+            {children}
+          </div>
+        </div>
+        <StatusLine />
+      </div>
+    </>
+  );
 }

@@ -17,6 +17,7 @@
 @import "./styles/tokens.css";
 @import "./styles/typography.css";
 @import "./styles/base.css";
+@import "./styles/app.css";
 
 @theme {
   /* Surfaces */
@@ -52,4 +53,16 @@
   --font-display: var(--font-display);
   --font-ui: var(--font-ui);
   --font-mono: var(--font-mono);
+}
+
+/* Utility keyframe used by LoadingSpinner. The design system's base.css
+   defines the ambient pulse / glow / blink animations; this is a generic
+   indeterminate spinner rotation and lives here rather than polluting the
+   canonical base layer. */
+@keyframes pb-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  @keyframes pb-spin { from, to { transform: none; } }
 }
