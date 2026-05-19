@@ -26,3 +26,15 @@ The user pre-edited `CLAUDE.md` to capture the L5 updater clarification:
 
 The CLAUDE.md change ships in the same commit as the updater ticket work (not the icon ticket).
 
+### Linear MCP auth intermittency during L5
+
+The Linear MCP server intermittently returns `token expired` mid-session even after a fresh `/login` round-trip. When that happens during L5 sub-ticket filing, the workflow falls back to:
+
+1. Commit references the L5 parent `SCA-729` instead of a sub-ticket ID.
+2. The commit subject still encodes the area (`feat(search): ...`), and the body cites the parent.
+3. The sub-ticket is filed retroactively once the MCP reconnects, and the back-fill is noted here with `<commit-sha> → SCA-<id>` so the audit trail is recoverable.
+
+Pending back-fills (sub-tickets to file once Linear reconnects):
+
+- `feat(search): FTS5 read surface + search_prompts/suggest_tags IPC` — landed against SCA-729 parent.
+
