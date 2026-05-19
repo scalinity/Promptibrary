@@ -65,6 +65,16 @@ pub async fn select_vault(
     let db = open_index_pool().await?;
     run_migrations(&db).await?;
 
+    // Best-effort: drop expired extraction-cache rows on every vault
+    // attach so stale source previews + candidates don't pile up across
+    // sessions (SCA-710). A failure here is non-fatal — we just log and
+    // continue rather than refuse to open the vault.
+    match crate::extraction::cache::purge_expired(&db).await {
+        Ok(n) if n > 0 => tracing::info!(rows = n, "purged expired extraction cache rows"),
+        Ok(_) => {}
+        Err(e) => tracing::warn!(error = %e, "extraction cache purge failed; continuing"),
+    }
+
     let mut state = services.state.write().await;
     state.vault = Some(vault);
     state.db = Some(db);
