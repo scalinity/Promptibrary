@@ -19,7 +19,21 @@ const SHADCN_IMPORT_BOUNDARY = {
 };
 
 export default tseslint.config(
-  { ignores: ["dist", "node_modules", "src-tauri/target", "src-tauri/gen", "playwright-report", "test-results"] },
+  {
+    ignores: [
+      "dist",
+      "node_modules",
+      "src-tauri/target",
+      "src-tauri/gen",
+      "playwright-report",
+      "test-results",
+      // SCA-624: parallel-agent worktrees under .claude/ contain
+      // generated Tauri assets (tauri-codegen-assets/*.js) that aren't
+      // valid JS and aren't part of our checked-in source. Lint must
+      // not scan them.
+      ".claude/**",
+    ],
+  },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ["**/*.{ts,tsx}"],
