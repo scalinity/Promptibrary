@@ -7,6 +7,12 @@
 //
 // On failure, every export throws an `AppErrorDto`. Underlying Tauri errors
 // that don't match the shape are wrapped as `Internal`.
+//
+// IMPORTANT: Tauri 2 commands written `fn name(input: SomeInput, ...)` expect
+// the JS side to send `{ input: { ...args } }` — the wrapper key matches the
+// Rust parameter NAME. Commands with no input parameter (or with only `State`)
+// take no args. Each wrapper below mirrors the actual Rust signature in
+// `src-tauri/src/commands/*.rs`.
 
 import { invoke as tauriInvoke } from "@tauri-apps/api/core";
 
@@ -18,7 +24,6 @@ import type {
   RunId,
 } from "@/shared/types/ids";
 import type { Prompt, LaunchDefaults } from "@/shared/types/prompt";
-import type { Source } from "@/shared/types/source";
 import type {
   AppSettings,
   SecretKey,
@@ -30,7 +35,7 @@ import type {
   LaunchProfile,
 } from "@/shared/types/launch";
 import type { Run } from "@/shared/types/run";
-import type { Variable } from "@/shared/types/variable";
+import type { Variable, VariableType, SelectOption } from "@/shared/types/variable";
 
 export type IpcCommand = string;
 
@@ -62,44 +67,95 @@ export async function invoke<T>(
 
 // ─── Vault ────────────────────────────────────────────────────────────────
 
+/**
+ * Mirrors `src-tauri/src/commands/vault.rs::VaultStatus`. The L2 surface
+ * derives display state (`exists` / `isGitRepo` / `writable` / `watcher`)
+ * from the two real fields — see use-vault-status helpers in the settings
+ * panel.
+ */
 export interface VaultStatus {
-  path: AbsolutePath | null;
-  exists: boolean;
-  isGitRepo: boolean;
-  writable: boolean;
-  watcherRunning: boolean;
+  vaultRoot: AbsolutePath | null;
+  initialized: boolean;
 }
 
-export const selectVault = (path: AbsolutePath) =>
-  invoke<VaultStatus>("select_vault", { path });
+export const selectVault = (vaultRoot: AbsolutePath) =>
+  invoke<VaultStatus>("select_vault", { input: { vaultRoot } });
 
-export const scanVault = () => invoke<Prompt[]>("scan_vault_cmd");
+export const validateVault = (vaultRoot: AbsolutePath) =>
+  invoke<VaultStatus>("validate_vault", { input: { vaultRoot } });
+
+export interface ScanResult {
+  scannedFiles: number;
+  indexedPrompts: number;
+  malformedFiles: number;
+  deletedRows: number;
+  durationMs: number;
+}
+
+export const scanVault = () => invoke<ScanResult>("scan_vault_cmd");
+
+export const rebuildIndex = () => invoke<ScanResult>("rebuild_index");
 
 export const getVaultStatus = () => invoke<VaultStatus>("get_vault_status");
 
 // ─── Prompts ──────────────────────────────────────────────────────────────
 
+/**
+ * Slim row returned by `list_prompts` — mirrors
+ * `src-tauri/src/commands/prompts.rs::PromptListItem`. Full prompts come from
+ * `getPrompt(id)`.
+ */
+export interface PromptListItem {
+  id: PromptId;
+  title: string;
+  slug: string;
+  summary: string;
+  vaultPath: RelativeVaultPath;
+  archivedAt: string | null;
+  tags: string[];
+}
+
 export interface ListPromptsArgs {
   includeArchived?: boolean;
+  tag?: string | null;
+  limit?: number;
+  offset?: number;
 }
 
 export const listPrompts = (args: ListPromptsArgs = {}) =>
-  invoke<Prompt[]>("list_prompts", args);
+  invoke<PromptListItem[]>("list_prompts", { input: args });
+
+export const getPrompt = (id: PromptId) =>
+  invoke<Prompt>("get_prompt", { input: { id } });
 
 export interface CreatePromptArgs {
   title: string;
   summary?: string;
   tags?: string[];
   body?: string;
-  source?: Source;
-  launchDefaults?: Partial<LaunchDefaults>;
+  variables?: Variable[];
 }
 
 export const createPrompt = (args: CreatePromptArgs) =>
-  invoke<Prompt>("create_prompt", args);
+  invoke<Prompt>("create_prompt", { input: args });
+
+export interface UpdatePromptArgs {
+  id: PromptId;
+  title?: string;
+  summary?: string;
+  body?: string;
+  tags?: string[];
+  variables?: Variable[];
+}
+
+export const updatePrompt = (args: UpdatePromptArgs) =>
+  invoke<Prompt>("update_prompt", { input: args });
 
 export const archivePrompt = (id: PromptId) =>
-  invoke<void>("archive_prompt_cmd", { id });
+  invoke<void>("archive_prompt_cmd", { input: { id } });
+
+export const deletePrompt = (id: PromptId) =>
+  invoke<void>("delete_prompt", { input: { id } });
 
 export type ExportFormat = "markdown" | "json";
 
@@ -110,35 +166,83 @@ export interface ExportPromptArgs {
 }
 
 export const exportPrompt = (args: ExportPromptArgs) =>
-  invoke<AbsolutePath>("export_prompt", args);
+  invoke<AbsolutePath>("export_prompt", { input: args });
 
 // ─── Variables ────────────────────────────────────────────────────────────
 
-export interface ParsedVariableRef {
+/**
+ * Mirrors `src-tauri/src/variables/parser.rs::VariableRef`. Carries both
+ * byte AND UTF-16 offsets so the CodeMirror surface can drive selection
+ * without re-deriving offsets from the doc string.
+ */
+export interface VariableRef {
+  refId: string;
+  raw: string;
   key: string;
-  type: string;
-  startByte: number;
-  endByte: number;
+  type: VariableType;
   startUtf16: number;
   endUtf16: number;
+  startByte: number;
+  endByte: number;
+  options: SelectOption[] | null;
+  constraints: Record<string, string>;
+}
+
+export interface VariableParseError {
+  message: string;
+  line: number;
+  col: number;
 }
 
 export interface ParseVariablesResult {
+  refs: VariableRef[];
   variables: Variable[];
-  refs: ParsedVariableRef[];
-  errors: Array<{ message: string; line: number; col: number }>;
+  errors: VariableParseError[];
 }
 
-export const parseVariables = (body: string) =>
-  invoke<ParseVariablesResult>("parse_variables", { body });
+export const parseVariables = (template: string, frontmatterVariables: Variable[] = []) =>
+  invoke<ParseVariablesResult>("parse_variables", {
+    input: { template, frontmatterVariables },
+  });
+
+export type BoolRenderMode =
+  | "frontmatter_strings"
+  | "literal_true_false";
 
 export interface RenderPromptPreviewArgs {
-  body: string;
+  template: string;
+  refs: VariableRef[];
   values: ResolvedVariableValue[];
+  boolRenderMode?: BoolRenderMode;
+  variables?: Variable[];
+}
+
+export interface RenderPromptOutput {
+  rendered: string;
 }
 
 export const renderPromptPreview = (args: RenderPromptPreviewArgs) =>
-  invoke<string>("render_prompt_preview", args);
+  invoke<RenderPromptOutput>("render_prompt_preview", { input: args });
+
+export interface ValidateLaunchInputsArgs {
+  variables: Variable[];
+  values: Record<string, unknown>;
+}
+
+export interface ValidationIssue {
+  key: string;
+  message: string;
+}
+
+export interface ValidateLaunchInputsResult {
+  resolved: ResolvedVariableValue[];
+  issues: ValidationIssue[];
+}
+
+export const validateLaunchInputs = (args: ValidateLaunchInputsArgs) =>
+  invoke<ValidateLaunchInputsResult>("validate_launch_inputs", {
+    input: args,
+  });
 
 // ─── Search ───────────────────────────────────────────────────────────────
 
@@ -156,7 +260,7 @@ export interface PromptSearchResult {
 }
 
 export const searchPrompts = (args: SearchPromptsArgs) =>
-  invoke<PromptSearchResult[]>("search_prompts", args);
+  invoke<PromptSearchResult[]>("search_prompts", { input: args });
 
 export type CmdkResultKind = "prompt" | "run" | "action" | "route" | "setting";
 
@@ -169,7 +273,7 @@ export interface CmdkResult {
 }
 
 export const cmdkSearch = (query: string) =>
-  invoke<CmdkResult[]>("cmdk_search", { query });
+  invoke<CmdkResult[]>("cmdk_search", { input: { query } });
 
 // ─── Launches ─────────────────────────────────────────────────────────────
 
@@ -182,7 +286,7 @@ export interface StartLaunchArgs {
 }
 
 export const startLaunch = (args: StartLaunchArgs) =>
-  invoke<LaunchProfile>("start_launch", args);
+  invoke<LaunchProfile>("start_launch", { input: args });
 
 export interface SendTerminalInputArgs {
   runId: RunId;
@@ -190,14 +294,15 @@ export interface SendTerminalInputArgs {
 }
 
 export const sendTerminalInput = (args: SendTerminalInputArgs) =>
-  invoke<void>("send_terminal_input", args);
+  invoke<void>("send_terminal_input", { input: args });
 
 // ─── Runs ─────────────────────────────────────────────────────────────────
 
-export const listRuns = (limit = 50) => invoke<Run[]>("list_runs", { limit });
+export const listRuns = (limit = 50) =>
+  invoke<Run[]>("list_runs", { input: { limit } });
 
 export const getPromptRuns = (promptId: PromptId, limit = 25) =>
-  invoke<Run[]>("get_prompt_runs", { promptId, limit });
+  invoke<Run[]>("get_prompt_runs", { input: { promptId, limit } });
 
 export const repairOrphanedTranscripts = () =>
   invoke<{ recovered: number; lost: number }>("repair_orphaned_transcripts");
@@ -218,7 +323,7 @@ export interface DetectSourceResult {
 }
 
 export const detectSource = (url: string) =>
-  invoke<DetectSourceResult>("detect_source", { url });
+  invoke<DetectSourceResult>("detect_source", { input: { url } });
 
 export interface ExtractPromptCandidatesArgs {
   url: string;
@@ -235,7 +340,7 @@ export interface PromptCandidate {
 }
 
 export const extractPromptCandidates = (args: ExtractPromptCandidatesArgs) =>
-  invoke<PromptCandidate[]>("extract_prompt_candidates", args);
+  invoke<PromptCandidate[]>("extract_prompt_candidates", { input: args });
 
 // ─── Settings + Secrets ───────────────────────────────────────────────────
 
@@ -247,7 +352,10 @@ export interface SetSecretArgs {
 }
 
 export const setSecret = (args: SetSecretArgs) =>
-  invoke<SecretStatus>("set_secret", args);
+  invoke<SecretStatus>("set_secret", { input: args });
+
+export const clearSecret = (key: SecretKey) =>
+  invoke<SecretStatus>("clear_secret", { input: { key } });
 
 export const getSecretStatus = () =>
   invoke<SecretStatusMap>("get_secret_status");
@@ -263,7 +371,7 @@ export interface GitCommitInfo {
 }
 
 export const getPromptHistory = (vaultPath: RelativeVaultPath) =>
-  invoke<GitCommitInfo[]>("get_prompt_history", { vaultPath });
+  invoke<GitCommitInfo[]>("get_prompt_history", { input: { vaultPath } });
 
 export interface RevertPromptArgs {
   promptId: PromptId;
@@ -271,7 +379,7 @@ export interface RevertPromptArgs {
 }
 
 export const revertPromptToCommit = (args: RevertPromptArgs) =>
-  invoke<Prompt>("revert_prompt_to_commit", args);
+  invoke<Prompt>("revert_prompt_to_commit", { input: args });
 
 // ─── System ───────────────────────────────────────────────────────────────
 
@@ -286,4 +394,4 @@ export const probeDependencies = () =>
   invoke<DependencyProbe[]>("probe_dependencies");
 
 export const openPath = (path: AbsolutePath) =>
-  invoke<void>("open_path", { path });
+  invoke<void>("open_path", { input: { path } });

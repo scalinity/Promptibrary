@@ -58,31 +58,23 @@ export function VaultSettings(): React.JSX.Element {
             }}
           >
             <StatusCard
-              label="exists"
-              ok={status.data.exists}
-              detail={status.data.exists ? "directory found" : "missing"}
+              label="vault root"
+              ok={status.data.vaultRoot != null}
+              detail={status.data.vaultRoot ?? "no path set"}
             />
             <StatusCard
-              label="git repo"
-              ok={status.data.isGitRepo}
+              label="initialized"
+              ok={status.data.initialized}
               detail={
-                status.data.isGitRepo
-                  ? "version history enabled"
-                  : "no history will be kept"
+                status.data.initialized
+                  ? "schema + index ready"
+                  : "not yet initialized"
               }
-            />
-            <StatusCard
-              label="writable"
-              ok={status.data.writable}
-              detail={status.data.writable ? "can save" : "read-only"}
-            />
-            <StatusCard
-              label="watcher"
-              ok={status.data.watcherRunning}
-              detail={status.data.watcherRunning ? "live" : "stopped"}
             />
           </ul>
         )}
+        {/* Per spec §13, expanded vault probes (writable, git repo, watcher
+            running) land alongside the L5 diagnostics surface. */}
       </div>
     </section>
   );

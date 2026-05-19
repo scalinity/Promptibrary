@@ -21,36 +21,62 @@ const ok = <T>(value: T) => Promise.resolve(value);
 
 // ─── Vault ────────────────────────────────────────────────────────────────
 
-export const selectVault: typeof Real.selectVault = (path) =>
+export const selectVault: typeof Real.selectVault = (vaultRoot) =>
+  ok({ vaultRoot, initialized: true });
+
+export const validateVault: typeof Real.validateVault = (vaultRoot) =>
+  ok({ vaultRoot, initialized: true });
+
+export const scanVault: typeof Real.scanVault = () =>
   ok({
-    path,
-    exists: true,
-    isGitRepo: true,
-    writable: true,
-    watcherRunning: true,
+    scannedFiles: PROMPT_FIXTURES.length,
+    indexedPrompts: PROMPT_FIXTURES.length,
+    malformedFiles: 0,
+    deletedRows: 0,
+    durationMs: 12,
   });
 
-export const scanVault: typeof Real.scanVault = () => ok(PROMPT_FIXTURES);
+export const rebuildIndex: typeof Real.rebuildIndex = () => scanVault();
 
 export const getVaultStatus: typeof Real.getVaultStatus = () =>
   ok({
-    path: asAbsolutePath("/Users/operator/prompts"),
-    exists: true,
-    isGitRepo: true,
-    writable: true,
-    watcherRunning: true,
+    vaultRoot: asAbsolutePath("/Users/operator/prompts"),
+    initialized: true,
   });
 
 // ─── Prompts ──────────────────────────────────────────────────────────────
+
+function toListItem(p: (typeof PROMPT_FIXTURES)[number]): Real.PromptListItem {
+  return {
+    id: p.id,
+    title: p.title,
+    slug: p.slug,
+    summary: p.summary,
+    vaultPath: p.vaultPath,
+    archivedAt: p.archivedAt,
+    tags: p.tags.map((t) => t as string),
+  };
+}
 
 export const listPrompts: typeof Real.listPrompts = ({
   includeArchived = false,
 } = {}) =>
   ok(
-    includeArchived
+    (includeArchived
       ? PROMPT_FIXTURES
-      : PROMPT_FIXTURES.filter((p) => p.archivedAt == null),
+      : PROMPT_FIXTURES.filter((p) => p.archivedAt == null)
+    ).map(toListItem),
   );
+
+export const getPrompt: typeof Real.getPrompt = (id) => {
+  const found = PROMPT_FIXTURES.find((p) => p.id === id);
+  if (found != null) return ok(found);
+  return Promise.reject({
+    kind: "PromptNotFound",
+    message: `Prompt ${id} not found in mock fixtures`,
+    details: { id: String(id) },
+  });
+};
 
 export const createPrompt: typeof Real.createPrompt = (args) =>
   ok({
@@ -61,7 +87,26 @@ export const createPrompt: typeof Real.createPrompt = (args) =>
     tags: (args.tags ?? []).map((t) => t as never),
   });
 
+export const updatePrompt: typeof Real.updatePrompt = (args) => {
+  const existing = PROMPT_FIXTURES.find((p) => p.id === args.id);
+  if (existing == null) {
+    return Promise.reject({
+      kind: "PromptNotFound",
+      message: `Prompt ${args.id} not found in mock fixtures`,
+      details: { id: String(args.id) },
+    });
+  }
+  return ok({
+    ...existing,
+    title: args.title ?? existing.title,
+    summary: args.summary ?? existing.summary,
+    body: args.body ?? existing.body,
+    tags: (args.tags ?? existing.tags).map((t) => t as never),
+  });
+};
+
 export const archivePrompt: typeof Real.archivePrompt = () => ok(undefined);
+export const deletePrompt: typeof Real.deletePrompt = () => ok(undefined);
 
 export const exportPrompt: typeof Real.exportPrompt = ({ destination }) =>
   ok(destination);
@@ -69,11 +114,14 @@ export const exportPrompt: typeof Real.exportPrompt = ({ destination }) =>
 // ─── Variables ────────────────────────────────────────────────────────────
 
 export const parseVariables: typeof Real.parseVariables = () =>
-  ok({ variables: [], refs: [], errors: [] });
+  ok({ refs: [], variables: [], errors: [] });
 
 export const renderPromptPreview: typeof Real.renderPromptPreview = ({
-  body,
-}) => ok(body);
+  template,
+}) => ok({ rendered: template });
+
+export const validateLaunchInputs: typeof Real.validateLaunchInputs = () =>
+  ok({ resolved: [], issues: [] });
 
 // ─── Search ───────────────────────────────────────────────────────────────
 
@@ -180,25 +228,46 @@ const baseSettings: AppSettings = {
 
 export const getSettings: typeof Real.getSettings = () => ok(baseSettings);
 
-const secretState: SecretStatusMap = {
-  anthropic_api_key: {
-    key: "anthropic_api_key",
-    exists: false,
-    lastValidatedAt: null,
-    validationStatus: "unknown",
-  },
-  x_bearer_token: {
-    key: "x_bearer_token",
-    exists: false,
-    lastValidatedAt: null,
-    validationStatus: "unknown",
-  },
+let secretState: SecretStatusMap = freshSecretState();
+
+function freshSecretState(): SecretStatusMap {
+  return {
+    anthropic_api_key: {
+      key: "anthropic_api_key",
+      exists: false,
+      lastValidatedAt: null,
+      validationStatus: "unknown",
+    },
+    x_bearer_token: {
+      key: "x_bearer_token",
+      exists: false,
+      lastValidatedAt: null,
+      validationStatus: "unknown",
+    },
+  };
+}
+
+/**
+ * Test helper — Playwright `test.beforeEach` calls this to reset module-level
+ * state between visual specs that run in the same worker. Production code
+ * never references it; the underscore prefix is the convention.
+ */
+export const __resetMockState = (): void => {
+  secretState = freshSecretState();
 };
 
 export const setSecret: typeof Real.setSecret = ({ key }) => {
   secretState[key] = {
     ...secretState[key],
     exists: true,
+  };
+  return ok(secretState[key]);
+};
+
+export const clearSecret: typeof Real.clearSecret = (key) => {
+  secretState[key] = {
+    ...secretState[key],
+    exists: false,
   };
   return ok(secretState[key]);
 };
@@ -237,13 +306,22 @@ export const _TAG_FIXTURES = TAG_FIXTURES;
 export { invoke } from "./ipc";
 export type {
   VaultStatus,
+  ScanResult,
+  PromptListItem,
   ListPromptsArgs,
   CreatePromptArgs,
+  UpdatePromptArgs,
   ExportFormat,
   ExportPromptArgs,
-  ParsedVariableRef,
+  VariableRef,
+  VariableParseError,
   ParseVariablesResult,
   RenderPromptPreviewArgs,
+  RenderPromptOutput,
+  BoolRenderMode,
+  ValidateLaunchInputsArgs,
+  ValidationIssue,
+  ValidateLaunchInputsResult,
   SearchPromptsArgs,
   PromptSearchResult,
   CmdkResultKind,

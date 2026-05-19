@@ -3,14 +3,18 @@
 // The 3px left spine encodes state via the row's state class
 // (`.selected` / `.running` / `.recent`). Title is Switzer 500, tag chips
 // inherit the canonical `.row-tags > span` style, meta line is mono dim.
+//
+// Data shape is the slim `PromptListItem` returned by `listPrompts` — the
+// full prompt body / variables / telemetry isn't available here. Telemetry
+// chips light up on the prompt detail route where the full Prompt is fetched.
 
-import type { Prompt } from "@/shared/types/prompt";
+import type { PromptListItem } from "@/shared/api/ipc";
 import type { PromptId } from "@/shared/types/ids";
 import { cn } from "@/shared/lib/utils";
 import { formatRelative } from "@/shared/lib/dates";
 
 interface PromptCardProps {
-  prompt: Prompt;
+  prompt: PromptListItem;
   selected: boolean;
   running?: boolean;
   recent?: boolean;
@@ -24,10 +28,6 @@ export function PromptCard({
   recent = false,
   onSelect,
 }: PromptCardProps): React.JSX.Element {
-  const variableCount = prompt.variables.length;
-  const launchCount = prompt.telemetry.launchCount;
-  const lastUsed = prompt.telemetry.lastUsedAt;
-
   return (
     <div
       role="button"
@@ -58,28 +58,10 @@ export function PromptCard({
       <div className="row-meta">
         {running ? (
           <span>running · live</span>
+        ) : prompt.archivedAt != null ? (
+          <span>archived {formatRelative(prompt.archivedAt)}</span>
         ) : (
-          <span>
-            {lastUsed != null
-              ? `last ${formatRelative(lastUsed)}`
-              : `edited ${formatRelative(prompt.updatedAt)}`}
-          </span>
-        )}
-        {launchCount > 0 && (
-          <>
-            <span className="dotsep">·</span>
-            <span>
-              {launchCount} {launchCount === 1 ? "launch" : "launches"}
-            </span>
-          </>
-        )}
-        {variableCount > 0 && (
-          <>
-            <span className="dotsep">·</span>
-            <span>
-              {variableCount} {variableCount === 1 ? "var" : "vars"}
-            </span>
-          </>
+          <span>{prompt.summary || prompt.slug}</span>
         )}
       </div>
     </div>

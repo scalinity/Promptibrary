@@ -34,14 +34,11 @@ export function LibraryRoute(): React.JSX.Element {
     const all = prompts.data;
     const archived = all.filter((p) => p.archivedAt != null);
     const active = all.filter((p) => p.archivedAt == null);
-    const recent = [...active]
-      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-      .slice(0, 25);
 
     setCounts({
       all: active.length,
       pinned: 0,
-      recent: recent.length,
+      recent: Math.min(active.length, 25),
       archived: archived.length,
     });
 

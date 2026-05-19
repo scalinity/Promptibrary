@@ -21,7 +21,7 @@ import { StateField, EditorState, Range } from "@codemirror/state";
 import { autocompletion, type CompletionContext } from "@codemirror/autocomplete";
 import { useEffect, useMemo, useState } from "react";
 
-import { parseVariables, type ParsedVariableRef } from "@/shared/api/ipc";
+import { parseVariables, type VariableRef } from "@/shared/api/ipc";
 import type { PromptId } from "@/shared/types/ids";
 
 interface PromptBodyEditorProps {
@@ -190,7 +190,7 @@ export function PromptBodyEditor({
   readOnly = false,
 }: PromptBodyEditorProps): React.JSX.Element {
   const [parseError, setParseError] = useState<string | null>(null);
-  const [, setRefs] = useState<ParsedVariableRef[]>([]);
+  const [, setRefs] = useState<VariableRef[]>([]);
 
   // Debounced parse: 200ms after the user stops typing, ping the Rust
   // parser. Direct `useEffect` here is the rare legitimate case — we're

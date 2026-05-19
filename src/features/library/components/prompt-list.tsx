@@ -2,16 +2,20 @@
 //
 // Uses `react-virtuoso` so 500+ rows scroll smoothly. Selection state is in
 // the library store; the spine state classes come from PromptCard.
+//
+// Operates on `PromptListItem[]` (slim rows from `listPrompts`). Telemetry +
+// timestamps are absent from this surface — sort by launch count requires
+// the full Prompt and is deferred to L5 when the FTS-backed search lands.
 
 import { Virtuoso } from "react-virtuoso";
 
 import { PromptCard } from "./prompt-card";
 import { useLibraryStore } from "@/features/library/stores/library-store";
-import type { Prompt } from "@/shared/types/prompt";
+import type { PromptListItem } from "@/shared/api/ipc";
 import { EmptyState } from "@/shared/ui/empty-state";
 
 interface PromptListProps {
-  prompts: Prompt[];
+  prompts: PromptListItem[];
   loading: boolean;
 }
 
@@ -53,13 +57,11 @@ export function PromptList({ prompts, loading }: PromptListProps): React.JSX.Ele
     );
   }
 
-  // Recent set = top 3 most recently updated.
-  const recentIds = new Set(
-    [...filtered]
-      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-      .slice(0, 3)
-      .map((p) => p.id),
-  );
+  // Recent set — first 3 in the (sorted) filtered list. Without per-row
+  // timestamps on the slim shape, "recent" tracks list position rather than
+  // wall-clock recency. L5 swaps in real timestamps when the detail/list
+  // queries are unified.
+  const recentIds = new Set(filtered.slice(0, 3).map((p) => p.id));
 
   return (
     <div className="list-rows" data-testid="prompt-list">
@@ -82,16 +84,16 @@ export function PromptList({ prompts, loading }: PromptListProps): React.JSX.Ele
 }
 
 function filterAndSort(
-  prompts: Prompt[],
+  prompts: PromptListItem[],
   filter: { query: string; tag: string | null; archived: boolean },
   sort: string,
-): Prompt[] {
+): PromptListItem[] {
   const q = filter.query.trim().toLowerCase();
   const filtered = prompts.filter((p) => {
     if (!filter.archived && p.archivedAt != null) return false;
-    if (filter.tag != null && !p.tags.includes(filter.tag as never)) return false;
+    if (filter.tag != null && !p.tags.includes(filter.tag)) return false;
     if (q.length > 0) {
-      const hay = `${p.title} ${p.summary} ${p.tags.join(" ")}`.toLowerCase();
+      const hay = `${p.title} ${p.summary ?? ""} ${p.tags.join(" ")}`.toLowerCase();
       if (!hay.includes(q)) return false;
     }
     return true;
@@ -101,21 +103,15 @@ function filterAndSort(
     case "title":
       sorted.sort((a, b) => a.title.localeCompare(b.title));
       break;
+    // `launch_count` and `recently_edited` both require telemetry +
+    // updatedAt on the row, which the slim shape doesn't carry. Fall
+    // through to slug-stable order; real ordering arrives with L5's
+    // hybrid-rank search.
     case "launch_count":
-      sorted.sort(
-        (a, b) => b.telemetry.launchCount - a.telemetry.launchCount,
-      );
-      break;
     case "recently_edited":
-      sorted.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-      break;
     case "recently_used":
     default:
-      sorted.sort((a, b) => {
-        const al = a.telemetry.lastUsedAt ?? a.updatedAt;
-        const bl = b.telemetry.lastUsedAt ?? b.updatedAt;
-        return bl.localeCompare(al);
-      });
+      sorted.sort((a, b) => a.slug.localeCompare(b.slug));
   }
   return sorted;
 }
