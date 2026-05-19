@@ -8,14 +8,24 @@ import type {
   VerifierMode,
 } from "./enums";
 
+// Spec §13 hard-codes these four values for V1 — they're application-level
+// constants, not user-tunable settings. Exporting them here (rather than as
+// struct fields) prevents the Rust/TS contract drift where Rust said `String`
+// while TS said a literal: nothing on the wire carries these any more.
+//
+// V2 may make extraction model choices configurable; if so, re-introduce as
+// fields with the same literal-union shape on both sides.
+export const EXTRACTION_MODEL = "claude-sonnet-4-6" as const;
+export const DEEP_EXTRACTION_MODEL = "claude-opus-4-7" as const;
+export const DEFAULT_PROMPT_DIRECTORY = "promptibrary/prompts" as const;
+export const DEFAULT_RUN_DIRECTORY = "promptibrary/runs" as const;
+
 export interface LocalSettings {
   vaultPath: AbsolutePath | null;
   defaultDestination: "claude_code_cli";
   defaultModel: ClaudeModelId;
   defaultVerifierMode: VerifierMode;
   defaultPermissionMode: ClaudePermissionMode;
-  extractionModel: "claude-sonnet-4-6";
-  deepExtractionModel: "claude-opus-4-7";
   telemetryEnabled: boolean;
   updateManifestUrl: string | null;
   versionHistory: {
@@ -27,8 +37,6 @@ export interface LocalSettings {
 
 export interface VaultSettings {
   tagColors: Record<string, TagColorSlug>;
-  defaultPromptDirectory: "promptibrary/prompts";
-  defaultRunDirectory: "promptibrary/runs";
 }
 
 export interface EffectiveSettings extends LocalSettings {

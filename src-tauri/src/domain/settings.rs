@@ -11,17 +11,16 @@ use crate::ids::{PromptId, RunId};
 use super::prompt::{ClaudeModelId, ClaudePermissionMode, LaunchDestination, VerifierMode};
 use super::tag::TagColorSlug;
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
-pub enum ExtractionModelId {
-    #[serde(rename = "claude-sonnet-4-6")]
-    ClaudeSonnet46,
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
-pub enum DeepExtractionModelId {
-    #[serde(rename = "claude-opus-4-7")]
-    ClaudeOpus47,
-}
+/// Spec §13 hard-codes the extraction models and vault directory layout for V1.
+/// They're application-level constants rather than user-tunable settings, so
+/// they live as module-level `const`s on both sides (see
+/// `src/shared/types/settings.ts`) rather than as struct fields. Nothing on
+/// the wire carries them — eliminating the Rust `String` / TS literal-union
+/// drift that was the original review finding.
+pub const EXTRACTION_MODEL: &str = "claude-sonnet-4-6";
+pub const DEEP_EXTRACTION_MODEL: &str = "claude-opus-4-7";
+pub const DEFAULT_PROMPT_DIRECTORY: &str = "promptibrary/prompts";
+pub const DEFAULT_RUN_DIRECTORY: &str = "promptibrary/runs";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -38,8 +37,6 @@ pub struct LocalSettings {
     pub default_model: ClaudeModelId,
     pub default_verifier_mode: VerifierMode,
     pub default_permission_mode: ClaudePermissionMode,
-    pub extraction_model: ExtractionModelId,
-    pub deep_extraction_model: DeepExtractionModelId,
     pub telemetry_enabled: bool,
     pub update_manifest_url: Option<String>,
     pub version_history: VersionHistorySettings,
@@ -51,8 +48,6 @@ pub struct LocalSettings {
 #[serde(rename_all = "camelCase")]
 pub struct VaultSettings {
     pub tag_colors: HashMap<String, TagColorSlug>,
-    pub default_prompt_directory: String,
-    pub default_run_directory: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
