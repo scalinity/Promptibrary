@@ -246,10 +246,22 @@ export const validateLaunchInputs = (args: ValidateLaunchInputsArgs) =>
 
 // ─── Search ───────────────────────────────────────────────────────────────
 
+export type SearchMode = "text" | "semantic" | "hybrid";
+
 export interface SearchPromptsArgs {
   query: string;
   tag?: string | null;
   limit?: number;
+  mode?: SearchMode;
+  includeArchived?: boolean;
+}
+
+export interface ScoreParts {
+  text: number;
+  semantic: number;
+  recency: number;
+  usage: number;
+  exactTitlePin: boolean;
 }
 
 export interface PromptSearchResult {
@@ -257,6 +269,7 @@ export interface PromptSearchResult {
   title: string;
   snippet: string | null;
   score: number;
+  scoreParts?: ScoreParts;
 }
 
 export const searchPrompts = (args: SearchPromptsArgs) =>

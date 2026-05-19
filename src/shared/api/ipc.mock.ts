@@ -137,18 +137,72 @@ export const searchPrompts: typeof Real.searchPrompts = ({ query }) =>
     })),
   );
 
-export const cmdkSearch: typeof Real.cmdkSearch = (query) =>
-  ok(
-    PROMPT_FIXTURES.filter((p) =>
-      p.title.toLowerCase().includes(query.toLowerCase()),
-    ).map((p) => ({
+export const cmdkSearch: typeof Real.cmdkSearch = (query) => {
+  const q = query.toLowerCase();
+  const prompts = PROMPT_FIXTURES.filter((p) =>
+    p.title.toLowerCase().includes(q),
+  )
+    .slice(0, 8)
+    .map((p) => ({
       kind: "prompt" as const,
       id: p.id,
       title: p.title,
       subtitle: p.summary,
       score: 1,
-    })),
-  );
+    }));
+
+  const actions: Array<[string, string, string]> = [
+    ["new-prompt", "New prompt", "Create a new launch profile"],
+    ["import-url", "Import from URL", "Article / YouTube / X import"],
+    ["rebuild-index", "Rebuild index", "Drop + re-scan the vault"],
+    ["run-diagnostics", "Run diagnostics", "Check claude / yt-dlp / git / keychain"],
+    ["reveal-vault", "Reveal vault in Terminal.app", "Open Terminal at the vault root"],
+    ["repair-orphans", "Repair orphaned transcripts", "Move stray spool files"],
+  ];
+
+  const routes: Array<[string, string, string]> = [
+    ["library", "Library", "/library"],
+    ["compose", "Compose", "/compose/:id"],
+    ["import", "Import", "/import"],
+    ["past-run", "Past run", "/run/:id"],
+    ["history-diff", "History + diff", "/prompt/:id/history"],
+    ["settings", "Settings", "/settings"],
+    ["settings-vault", "Settings · Vault", "/settings/vault"],
+    ["settings-defaults", "Settings · Defaults", "/settings/defaults"],
+    ["settings-extraction", "Settings · Extraction", "/settings/extraction"],
+    ["settings-secrets", "Settings · Secrets", "/settings/secrets"],
+    ["settings-telemetry", "Settings · Telemetry", "/settings/telemetry"],
+    ["settings-diagnostics", "Settings · Diagnostics", "/settings/diagnostics"],
+    ["settings-updater", "Settings · Updater", "/settings/updater"],
+  ];
+
+  const filterStatic = <K extends "action" | "route">(
+    kind: K,
+    items: Array<[string, string, string]>,
+    limit: number,
+  ) =>
+    items
+      .filter(
+        ([_id, title, subtitle]) =>
+          q.length === 0 ||
+          title.toLowerCase().includes(q) ||
+          subtitle.toLowerCase().includes(q),
+      )
+      .slice(0, limit)
+      .map(([id, title, subtitle]) => ({
+        kind,
+        id,
+        title,
+        subtitle,
+        score: 0,
+      }));
+
+  return ok([
+    ...prompts,
+    ...filterStatic("action", actions, 8),
+    ...filterStatic("route", routes, 8),
+  ]);
+};
 
 // ─── Launches ─────────────────────────────────────────────────────────────
 

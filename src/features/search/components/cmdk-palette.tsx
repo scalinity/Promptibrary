@@ -1,22 +1,41 @@
-// ⌘K command palette — uses cmdk under the hood, styled with design-system
-// tokens. Groups: Prompts (real, via L1's listPrompts), Routes (static).
-// Runs / Actions / Settings entries land in L3-L5.
+// ⌘K command palette — backed by the cmdk_search IPC (L5/SCA-729).
+//
+// Sections, in the order returned by the backend:
+//   - prompts  : top 8 via the hybrid search backend (FTS5 + recency + usage)
+//   - runs     : top 5 matching prompt_title via the runs table
+//   - actions  : static catalog of in-app commands
+//   - routes   : static catalog of every spec §12 route
+//
+// The component groups results by `kind` and renders one Command.Group
+// per non-empty section. Group order is fixed (prompts → runs →
+// actions → routes) regardless of relative scores — the spec calls for
+// section-grouping rather than a single ranked list.
 
 import { Command } from "cmdk";
 import { useNavigate } from "react-router-dom";
 import { useHotkeys } from "react-hotkeys-hook";
 // eslint-disable-next-line no-restricted-imports -- SCA-723: pre-CLAUDE.md useEffect, refactor in follow-up cleanup pass
 import { useEffect, useRef } from "react";
+import { useQuery } from "@tanstack/react-query";
 
+import { cmdkSearch, type CmdkResult } from "@/shared/api/ipc";
+import { asPromptId } from "@/shared/types/ids";
+import { searchKeys } from "@/shared/api/queryKeys";
 import { useSearchStore } from "@/features/search/stores/search-store";
-import { usePrompts } from "@/features/library/hooks/use-prompts";
 import { useLibraryStore } from "@/features/library/stores/library-store";
 
-const ROUTES = [
-  { id: "lib", title: "Library", subtitle: "all prompts", path: "/" },
-  { id: "imp", title: "Import", subtitle: "from URL", path: "/import" },
-  { id: "set", title: "Settings", subtitle: "vault, defaults, secrets", path: "/settings" },
-];
+// Map static-action ids → handlers. Routes/prompts/runs handle
+// navigation generically; actions need bespoke side effects (routed to
+// the closest settings/diagnostics surface for now — the real action
+// hooks land in the diagnostics + repair-orphans tickets).
+const ACTION_ROUTES: Record<string, string> = {
+  "new-prompt": "/compose/new",
+  "import-url": "/import",
+  "rebuild-index": "/settings/diagnostics",
+  "run-diagnostics": "/settings/diagnostics",
+  "reveal-vault": "/settings/vault",
+  "repair-orphans": "/settings/diagnostics",
+};
 
 export function CmdKPalette(): React.JSX.Element {
   const isOpen = useSearchStore((s) => s.isOpen);
@@ -28,11 +47,8 @@ export function CmdKPalette(): React.JSX.Element {
 
   const navigate = useNavigate();
   const select = useLibraryStore((s) => s.select);
-  const prompts = usePrompts();
 
-  // SCA-655 — remember the previously-focused element so we can restore
-  // focus when the palette closes. Keyboard users (most of the cmdk
-  // audience) would otherwise land on document.body.
+  // Restore focus to the previously-focused element on close (SCA-655).
   const previousActive = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
@@ -58,18 +74,54 @@ export function CmdKPalette(): React.JSX.Element {
   );
 
   // Clear the query when the dialog closes so reopening starts fresh.
-  // This is a sync between a Zustand boolean and a Zustand string —
-  // useEffect is the right fit; nothing declarative bridges the two.
+  // useEffect is the right fit here: bridging a Zustand boolean to a
+  // Zustand string is exactly the cross-store sync useEffect is for.
   useEffect(() => {
     if (!isOpen) setQuery("");
   }, [isOpen, setQuery]);
 
+  const search = useQuery({
+    queryKey: searchKeys.cmdk(query),
+    queryFn: () => cmdkSearch(query),
+    enabled: isOpen,
+    staleTime: 1_000,
+    placeholderData: (previous) => previous,
+  });
+
   if (!isOpen) return <></>;
 
-  const lc = query.toLowerCase();
-  const promptMatches = (prompts.data ?? [])
-    .filter((p) => p.title.toLowerCase().includes(lc))
-    .slice(0, 8);
+  const results: CmdkResult[] = search.data ?? [];
+  const byKind = {
+    prompt: results.filter((r) => r.kind === "prompt"),
+    run: results.filter((r) => r.kind === "run"),
+    action: results.filter((r) => r.kind === "action"),
+    route: results.filter((r) => r.kind === "route"),
+  };
+
+  const handleSelect = (item: CmdkResult): void => {
+    switch (item.kind) {
+      case "prompt":
+        select(asPromptId(item.id));
+        navigate("/");
+        break;
+      case "run":
+        navigate(`/run/${item.id}`);
+        break;
+      case "route":
+        // subtitle holds the route path
+        if (item.subtitle) navigate(item.subtitle);
+        break;
+      case "action": {
+        const target = ACTION_ROUTES[item.id];
+        if (target) navigate(target);
+        break;
+      }
+      case "setting":
+        if (item.subtitle) navigate(item.subtitle);
+        break;
+    }
+    close();
+  };
 
   return (
     <div
@@ -137,8 +189,8 @@ export function CmdKPalette(): React.JSX.Element {
           <button
             type="button"
             onClick={toggleSemantic}
-            disabled
-            title="Semantic search activates in L5"
+            title="Toggle semantic search (currently text-only — embedding model lands in a follow-up)"
+            aria-pressed={semantic}
             style={{
               fontFamily: "var(--font-mono)",
               fontSize: 10.5,
@@ -149,7 +201,7 @@ export function CmdKPalette(): React.JSX.Element {
               border: "1px solid var(--border-subtle)",
               borderRadius: "var(--r-xs)",
               padding: "2px 8px",
-              cursor: "not-allowed",
+              cursor: "pointer",
             }}
           >
             sem
@@ -173,43 +225,78 @@ export function CmdKPalette(): React.JSX.Element {
           >
             nothing matches
           </Command.Empty>
-          {promptMatches.length > 0 && (
+
+          {byKind.prompt.length > 0 && (
             <Command.Group heading="prompts">
-              {promptMatches.map((p) => (
+              {byKind.prompt.map((p) => (
                 <Command.Item
-                  key={p.id}
+                  key={`prompt:${p.id}`}
                   value={`prompt:${p.id}:${p.title}`}
-                  onSelect={() => {
-                    select(p.id);
-                    navigate("/");
-                    close();
-                  }}
+                  onSelect={() => handleSelect(p)}
                   style={cmdkItemStyle}
                 >
                   <span style={{ color: "var(--ink-primary)" }}>{p.title}</span>
-                  {p.summary && (
-                    <span style={cmdkSubStyle}>{p.summary}</span>
+                  {p.subtitle != null && p.subtitle !== "" && (
+                    <span style={cmdkSubStyle}>{p.subtitle}</span>
                   )}
                 </Command.Item>
               ))}
             </Command.Group>
           )}
-          <Command.Group heading="go to">
-            {ROUTES.map((r) => (
-              <Command.Item
-                key={r.id}
-                value={`route:${r.path}:${r.title}`}
-                onSelect={() => {
-                  navigate(r.path);
-                  close();
-                }}
-                style={cmdkItemStyle}
-              >
-                <span style={{ color: "var(--ink-primary)" }}>{r.title}</span>
-                <span style={cmdkSubStyle}>{r.subtitle}</span>
-              </Command.Item>
-            ))}
-          </Command.Group>
+
+          {byKind.run.length > 0 && (
+            <Command.Group heading="runs">
+              {byKind.run.map((r) => (
+                <Command.Item
+                  key={`run:${r.id}`}
+                  value={`run:${r.id}:${r.title}`}
+                  onSelect={() => handleSelect(r)}
+                  style={cmdkItemStyle}
+                >
+                  <span style={{ color: "var(--ink-primary)" }}>{r.title}</span>
+                  {r.subtitle != null && r.subtitle !== "" && (
+                    <span style={cmdkSubStyle}>{r.subtitle}</span>
+                  )}
+                </Command.Item>
+              ))}
+            </Command.Group>
+          )}
+
+          {byKind.action.length > 0 && (
+            <Command.Group heading="actions">
+              {byKind.action.map((a) => (
+                <Command.Item
+                  key={`action:${a.id}`}
+                  value={`action:${a.id}:${a.title}`}
+                  onSelect={() => handleSelect(a)}
+                  style={cmdkItemStyle}
+                >
+                  <span style={{ color: "var(--ink-primary)" }}>{a.title}</span>
+                  {a.subtitle != null && a.subtitle !== "" && (
+                    <span style={cmdkSubStyle}>{a.subtitle}</span>
+                  )}
+                </Command.Item>
+              ))}
+            </Command.Group>
+          )}
+
+          {byKind.route.length > 0 && (
+            <Command.Group heading="go to">
+              {byKind.route.map((r) => (
+                <Command.Item
+                  key={`route:${r.id}`}
+                  value={`route:${r.id}:${r.title}`}
+                  onSelect={() => handleSelect(r)}
+                  style={cmdkItemStyle}
+                >
+                  <span style={{ color: "var(--ink-primary)" }}>{r.title}</span>
+                  {r.subtitle != null && r.subtitle !== "" && (
+                    <span style={cmdkSubStyle}>{r.subtitle}</span>
+                  )}
+                </Command.Item>
+              ))}
+            </Command.Group>
+          )}
         </Command.List>
         <footer
           style={{
@@ -224,7 +311,11 @@ export function CmdKPalette(): React.JSX.Element {
           }}
         >
           <span>↑ ↓ navigate · ↵ open · esc close</span>
-          <span>L2 surface — runs/actions land in L3+</span>
+          <span>
+            {search.isFetching
+              ? "…"
+              : `${results.length} result${results.length === 1 ? "" : "s"}`}
+          </span>
         </footer>
       </Command>
     </div>
