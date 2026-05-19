@@ -29,6 +29,13 @@ use crate::settings::secret_store::SecretStore;
 const OEMBED_URL_PREFIX: &str = "https://publish.twitter.com/oembed?omit_script=1&url=";
 const X_API_BASE: &str = "https://api.twitter.com/2";
 
+/// X API v2 returns up to 100 tweets per page. Five pages = 500 tweets,
+/// which is enough to walk back through a prolific user's recent
+/// timeline and surface every reply in a long-ish thread. Beyond this
+/// the reply is either older than the thread we care about or buried
+/// deeper than the spec-mandated 100-post chain cap (§6).
+const X_TIMELINE_PAGES_MAX: usize = 5;
+
 #[derive(Debug, Deserialize)]
 struct OembedBody {
     html: Option<String>,
@@ -194,7 +201,7 @@ pub async fn fetch_thread_via_api(
     // 2. Paginate author timeline, filter by conversation/author.
     let mut next_token: Option<String> = None;
     let mut self_replies: Vec<Tweet> = vec![root.clone()];
-    for _ in 0..5 {
+    for _ in 0..X_TIMELINE_PAGES_MAX {
         let mut url = format!(
             "{X_API_BASE}/users/{}/tweets?max_results=100&tweet.fields=author_id,conversation_id,created_at,referenced_tweets",
             root.author_id
