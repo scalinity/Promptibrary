@@ -13,10 +13,14 @@ use std::path::PathBuf;
 use crate::error::Result;
 use crate::vault::paths::VaultPaths;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct RepairSummary {
     pub orphans_moved: usize,
     pub dirs_created: usize,
+    /// SCA-616: count of orphan files that COULDN'T be moved cleanly —
+    /// e.g. cross-FS rename failed AND copy-then-remove leaked the
+    /// source. The UI should surface a banner so the user can intervene.
+    pub orphans_left_behind: usize,
 }
 
 pub fn repair_missing_dirs(vault: &VaultPaths) -> Result<RepairSummary> {
@@ -33,8 +37,8 @@ pub fn repair_missing_dirs(vault: &VaultPaths) -> Result<RepairSummary> {
         }
     }
     Ok(RepairSummary {
-        orphans_moved: 0,
         dirs_created: created,
+        ..Default::default()
     })
 }
 
@@ -48,11 +52,9 @@ pub fn repair_orphaned_transcripts(
     orphan_root: &PathBuf,
 ) -> Result<RepairSummary> {
     let mut moved = 0usize;
+    let mut left_behind = 0usize;
     if !orphan_root.exists() {
-        return Ok(RepairSummary {
-            orphans_moved: 0,
-            dirs_created: 0,
-        });
+        return Ok(RepairSummary::default());
     }
     for entry in std::fs::read_dir(orphan_root).map_err(crate::error::AppError::from)? {
         let entry = match entry {
@@ -89,15 +91,40 @@ pub fn repair_orphaned_transcripts(
             }
         }
         // Use atomic rename when on same filesystem; fall back to copy + delete.
-        if std::fs::rename(&path, &dest).is_err() {
-            std::fs::copy(&path, &dest).map_err(crate::error::AppError::from)?;
-            let _ = std::fs::remove_file(&path);
+        // SCA-616: if the source remove_file fails after a successful copy
+        // (cross-FS rename branch), we have a duplicate. Log and count the
+        // duplicate so the UI can warn the user.
+        match std::fs::rename(&path, &dest) {
+            Ok(_) => {
+                moved += 1;
+            }
+            Err(_) => match std::fs::copy(&path, &dest) {
+                Ok(_) => {
+                    if let Err(e) = std::fs::remove_file(&path) {
+                        tracing::warn!(
+                            orphan = %path.display(),
+                            error = ?e,
+                            "repair: copy succeeded but source remove failed; orphan left in spool"
+                        );
+                        left_behind += 1;
+                    }
+                    moved += 1;
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        orphan = %path.display(),
+                        error = ?e,
+                        "repair: rename and copy both failed; orphan left in spool"
+                    );
+                    left_behind += 1;
+                }
+            },
         }
-        moved += 1;
     }
     Ok(RepairSummary {
         orphans_moved: moved,
         dirs_created: 0,
+        orphans_left_behind: left_behind,
     })
 }
 
