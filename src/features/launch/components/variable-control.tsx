@@ -17,6 +17,7 @@ interface VariableControlProps {
   variable: Variable;
   value: ResolvedVariableValue | undefined;
   onChange: (value: ResolvedVariableValue) => void;
+  onClear?: (key: string) => void;
   error?: string | null;
 }
 
@@ -24,6 +25,7 @@ export function VariableControl({
   variable,
   value,
   onChange,
+  onClear,
   error,
 }: VariableControlProps): React.JSX.Element {
   return (
@@ -39,7 +41,7 @@ export function VariableControl({
           <span className="opt">— optional</span>
         )}
       </div>
-      <Control variable={variable} value={value} onChange={onChange} />
+      <Control variable={variable} value={value} onChange={onChange} onClear={onClear} />
       {error != null && (
         <div
           role="alert"
@@ -62,10 +64,12 @@ function Control({
   variable,
   value,
   onChange,
+  onClear,
 }: {
   variable: Variable;
   value: ResolvedVariableValue | undefined;
   onChange: (value: ResolvedVariableValue) => void;
+  onClear?: (key: string) => void;
 }): React.JSX.Element {
   switch (variable.type) {
     case "file":
@@ -187,7 +191,13 @@ function Control({
           value={value?.type === "number" ? value.value : ""}
           onChange={(e) => {
             const raw = e.target.value;
-            if (raw === "") return;
+            // SCA-640 — empty input means "no value"; drop the key from
+            // the draft so validation sees missing rather than the old
+            // number and submission doesn't carry stale state.
+            if (raw === "") {
+              onClear?.(variable.key);
+              return;
+            }
             const n = Number(raw);
             if (Number.isFinite(n))
               onChange({ key: variable.key, type: "number", value: n });

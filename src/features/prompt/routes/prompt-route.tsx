@@ -49,9 +49,9 @@ export function PromptRoute(): React.JSX.Element {
   useHotkeys(
     "meta+enter, ctrl+enter",
     (e) => {
-      if (id != null) {
+      if (promptQuery.data != null) {
         e.preventDefault();
-        openLaunch(id);
+        openLaunch(promptQuery.data);
       }
     },
     { enableOnFormTags: true },
@@ -138,7 +138,7 @@ export function PromptRoute(): React.JSX.Element {
             <button
               type="button"
               className="btn-launch"
-              onClick={() => openLaunch(prompt.id)}
+              onClick={() => openLaunch(prompt)}
             >
               launch <span className="kbd-inline">⌘↵</span>
             </button>

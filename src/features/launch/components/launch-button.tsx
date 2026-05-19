@@ -24,18 +24,25 @@ export function LaunchButton({ prompt }: Props): React.JSX.Element {
   const startLaunch = useStartLaunch();
   const [error, setError] = useState<string | null>(null);
 
-  const disabled = !validation.ready || startLaunch.isPending;
+  // SCA-633 — resolve the effective working directory once and treat null
+  // as a hard block, replacing the L2-foundation `("" as never)` cast that
+  // let an empty path reach Rust.
+  const workingDirectory =
+    overrides.workingDirectory ?? prompt.launchDefaults.workingDirectory;
+  const disabled =
+    !validation.ready || workingDirectory == null || startLaunch.isPending;
 
   const onLaunch = () => {
+    if (workingDirectory == null) {
+      setError("Pick a working directory before launching.");
+      return;
+    }
     setError(null);
     startLaunch
       .mutateAsync({
         promptId: prompt.id,
         values: Object.values(values),
-        workingDirectory:
-          overrides.workingDirectory ??
-          prompt.launchDefaults.workingDirectory ??
-          ("" as never),
+        workingDirectory,
         inlineTweakBody: inlineTweak,
         overrides,
       })

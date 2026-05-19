@@ -18,6 +18,7 @@ interface Props {
 export function VariableForm({ prompt }: Props): React.JSX.Element {
   const values = useLaunchDraftStore((s) => s.values);
   const setValue = useLaunchDraftStore((s) => s.setValue);
+  const clearValue = useLaunchDraftStore((s) => s.clearValue);
   const validation = useLaunchValidation(prompt);
 
   const ordered = useMemo(
@@ -75,6 +76,7 @@ export function VariableForm({ prompt }: Props): React.JSX.Element {
             value={values[variable.key]}
             error={validation.fieldErrors[variable.key] ?? null}
             onChange={(v) => setValue(variable.key, v)}
+            onClear={clearValue}
           />
         ))}
       </div>
