@@ -9,9 +9,16 @@ import { useImportStore } from "@/features/import/stores/import-store";
 
 interface Props {
   onError?: (message: string) => void;
+  /**
+   * Fires after a successful detection that produced a supported source
+   * kind. The caller (ImportRoute) uses this to drive the preview fetch
+   * from an event handler instead of a `useEffect` watching the store —
+   * see CLAUDE.md's strict no-useEffect rule.
+   */
+  onDetectionReady?: () => void;
 }
 
-export function SourceUrlForm({ onError }: Props): React.JSX.Element {
+export function SourceUrlForm({ onError, onDetectionReady }: Props): React.JSX.Element {
   const url = useImportStore((s) => s.url);
   const setUrl = useImportStore((s) => s.setUrl);
   const setDetection = useImportStore((s) => s.setDetection);
@@ -22,6 +29,9 @@ export function SourceUrlForm({ onError }: Props): React.JSX.Element {
     try {
       const detection = await detectSourceTyped(url.trim());
       setDetection(detection);
+      if (detection.kind !== "unsupported") {
+        onDetectionReady?.();
+      }
     } catch (e: unknown) {
       const message = isAppError(e) ? e.message : "detection failed";
       onError?.(message);

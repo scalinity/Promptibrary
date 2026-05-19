@@ -5,7 +5,7 @@
 //                                    \
 //                                     fetch_failed | extraction_failed
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useHotkeys } from "react-hotkeys-hook";
 
@@ -63,13 +63,6 @@ export function ImportRoute(): React.JSX.Element {
       setFetchFailed({ kind: "network_unavailable", message });
     }
   }, [detection, url, setPreview, setFetchFailed]);
-
-  // When detection lands, kick the preview fetch immediately.
-  useEffect(() => {
-    if (phase === "detected") {
-      void fetchPreview();
-    }
-  }, [phase, fetchPreview]);
 
   const runExtraction = useCallback(async () => {
     if (!preview) return;
@@ -174,7 +167,10 @@ export function ImportRoute(): React.JSX.Element {
 
         <StageBar phase={phase} />
 
-        <SourceUrlForm onError={setTopError} />
+        <SourceUrlForm
+          onError={setTopError}
+          onDetectionReady={() => void fetchPreview()}
+        />
 
         {detection != null && <DetectionChip detection={detection} />}
 
