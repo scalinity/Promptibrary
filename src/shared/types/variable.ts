@@ -30,7 +30,8 @@ export interface VariableBase<TType extends VariableType, TValue> {
 export interface FileVariable extends VariableBase<"file", AbsolutePath> {
   mustExist: boolean;
   allowedExtensions: string[];
-  allowMultiple: false;
+  // V1 is single-file-only per spec §5. Multi-file support would re-introduce
+  // `allowMultiple` here and on the Rust side.
 }
 
 export interface FolderVariable extends VariableBase<"folder", AbsolutePath> {
@@ -58,7 +59,8 @@ export interface SelectOption {
 
 export interface SelectVariable extends VariableBase<"select", string> {
   options: SelectOption[];
-  allowCustom: false;
+  // V1 selects are option-only per spec §5. Custom-value support would
+  // re-introduce `allowCustom` here and on the Rust side.
 }
 
 export interface BoolVariable extends VariableBase<"bool", boolean> {

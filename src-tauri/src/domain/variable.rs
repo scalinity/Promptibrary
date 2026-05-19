@@ -47,7 +47,8 @@ pub struct FileVariable {
     pub source: VariableSource,
     pub must_exist: bool,
     pub allowed_extensions: Vec<String>,
-    pub allow_multiple: bool,
+    // V1 is single-file-only per spec §5. If multi-file support is ever added,
+    // re-introduce as an `allow_multiple: bool` field on both sides.
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -113,7 +114,8 @@ pub struct SelectVariable {
     pub order: u32,
     pub source: VariableSource,
     pub options: Vec<SelectOption>,
-    pub allow_custom: bool,
+    // V1 selects are option-only per spec §5. Custom-value support would
+    // re-introduce `allow_custom: bool` on both sides.
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
