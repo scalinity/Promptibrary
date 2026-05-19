@@ -26,7 +26,6 @@
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use sqlx::SqlitePool;
 
 use crate::error::{AppError, Result};
@@ -217,15 +216,10 @@ pub async fn event_count_for_run(db: &SqlitePool, run_id: &str) -> Result<i64> {
     Ok(count)
 }
 
-/// Helper: extract a typed value from a JSON payload column. Used in
-/// tests and by the run-detail view to render specific event fields.
-pub fn payload_field(payload: &Value, field: &str) -> Option<Value> {
-    payload.get(field).cloned()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::Value;
     use crate::index::db::in_memory_connect_options;
     use crate::index::migrations::run_migrations;
     use sqlx::sqlite::SqlitePoolOptions;
