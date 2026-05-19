@@ -13,6 +13,18 @@ use crate::error::Result;
 
 use super::secret_store::SecretStore;
 
+/// Account name used by `commands::system::probe_keychain` for its
+/// write-read-delete round-trip on the keychain (SCA-731). This MUST
+/// be disjoint from every `SecretKey::as_keychain_account()` return
+/// value so a probe failure or interrupted process never overwrites
+/// the user's real secrets.
+///
+/// We deliberately keep this OUT of the `SecretKey` enum: probe slots
+/// shouldn't surface in `get_secret_status()` or in the spec §13
+/// secrets list. A constant string under the same `KEYCHAIN_SERVICE`
+/// is the simplest correct shape.
+pub const KEYCHAIN_PROBE_ACCOUNT: &str = "__diagnostics_probe__";
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SecretKey {

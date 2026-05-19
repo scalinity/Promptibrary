@@ -29,7 +29,7 @@ use tauri::State;
 
 use crate::app_state::ManagedState;
 use crate::error::{AppError, AppErrorKind, Result};
-use crate::settings::keychain::{self, SecretKey};
+use crate::settings::keychain::KEYCHAIN_PROBE_ACCOUNT;
 use crate::settings::secret_store::SecretStore;
 
 // ─── probe_dependencies ──────────────────────────────────────────────
@@ -155,30 +155,16 @@ async fn probe_binary(
 }
 
 async fn probe_keychain(store: &dyn SecretStore) -> DependencyProbe {
-    // Write-read-clear round-trip on a dedicated probe key. The
-    // SecretKey enum doesn't include a "probe" key, so we re-use the
-    // AnthropicApiKey slot transiently — restoring it afterwards. To
-    // stay safe against losing the user's real key, we first read,
-    // probe, then write back if there was a value.
-    let original = match keychain::get_secret(store, SecretKey::AnthropicApiKey) {
-        Ok(v) => v,
-        Err(_) => {
-            return DependencyProbe {
-                name: "keychain",
-                status: ProbeStatus::Error,
-                version: None,
-                install_hint: Some(
-                    "macOS keychain access denied — check Settings → Privacy & Security",
-                ),
-            }
-        }
-    };
+    // Probe a disjoint account name so we never touch the live
+    // AnthropicApiKey slot (SCA-731). The pre-fix design read-wrote-
+    // restored the real slot, which lost the user's key on any failure
+    // between probe-write and restore.
+    const PROBE_VALUE: &str = "promptibrary-keychain-probe";
 
-    let probe_value = "promptibrary-keychain-probe";
     let probe_result = (|| -> Result<()> {
-        keychain::set_secret(store, SecretKey::AnthropicApiKey, probe_value)?;
-        let round_tripped = keychain::get_secret(store, SecretKey::AnthropicApiKey)?;
-        if round_tripped.as_deref() != Some(probe_value) {
+        store.set(KEYCHAIN_PROBE_ACCOUNT, PROBE_VALUE)?;
+        let round_tripped = store.get(KEYCHAIN_PROBE_ACCOUNT)?;
+        if round_tripped.as_deref() != Some(PROBE_VALUE) {
             return Err(AppError::new(
                 AppErrorKind::SettingsInvalid,
                 "keychain probe round-trip mismatch",
@@ -187,11 +173,12 @@ async fn probe_keychain(store: &dyn SecretStore) -> DependencyProbe {
         Ok(())
     })();
 
-    // Restore original state regardless of probe outcome.
-    let _ = match original.as_deref() {
-        Some(v) => keychain::set_secret(store, SecretKey::AnthropicApiKey, v),
-        None => keychain::clear_secret(store, SecretKey::AnthropicApiKey),
-    };
+    // Best-effort cleanup. If delete fails, the stale probe value is
+    // confined to the diagnostics-probe slot — not to any real secret
+    // — and the next probe will overwrite it. We log but do not fail.
+    if let Err(e) = store.delete(KEYCHAIN_PROBE_ACCOUNT) {
+        tracing::warn!(error = %e, "keychain probe cleanup failed");
+    }
 
     match probe_result {
         Ok(()) => DependencyProbe {
@@ -372,11 +359,69 @@ mod tests {
         );
     }
 
+    /// SCA-731 invariant: the probe MUST NOT touch the user's real
+    /// AnthropicApiKey slot. Pre-fix design read-wrote-restored the
+    /// real slot; any failure between probe-write and restore lost
+    /// the user's key. The disjoint-account fix sidesteps that entire
+    /// failure mode.
     #[tokio::test]
-    async fn probe_keychain_preserves_existing_value() {
+    async fn probe_keychain_never_touches_real_secret_slot() {
+        use crate::settings::keychain::{self, SecretKey, KEYCHAIN_PROBE_ACCOUNT};
+
         let store = InMemorySecretStore::new();
         keychain::set_secret(&store, SecretKey::AnthropicApiKey, "sk-real-key").unwrap();
-        let _ = probe_keychain(&store).await;
+
+        let p = probe_keychain(&store).await;
+        assert!(matches!(p.status, ProbeStatus::Ok));
+
+        // Real secret preserved.
+        let after = keychain::get_secret(&store, SecretKey::AnthropicApiKey).unwrap();
+        assert_eq!(after.as_deref(), Some("sk-real-key"));
+
+        // Probe slot cleaned up successfully on the happy path.
+        assert_eq!(store.get(KEYCHAIN_PROBE_ACCOUNT).unwrap(), None);
+    }
+
+    /// SCA-731 fault-injection: if the cleanup `delete` fails, the
+    /// probe still succeeds because no real secret was ever at risk.
+    /// Confirms the failure mode is isolated to the disjoint probe
+    /// slot.
+    #[tokio::test]
+    async fn probe_keychain_succeeds_even_when_cleanup_delete_fails() {
+        use crate::settings::keychain::{self, SecretKey};
+
+        struct CleanupFailingStore {
+            inner: InMemorySecretStore,
+        }
+
+        impl SecretStore for CleanupFailingStore {
+            fn get(&self, key: &str) -> Result<Option<String>> {
+                self.inner.get(key)
+            }
+            fn set(&self, key: &str, value: &str) -> Result<()> {
+                self.inner.set(key, value)
+            }
+            fn delete(&self, _key: &str) -> Result<()> {
+                Err(AppError::new(
+                    AppErrorKind::KeychainError,
+                    "simulated cleanup failure",
+                ))
+            }
+        }
+
+        let store = CleanupFailingStore {
+            inner: InMemorySecretStore::new(),
+        };
+        keychain::set_secret(&store, SecretKey::AnthropicApiKey, "sk-real-key").unwrap();
+
+        let p = probe_keychain(&store).await;
+        assert!(
+            matches!(p.status, ProbeStatus::Ok),
+            "probe must still report Ok when only cleanup fails; got {p:?}"
+        );
+
+        // The user's real secret survives the probe regardless of
+        // cleanup failure — this is the whole point of CRIT-1's fix.
         let after = keychain::get_secret(&store, SecretKey::AnthropicApiKey).unwrap();
         assert_eq!(after.as_deref(), Some("sk-real-key"));
     }
