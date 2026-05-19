@@ -13,7 +13,6 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 use sqlx::SqlitePool;
 
 use super::cache;
@@ -438,20 +437,6 @@ fn source_kind_label(input: &ExtractionInput) -> &'static str {
         Source::XTwitter(_) => "x_twitter",
         Source::Article(_) => "article",
     }
-}
-
-// Convenience constructor for IPC wiring.
-pub fn http_client_for_extraction() -> reqwest::Client {
-    reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(60))
-        .build()
-        .expect("reqwest client builds")
-}
-
-// Suppress unused warnings on the JSON helper when used downstream.
-#[allow(dead_code)]
-fn _unused_helper() -> serde_json::Value {
-    json!({})
 }
 
 #[cfg(test)]
