@@ -15,6 +15,7 @@ use tokio::sync::{Mutex, RwLock};
 use crate::extraction::anthropic::{AnthropicTransport, HttpAnthropicTransport};
 use crate::extraction::fetchers::youtube::{RealYtDlpRunner, YtDlpRunner};
 use crate::extraction::rate_limit::RateLimiter;
+use crate::index::embeddings::{EmbeddingService, MockEmbeddingService};
 use crate::settings::secret_store::SecretStore;
 #[cfg(any(
     test,
@@ -56,6 +57,11 @@ pub struct AppServices {
     /// Linux: `$XDG_CONFIG_HOME/promptibrary` or `~/.config/promptibrary`;
     /// Windows: `%APPDATA%\promptibrary`. Tests use a tempdir override.
     pub app_data_dir: PathBuf,
+    /// SCA-784: backend-agnostic embedding service. Defaults to
+    /// `MockEmbeddingService` until `fastembed = "5.13"` is enabled in
+    /// Cargo.toml — see `src/index/embeddings.rs` module docstring for
+    /// the enable procedure.
+    pub embedding_service: Arc<dyn EmbeddingService>,
 }
 
 #[derive(Default)]
@@ -90,6 +96,7 @@ impl AppServices {
 
         let extraction_temp_dir = std::env::temp_dir().join("promptibrary").join("extraction");
         let app_data_dir = default_app_data_dir();
+        let embedding_service: Arc<dyn EmbeddingService> = MockEmbeddingService::new();
 
         Self {
             state: RwLock::default(),
@@ -101,6 +108,7 @@ impl AppServices {
             anthropic_transport,
             extraction_temp_dir,
             app_data_dir,
+            embedding_service,
         }
     }
 
@@ -124,6 +132,7 @@ impl AppServices {
             anthropic_transport,
             extraction_temp_dir: std::env::temp_dir().join("promptibrary").join("extraction"),
             app_data_dir: default_app_data_dir(),
+            embedding_service: MockEmbeddingService::new(),
         }
     }
 
@@ -133,6 +142,16 @@ impl AppServices {
     pub fn with_app_data_dir(self, app_data_dir: PathBuf) -> Self {
         Self {
             app_data_dir,
+            ..self
+        }
+    }
+
+    /// Test helper that overrides the embedding service so a test can
+    /// assert against deterministic vectors or skip the embedding path
+    /// entirely.
+    pub fn with_embedding_service(self, embedding_service: Arc<dyn EmbeddingService>) -> Self {
+        Self {
+            embedding_service,
             ..self
         }
     }

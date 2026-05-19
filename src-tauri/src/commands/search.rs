@@ -47,6 +47,7 @@ use tauri::State;
 use crate::app_state::ManagedState;
 use crate::commands::vault::current_vault_db;
 use crate::error::{AppError, Result};
+use crate::index::embeddings::{self, EmbeddingService};
 use crate::index::fts::search_fts;
 use crate::index::sql_util::escape_like;
 
@@ -150,23 +151,19 @@ pub async fn search_prompts(
     services: State<'_, ManagedState>,
 ) -> Result<Vec<PromptSearchResult>> {
     let (_vault, db) = current_vault_db(&services).await?;
-    search_prompts_inner(&db, &input).await
+    let embed = services.embedding_service.clone();
+    search_prompts_inner(&db, &input, Some(embed.as_ref())).await
 }
 
 async fn search_prompts_inner(
     db: &SqlitePool,
     input: &SearchPromptsInput,
+    embedding_service: Option<&dyn EmbeddingService>,
 ) -> Result<Vec<PromptSearchResult>> {
     let limit = effective_limit(input.limit);
     let bounded = bound_query(&input.query);
     let trimmed = bounded.trim();
     let mode = input.mode.unwrap_or_default();
-    // SCA-739: include_archived defaults to false. Applies to the
-    // recent-prompts path and the prompt-meta join used by hybrid
-    // and fts-only. FTS search itself (`index::fts::search_fts`)
-    // continues to exclude archived rows unconditionally — that's
-    // the spec's text-search baseline; the toggle controls list
-    // membership, not whether archived rows are full-text-searchable.
     let include_archived = input.include_archived.unwrap_or(false);
 
     if trimmed.is_empty() {
@@ -177,12 +174,17 @@ async fn search_prompts_inner(
         SearchMode::Text => {
             fts_only(db, trimmed, input.tag.as_deref(), limit, include_archived).await
         }
-        SearchMode::Semantic => {
-            // Embedding service is deferred; no semantic results to return.
-            Ok(Vec::new())
-        }
+        SearchMode::Semantic => semantic_only(db, trimmed, limit, embedding_service).await,
         SearchMode::Hybrid => {
-            hybrid(db, trimmed, input.tag.as_deref(), limit, include_archived).await
+            hybrid(
+                db,
+                trimmed,
+                input.tag.as_deref(),
+                limit,
+                include_archived,
+                embedding_service,
+            )
+            .await
         }
     }
 }
@@ -195,6 +197,7 @@ async fn hybrid(
     tag: Option<&str>,
     limit: usize,
     include_archived: bool,
+    embedding_service: Option<&dyn EmbeddingService>,
 ) -> Result<Vec<PromptSearchResult>> {
     // Pull a 4× window from FTS so post-tag-filter we still fill the limit.
     let raw_limit = if tag.is_some() { limit * 4 } else { limit };
@@ -216,6 +219,15 @@ async fn hybrid(
     let prompt_meta = fetch_prompt_meta(db, &ids, tag, include_archived).await?;
     let usage = fetch_usage_stats(db, &ids).await?;
 
+    // SCA-784: semantic component lookup. If an embedding service is
+    // wired and the candidate has a stored embedding, compute cosine
+    // and normalize to [0, 1]. Otherwise semantic=0 (V1-acceptable
+    // fall-through to text+recency+usage ranking).
+    let semantic_scores = match embedding_service {
+        Some(svc) => semantic_scores_for_candidates(db, svc, query, &ids).await?,
+        None => HashMap::new(),
+    };
+
     let now = Utc::now();
     let query_lower = query.to_lowercase();
 
@@ -227,10 +239,12 @@ async fn hybrid(
         let text_component = text_rank.get(id).copied().unwrap_or(0.0);
         let stats = usage.get(id).copied().unwrap_or(UsageStats::default());
         let snippet = snippets.remove(id).unwrap_or(None);
+        let semantic_component = semantic_scores.get(id).copied().unwrap_or(0.0);
         out.push(compose_scored_result(
             id,
             meta,
             text_component,
+            semantic_component,
             stats,
             now,
             &query_lower,
@@ -255,6 +269,7 @@ fn compose_scored_result(
     id: &str,
     meta: &PromptMeta,
     text_component: f64,
+    semantic_component: f64,
     stats: UsageStats,
     now: DateTime<Utc>,
     query_lower: &str,
@@ -266,7 +281,7 @@ fn compose_scored_result(
     // semantic component is held at 0 until the embedding service
     // lands. We still feed the weighted sum so the score formula
     // matches §9 exactly.
-    let semantic = 0.0;
+    let semantic = semantic_component;
     // SCA-737: full Unicode case-folding on BOTH sides.
     let pin = meta.title.to_lowercase() == query_lower;
     let pin_bonus = if pin { EXACT_TITLE_PIN_BONUS } else { 0.0 };
@@ -287,6 +302,87 @@ fn compose_scored_result(
             exact_title_pin: pin,
         },
     }
+}
+
+/// SCA-784: compute the per-candidate semantic component used in the
+/// hybrid score formula. Normalizes cosine to [0, 1] via `max(0, cosine)`
+/// — negative-cosine matches aren't more relevant than nothing.
+async fn semantic_scores_for_candidates(
+    db: &SqlitePool,
+    svc: &dyn EmbeddingService,
+    query: &str,
+    candidate_ids: &[String],
+) -> Result<HashMap<String, f64>> {
+    let query_vec = svc.embed(query)?;
+    // Pull the embeddings for just the candidate set rather than the
+    // whole table. At V1 scale (≤ 800 candidates per hybrid call —
+    // bounded by MAX_LIMIT * 4) one SELECT covers them.
+    if candidate_ids.is_empty() {
+        return Ok(HashMap::new());
+    }
+    let placeholders = vec!["?"; candidate_ids.len()].join(",");
+    let sql = format!(
+        "SELECT prompt_id, embedding FROM prompt_embeddings
+          WHERE model = ? AND prompt_id IN ({placeholders})"
+    );
+    let mut q = sqlx::query_as::<_, (String, Vec<u8>)>(&sql);
+    q = q.bind(svc.id());
+    for id in candidate_ids {
+        q = q.bind(id);
+    }
+    let rows = q.fetch_all(db).await.map_err(AppError::from)?;
+    let mut out = HashMap::new();
+    for (pid, bytes) in rows {
+        let vec = embeddings::bytes_to_vector(&bytes)?;
+        if vec.len() != query_vec.len() {
+            continue;
+        }
+        let cosine = embeddings::cosine(&vec, &query_vec) as f64;
+        out.insert(pid, cosine.max(0.0));
+    }
+    Ok(out)
+}
+
+// ─── Semantic-only mode ──────────────────────────────────────────────
+
+async fn semantic_only(
+    db: &SqlitePool,
+    query: &str,
+    limit: usize,
+    embedding_service: Option<&dyn EmbeddingService>,
+) -> Result<Vec<PromptSearchResult>> {
+    // SCA-784: SearchMode::Semantic used to return an empty Vec while
+    // embeddings were deferred. Now that the storage layer is real,
+    // semantic mode returns cosine-ranked results when an embedding
+    // service is wired — otherwise falls through to empty.
+    let Some(svc) = embedding_service else {
+        return Ok(Vec::new());
+    };
+    let query_vec = svc.embed(query)?;
+    let ranked = embeddings::search_semantic(db, svc.id(), &query_vec, limit).await?;
+    if ranked.is_empty() {
+        return Ok(Vec::new());
+    }
+    let ids: Vec<String> = ranked.iter().map(|(id, _)| id.clone()).collect();
+    let meta = fetch_prompt_meta(db, &ids, None, false).await?;
+    Ok(ranked
+        .into_iter()
+        .filter_map(|(id, cosine)| {
+            meta.get(&id).map(|m| PromptSearchResult {
+                prompt_id: id.clone(),
+                title: m.title.clone(),
+                snippet: None,
+                score: cosine as f64,
+                score_parts: ScoreParts {
+                    text: 0.0,
+                    semantic: (cosine as f64).max(0.0),
+                    recency: 0.0,
+                    usage: 0.0,
+                    exact_title_pin: false,
+                },
+            })
+        })
+        .collect())
 }
 
 fn recency_boost(last_used_at: Option<DateTime<Utc>>, now: DateTime<Utc>) -> f64 {
@@ -678,6 +774,7 @@ async fn cmdk_search_inner(
             mode: Some(SearchMode::Hybrid),
             include_archived: Some(false),
         },
+        None,
     )
     .await?;
 
@@ -918,6 +1015,7 @@ mod tests {
                 mode: None,
                 include_archived: None,
             },
+            None,
         )
         .await
         .unwrap();
@@ -964,6 +1062,7 @@ mod tests {
                 mode: Some(SearchMode::Hybrid),
                 include_archived: None,
             },
+            None,
         )
         .await
         .unwrap();
@@ -1014,6 +1113,7 @@ mod tests {
                 mode: Some(SearchMode::Hybrid),
                 include_archived: None,
             },
+            None,
         )
         .await
         .unwrap();
@@ -1056,6 +1156,7 @@ mod tests {
                 mode: Some(SearchMode::Hybrid),
                 include_archived: None,
             },
+            None,
         )
         .await
         .unwrap();
@@ -1105,6 +1206,7 @@ mod tests {
             "01a",
             &meta,
             1.0 / 61.0, // top FTS hit
+            0.5,        // SCA-784: mid-range semantic component
             UsageStats {
                 launch_count: 1,
                 last_used_at: Some(now - Duration::hours(1)),
@@ -1115,12 +1217,14 @@ mod tests {
         );
         assert!(pinned.score_parts.exact_title_pin);
         assert!(pinned.score > EXACT_TITLE_PIN_BONUS);
+        assert!((pinned.score_parts.semantic - 0.5).abs() < 1e-9);
 
         // Non-pin baseline: score stays in the natural range.
         let unpinned = compose_scored_result(
             "01a",
             &meta,
             1.0 / 61.0,
+            0.0, // semantic component absent
             UsageStats {
                 launch_count: 1,
                 last_used_at: Some(now - Duration::hours(1)),
@@ -1156,6 +1260,7 @@ mod tests {
                 mode: None,
                 include_archived: None,
             },
+            None,
         )
         .await
         .unwrap();
@@ -1179,6 +1284,7 @@ mod tests {
                 mode: Some(SearchMode::Semantic),
                 include_archived: None,
             },
+            None,
         )
         .await
         .unwrap();
@@ -1208,6 +1314,7 @@ mod tests {
                 mode: None,
                 include_archived: None,
             },
+            None,
         )
         .await
         .unwrap();
@@ -1224,6 +1331,7 @@ mod tests {
                 mode: None,
                 include_archived: Some(true),
             },
+            None,
         )
         .await
         .unwrap();
@@ -1252,6 +1360,7 @@ mod tests {
                 mode: Some(SearchMode::Text),
                 include_archived: None,
             },
+            None,
         )
         .await
         .unwrap();
@@ -1383,5 +1492,65 @@ mod tests {
         // src/router.tsx. SCA-755 pins the set so future router
         // additions can be reconciled deliberately.
         assert_eq!(ids, vec!["library", "import", "settings"]);
+    }
+
+    /// SCA-784: hybrid path consumes the EmbeddingService when one is
+    /// wired AND the candidate has a stored embedding. Pre-populate
+    /// embeddings for two FTS-matching prompts, then verify the one
+    /// whose stored embedding is closest to the query's embedding
+    /// gets a higher semantic component (reflected in score_parts).
+    #[tokio::test]
+    async fn hybrid_consumes_semantic_component_when_embeddings_present() {
+        use crate::index::embeddings::{self, MockEmbeddingService};
+        let db = temp_pool().await;
+        upsert_prompt(&db, &sample_prompt("01close", "kubernetes deployment", "x", &[]))
+            .await
+            .unwrap();
+        upsert_prompt(&db, &sample_prompt("02far", "kubernetes deployment v2", "x", &[]))
+            .await
+            .unwrap();
+
+        let svc = MockEmbeddingService;
+        // Store embedding for 01close = embed("kubernetes deployment")
+        // (same text as the query → cosine ~1).
+        let v_close = svc.embed("kubernetes deployment").unwrap();
+        embeddings::upsert_embedding(&db, "01close", svc.id(), &v_close, "sha256:close")
+            .await
+            .unwrap();
+        // Store embedding for 02far = embed("python web framework")
+        // (different text → low cosine against query).
+        let v_far = svc.embed("python web framework").unwrap();
+        embeddings::upsert_embedding(&db, "02far", svc.id(), &v_far, "sha256:far")
+            .await
+            .unwrap();
+
+        let res = search_prompts_inner(
+            &db,
+            &SearchPromptsInput {
+                query: "kubernetes deployment".into(),
+                tag: None,
+                limit: None,
+                mode: Some(SearchMode::Hybrid),
+                include_archived: None,
+            },
+            Some(&svc),
+        )
+        .await
+        .unwrap();
+
+        // 01close has both FTS hit AND the better semantic match → wins.
+        assert!(res.len() >= 2);
+        // The semantically-close prompt should be first (it's also the
+        // exact title match, so the pin lifts it too — but we assert
+        // the semantic_component is non-zero on it).
+        let close = res.iter().find(|r| r.prompt_id == "01close").unwrap();
+        let far = res.iter().find(|r| r.prompt_id == "02far").unwrap();
+        assert!(
+            close.score_parts.semantic > far.score_parts.semantic,
+            "close.semantic ({}) should beat far.semantic ({})",
+            close.score_parts.semantic,
+            far.score_parts.semantic
+        );
+        assert!(close.score_parts.semantic > 0.9);
     }
 }
