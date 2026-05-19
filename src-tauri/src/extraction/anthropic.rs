@@ -405,9 +405,24 @@ fn build_repair_request(
     invalid_raw: &str,
     errors: &[ValidationError],
 ) -> AnthropicRequest {
+    // Cap each error's debug repr so a giant `JsonParseFailed { error: ... }`
+    // doesn't blow past the repair input budget (SCA-719). 500 chars is
+    // enough to keep the substantive context (offset, expected/found
+    // tokens) while bounding the worst case.
+    const MAX_ERROR_REPR_CHARS: usize = 500;
     let mut error_lines = String::new();
     for e in errors {
-        error_lines.push_str(&format!("- {e:?}\n"));
+        let repr = format!("{e:?}");
+        let mut bytes_to_take = repr.len().min(MAX_ERROR_REPR_CHARS);
+        while bytes_to_take > 0 && !repr.is_char_boundary(bytes_to_take) {
+            bytes_to_take -= 1;
+        }
+        let truncated = if repr.len() > MAX_ERROR_REPR_CHARS {
+            format!("{}… [truncated]", &repr[..bytes_to_take])
+        } else {
+            repr
+        };
+        error_lines.push_str(&format!("- {truncated}\n"));
     }
     let repair_text = format!(
         "Your previous response did not pass validation. Return ONLY valid JSON matching the schema; no markdown, no commentary.\n\nValidation errors:\n{error_lines}\n\nYour previous response was:\n{invalid_raw}\n\nReturn the corrected JSON now."
