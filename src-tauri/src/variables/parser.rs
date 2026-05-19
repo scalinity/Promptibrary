@@ -290,11 +290,26 @@ fn parse_block(
         _ => HashMap::new(),
     };
 
-    if let (Some(min), Some(max)) = (
-        constraints.get("min").and_then(|s| s.parse::<f64>().ok()),
-        constraints.get("max").and_then(|s| s.parse::<f64>().ok()),
-    ) {
-        if min > max {
+    // SCA-612: f64::parse accepts "NaN" / "inf" / "-inf"; NaN comparisons
+    // also return false for `>` so a {{number:n?min=NaN,max=10}} would
+    // sneak past the range check below. Reject non-finite values up
+    // front, then perform the range comparison only when both sides are
+    // finite.
+    let min_parsed = constraints.get("min").and_then(|s| s.parse::<f64>().ok());
+    let max_parsed = constraints.get("max").and_then(|s| s.parse::<f64>().ok());
+    for (key, val) in [("min", min_parsed), ("max", max_parsed)] {
+        if let Some(v) = val {
+            if !v.is_finite() {
+                errors.push(VariableParseError::InvalidConstraint {
+                    key: key.into(),
+                    value: format!("{}", v),
+                    reason: format!("{key}={v} is not a finite number"),
+                });
+            }
+        }
+    }
+    if let (Some(min), Some(max)) = (min_parsed, max_parsed) {
+        if min.is_finite() && max.is_finite() && min > max {
             errors.push(VariableParseError::InvalidConstraint {
                 key: "min".into(),
                 value: format!("{}", min),
