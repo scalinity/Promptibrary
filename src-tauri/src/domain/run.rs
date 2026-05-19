@@ -58,8 +58,11 @@ pub struct Run {
     pub signal: Option<StopSignal>,
     pub transcript_vault_path: Option<String>,
     pub transcript_spool_path: Option<PathBuf>,
-    pub stdout_bytes: u64,
-    pub stderr_bytes: u64,
+    // Use i64 to match SQLite's signed INTEGER storage and JS number range
+    // (exact up to 2^53). A claude run that produces >8 EB of terminal output
+    // is a bug worth surfacing, not a precision-loss to paper over.
+    pub stdout_bytes: i64,
+    pub stderr_bytes: i64,
     pub token_count: Option<TokenCount>,
     pub cost_usd: Option<f64>,
     pub error: Option<AppErrorDto>,
