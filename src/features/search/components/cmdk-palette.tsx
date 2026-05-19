@@ -24,6 +24,40 @@ import { searchKeys } from "@/shared/api/queryKeys";
 import { useSearchStore } from "@/features/search/stores/search-store";
 import { useLibraryStore } from "@/features/library/stores/library-store";
 
+/// SCA-742: render FTS5 snippet `<mark>…</mark>` markers as real
+/// `<mark>` elements. Pre-fix the JSX rendered the snippet as a text
+/// node (correct XSS posture), so users saw literal `<mark>` and
+/// `</mark>` strings in the subtitle area instead of highlighted hits.
+///
+/// We split on the two marker tokens and wrap the captured ranges in
+/// real `<mark>` JSX elements. Everything else stays a text node, so
+/// XSS surface is unchanged — the FTS5 snippet payload can contain
+/// any content from the prompt body, but text-content rendering is
+/// safe by construction.
+function renderSnippet(snippet: string): React.ReactNode {
+  const parts = snippet.split(/(<mark>|<\/mark>)/g);
+  const out: React.ReactNode[] = [];
+  let inMark = false;
+  let key = 0;
+  for (const part of parts) {
+    if (part === "<mark>") {
+      inMark = true;
+      continue;
+    }
+    if (part === "</mark>") {
+      inMark = false;
+      continue;
+    }
+    if (part === "") continue;
+    if (inMark) {
+      out.push(<mark key={key++}>{part}</mark>);
+    } else {
+      out.push(part);
+    }
+  }
+  return out;
+}
+
 // Map static-action ids → handlers. Routes/prompts/runs handle
 // navigation generically; actions need bespoke side effects (routed to
 // the closest existing surface for now — the real action hooks land
@@ -243,7 +277,7 @@ export function CmdKPalette(): React.JSX.Element {
                 >
                   <span style={{ color: "var(--ink-primary)" }}>{p.title}</span>
                   {p.subtitle != null && p.subtitle !== "" && (
-                    <span style={cmdkSubStyle}>{p.subtitle}</span>
+                    <span style={cmdkSubStyle}>{renderSnippet(p.subtitle)}</span>
                   )}
                 </Command.Item>
               ))}
