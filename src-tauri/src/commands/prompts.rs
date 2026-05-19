@@ -178,7 +178,7 @@ pub async fn create_prompt(
             content_hash: None,
         }),
         variables: input.variables,
-        launch_defaults: default_launch_defaults(),
+        launch_defaults: crate::domain::prompt::LaunchDefaults::default(),
         telemetry: crate::domain::prompt::PromptTelemetrySummary {
             launch_count: 0,
             last_used_at: None,
@@ -319,7 +319,7 @@ fn prompt_from_file(vault_path: &str, content: &str) -> Result<Prompt> {
     let doc = parse_markdown_document(content)?;
     let fm = parse_prompt_frontmatter(&doc.frontmatter_yaml)?;
     let body = doc.body;
-    let checksum = format!("sha256:{}", hex_sha256(content));
+    let checksum = format!("sha256:{}", crate::util::hash::sha256_hex(content));
     Ok(Prompt {
         id: PromptId(fm.id),
         title: fm.title,
@@ -333,7 +333,7 @@ fn prompt_from_file(vault_path: &str, content: &str) -> Result<Prompt> {
         tags: fm.tags,
         source: fm.source,
         variables: fm.variables,
-        launch_defaults: fm.launch_defaults.unwrap_or_else(default_launch_defaults),
+        launch_defaults: fm.launch_defaults.unwrap_or_default(),
         telemetry: crate::domain::prompt::PromptTelemetrySummary {
             launch_count: 0,
             last_used_at: None,
@@ -345,31 +345,3 @@ fn prompt_from_file(vault_path: &str, content: &str) -> Result<Prompt> {
     })
 }
 
-fn hex_sha256(s: &str) -> String {
-    use sha2::{Digest, Sha256};
-    let mut h = Sha256::new();
-    h.update(s.as_bytes());
-    let mut out = String::with_capacity(64);
-    for b in h.finalize() {
-        out.push_str(&format!("{:02x}", b));
-    }
-    out
-}
-
-fn default_launch_defaults() -> crate::domain::prompt::LaunchDefaults {
-    use crate::domain::prompt::*;
-    LaunchDefaults {
-        destination: LaunchDestination::ClaudeCodeCli,
-        model: ClaudeModelId::ClaudeSonnet46,
-        verifier_mode: VerifierMode::Off,
-        working_directory: None,
-        additional_directories: vec![],
-        permission_mode: ClaudePermissionMode::Default,
-        allowed_tools: vec![],
-        disallowed_tools: vec![],
-        mcp_config_paths: vec![],
-        strict_mcp_config: false,
-        append_system_prompt: None,
-        max_turns: None,
-    }
-}

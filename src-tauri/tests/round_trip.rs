@@ -9,12 +9,8 @@ use chrono::Utc;
 use sqlx::sqlite::SqlitePoolOptions;
 use sqlx::SqlitePool;
 
-use promptibrary_lib::domain::prompt::{
-    ClaudeModelId, ClaudePermissionMode, LaunchDefaults, LaunchDestination, Prompt,
-    PromptTelemetrySummary, VerifierMode,
-};
+use promptibrary_lib::domain::prompt::{LaunchDefaults, Prompt, PromptTelemetrySummary};
 use promptibrary_lib::domain::source::{ManualSource, Source};
-use promptibrary_lib::domain::variable::Variable;
 use promptibrary_lib::ids::PromptId;
 use promptibrary_lib::index::migrations::run_migrations;
 use promptibrary_lib::index::prompts_repo;
@@ -40,23 +36,6 @@ async fn temp_db() -> SqlitePool {
     pool
 }
 
-fn default_launch_defaults() -> LaunchDefaults {
-    LaunchDefaults {
-        destination: LaunchDestination::ClaudeCodeCli,
-        model: ClaudeModelId::ClaudeSonnet46,
-        verifier_mode: VerifierMode::Off,
-        working_directory: None,
-        additional_directories: vec![],
-        permission_mode: ClaudePermissionMode::Default,
-        allowed_tools: vec![],
-        disallowed_tools: vec![],
-        mcp_config_paths: vec![],
-        strict_mcp_config: false,
-        append_system_prompt: None,
-        max_turns: None,
-    }
-}
-
 fn make_prompt(title: &str, slug: &str, body: &str) -> Prompt {
     Prompt {
         id: PromptId(promptibrary_lib::ids::new_ulid()),
@@ -76,7 +55,7 @@ fn make_prompt(title: &str, slug: &str, body: &str) -> Prompt {
             content_hash: None,
         }),
         variables: vec![],
-        launch_defaults: default_launch_defaults(),
+        launch_defaults: LaunchDefaults::default(),
         telemetry: PromptTelemetrySummary {
             launch_count: 0,
             last_used_at: None,

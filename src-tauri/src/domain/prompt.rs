@@ -82,6 +82,30 @@ pub struct LaunchDefaults {
     pub max_turns: Option<u32>,
 }
 
+impl Default for LaunchDefaults {
+    /// Spec §4 default LaunchDefaults: ClaudeCodeCli + claude-sonnet-4-6
+    /// + verifier off + permissions default + empty tool lists + no MCP +
+    /// no append_system_prompt + no max_turns (max_turns stays unset per
+    /// spec §7 risk note — never passed to claude). SCA-600 consolidates
+    /// the three duplicate default_launch_defaults helpers into this impl.
+    fn default() -> Self {
+        Self {
+            destination: LaunchDestination::ClaudeCodeCli,
+            model: ClaudeModelId::ClaudeSonnet46,
+            verifier_mode: VerifierMode::Off,
+            working_directory: None,
+            additional_directories: vec![],
+            permission_mode: ClaudePermissionMode::Default,
+            allowed_tools: vec![],
+            disallowed_tools: vec![],
+            mcp_config_paths: vec![],
+            strict_mcp_config: false,
+            append_system_prompt: None,
+            max_turns: None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PromptTelemetrySummary {

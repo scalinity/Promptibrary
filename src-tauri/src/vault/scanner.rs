@@ -127,7 +127,7 @@ pub async fn scan_vault<F: FnMut(ScanProgress)>(
             tags: fm.tags,
             source: fm.source,
             variables: fm.variables,
-            launch_defaults: fm.launch_defaults.unwrap_or_else(default_launch_defaults),
+            launch_defaults: fm.launch_defaults.unwrap_or_default(),
             telemetry: crate::domain::prompt::PromptTelemetrySummary {
                 launch_count: 0,
                 last_used_at: None,
@@ -135,7 +135,7 @@ pub async fn scan_vault<F: FnMut(ScanProgress)>(
                 avg_run_seconds: None,
                 avg_token_count: None,
             },
-            checksum_sha256: format!("sha256:{}", hex_sha256(&content)),
+            checksum_sha256: format!("sha256:{}", crate::util::hash::sha256_hex(&content)),
         };
 
         if let Err(e) = prompts_repo::upsert_prompt(db, &prompt).await {
@@ -195,35 +195,6 @@ pub async fn scan_vault<F: FnMut(ScanProgress)>(
         malformed: summary.malformed_files,
     });
     Ok(summary)
-}
-
-fn default_launch_defaults() -> crate::domain::prompt::LaunchDefaults {
-    use crate::domain::prompt::*;
-    LaunchDefaults {
-        destination: LaunchDestination::ClaudeCodeCli,
-        model: ClaudeModelId::ClaudeSonnet46,
-        verifier_mode: VerifierMode::Off,
-        working_directory: None,
-        additional_directories: vec![],
-        permission_mode: ClaudePermissionMode::Default,
-        allowed_tools: vec![],
-        disallowed_tools: vec![],
-        mcp_config_paths: vec![],
-        strict_mcp_config: false,
-        append_system_prompt: None,
-        max_turns: None,
-    }
-}
-
-fn hex_sha256(s: &str) -> String {
-    use sha2::{Digest, Sha256};
-    let mut h = Sha256::new();
-    h.update(s.as_bytes());
-    let mut out = String::with_capacity(64);
-    for b in h.finalize() {
-        out.push_str(&format!("{:02x}", b));
-    }
-    out
 }
 
 // Silence unused-imports warnings for items only used in tests.
