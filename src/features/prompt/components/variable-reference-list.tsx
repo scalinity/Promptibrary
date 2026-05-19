@@ -21,14 +21,25 @@ export function VariableReferenceList({
   const [result, setResult] = useState<ParseVariablesResult | null>(null);
 
   // Direct useEffect: bridges the body string into an async backend call.
-  // 200ms debounce matches the editor.
+  // 200ms debounce matches the editor. SCA-631 — cancelled flag prevents
+  // stale responses from overwriting newer state.
   useEffect(() => {
+    let cancelled = false;
     const handle = window.setTimeout(() => {
       parseVariables(body)
-        .then(setResult)
-        .catch(() => setResult(null));
+        .then((r) => {
+          if (cancelled) return;
+          setResult(r);
+        })
+        .catch(() => {
+          if (cancelled) return;
+          setResult(null);
+        });
     }, 200);
-    return () => window.clearTimeout(handle);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(handle);
+    };
   }, [body]);
 
   const variables = result?.variables ?? [];

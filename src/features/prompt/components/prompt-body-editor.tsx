@@ -22,6 +22,7 @@ import { autocompletion, type CompletionContext } from "@codemirror/autocomplete
 import { useEffect, useMemo, useState } from "react";
 
 import { parseVariables, type VariableRef } from "@/shared/api/ipc";
+import { isAppError } from "@/shared/api/errors";
 import type { PromptId } from "@/shared/types/ids";
 
 interface PromptBodyEditorProps {
@@ -195,10 +196,16 @@ export function PromptBodyEditor({
   // Debounced parse: 200ms after the user stops typing, ping the Rust
   // parser. Direct `useEffect` here is the rare legitimate case — we're
   // bridging a typed React value into an async backend probe.
+  //
+  // SCA-631 — the `cancelled` flag guards against late responses
+  // clobbering state for a newer doc. Without it, fast typing on a long
+  // body produces flicker between stale and fresh parse results.
   useEffect(() => {
+    let cancelled = false;
     const handle = window.setTimeout(() => {
       parseVariables(value)
         .then((result) => {
+          if (cancelled) return;
           setRefs(result.refs);
           setParseError(
             result.errors.length === 0
@@ -206,9 +213,20 @@ export function PromptBodyEditor({
               : result.errors[0]?.message ?? "parse error",
           );
         })
-        .catch(() => setParseError(null));
+        .catch((err: unknown) => {
+          if (cancelled) return;
+          // Surface the failure instead of silently clearing — a swallowed
+          // IPC error otherwise tells the user "looks fine" while the
+          // parser is broken.
+          setParseError(
+            isAppError(err) ? err.message : "parse error",
+          );
+        });
     }, 200);
-    return () => window.clearTimeout(handle);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(handle);
+    };
   }, [value]);
 
   const extensions = useMemo<Extension[]>(
