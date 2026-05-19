@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::domain::variable::Variable;
-use crate::error::{AppError, AppErrorKind, Result};
+use crate::error::Result;
 use crate::variables::parser::{
     parse_template_variables, ParseVariablesInput, ParseVariablesOutput, VariableRef,
 };
@@ -70,13 +70,11 @@ pub async fn validate_launch_inputs(
             Err(mut es) => issues.append(&mut es),
         }
     }
-    if !issues.is_empty() {
-        let payload = serde_json::to_string(&issues).unwrap_or_default();
-        return Err(
-            AppError::new(AppErrorKind::VariableValidationFailed, "validation failed")
-                .with_detail("issues_json", payload),
-        );
-    }
+    // SCA-596: return Ok with both `resolved` and `issues`, even when
+    // issues is non-empty. Callers (the L2 editor) check
+    // `issues.is_empty()` to decide launchability, and keep the partial
+    // `resolved` so the UI can patch one field at a time instead of
+    // re-validating the whole form on every keystroke.
     Ok(ValidateLaunchInputsOutput { resolved, issues })
 }
 
