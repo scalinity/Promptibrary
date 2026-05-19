@@ -161,19 +161,9 @@ export const cmdkSearch: typeof Real.cmdkSearch = (query) => {
   ];
 
   const routes: Array<[string, string, string]> = [
-    ["library", "Library", "/library"],
-    ["compose", "Compose", "/compose/:id"],
+    ["library", "Library", "/"],
     ["import", "Import", "/import"],
-    ["past-run", "Past run", "/run/:id"],
-    ["history-diff", "History + diff", "/prompt/:id/history"],
     ["settings", "Settings", "/settings"],
-    ["settings-vault", "Settings · Vault", "/settings/vault"],
-    ["settings-defaults", "Settings · Defaults", "/settings/defaults"],
-    ["settings-extraction", "Settings · Extraction", "/settings/extraction"],
-    ["settings-secrets", "Settings · Secrets", "/settings/secrets"],
-    ["settings-telemetry", "Settings · Telemetry", "/settings/telemetry"],
-    ["settings-diagnostics", "Settings · Diagnostics", "/settings/diagnostics"],
-    ["settings-updater", "Settings · Updater", "/settings/updater"],
   ];
 
   const filterStatic = <K extends "action" | "route">(

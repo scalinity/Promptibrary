@@ -26,15 +26,19 @@ import { useLibraryStore } from "@/features/library/stores/library-store";
 
 // Map static-action ids → handlers. Routes/prompts/runs handle
 // navigation generically; actions need bespoke side effects (routed to
-// the closest settings/diagnostics surface for now — the real action
-// hooks land in the diagnostics + repair-orphans tickets).
+// the closest existing surface for now — the real action hooks land
+// alongside the diagnostics + repair-orphans tickets).
+//
+// SCA-738: every target here is a route that actually exists in
+// src/router.tsx — the pre-fix design referenced /compose/new and
+// /settings/* nested routes that bounced to / via the wildcard.
 const ACTION_ROUTES: Record<string, string> = {
-  "new-prompt": "/compose/new",
+  "new-prompt": "/",
   "import-url": "/import",
-  "rebuild-index": "/settings/diagnostics",
-  "run-diagnostics": "/settings/diagnostics",
-  "reveal-vault": "/settings/vault",
-  "repair-orphans": "/settings/diagnostics",
+  "rebuild-index": "/settings",
+  "run-diagnostics": "/settings",
+  "reveal-vault": "/settings",
+  "repair-orphans": "/settings",
 };
 
 export function CmdKPalette(): React.JSX.Element {

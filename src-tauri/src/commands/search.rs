@@ -656,20 +656,16 @@ fn cmdk_actions(query: &str) -> Vec<CmdkResult> {
 }
 
 fn cmdk_routes(query: &str) -> Vec<CmdkResult> {
+    // SCA-738: only routes that actually exist in src/router.tsx
+    // are listed here. Nested /settings/* routes don't exist; spec
+    // §12 lists them as logical sub-surfaces inside the single
+    // /settings route. /prompt/:promptId and /run/:runId require an
+    // id, so they're not useful as static "go to" entries — the
+    // user reaches them via the Prompt and Run sections of Cmd-K.
     const ROUTES: &[(&str, &str, &str)] = &[
-        ("library", "Library", "/library"),
-        ("compose", "Compose", "/compose/:id"),
+        ("library", "Library", "/"),
         ("import", "Import", "/import"),
-        ("past-run", "Past run", "/run/:id"),
-        ("history-diff", "History + diff", "/prompt/:id/history"),
         ("settings", "Settings", "/settings"),
-        ("settings-vault", "Settings · Vault", "/settings/vault"),
-        ("settings-defaults", "Settings · Defaults", "/settings/defaults"),
-        ("settings-extraction", "Settings · Extraction", "/settings/extraction"),
-        ("settings-secrets", "Settings · Secrets", "/settings/secrets"),
-        ("settings-telemetry", "Settings · Telemetry", "/settings/telemetry"),
-        ("settings-diagnostics", "Settings · Diagnostics", "/settings/diagnostics"),
-        ("settings-updater", "Settings · Updater", "/settings/updater"),
     ];
     filter_static(ROUTES, CmdkResultKind::Route, query, CMDK_ROUTE_LIMIT)
 }
