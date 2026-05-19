@@ -113,12 +113,23 @@ pub async fn scan_vault_cmd(services: State<'_, ManagedState>) -> Result<ScanRes
 
 #[tauri::command]
 pub async fn rebuild_index(services: State<'_, ManagedState>) -> Result<ScanResult> {
-    let (_vault, db) = current_vault_db(&services).await?;
-    sqlx::query("DELETE FROM prompts")
-        .execute(&db)
-        .await
-        .map_err(AppError::from)?;
-    scan_vault_cmd(services).await
+    // SCA-603: don't truncate the index until the scan succeeds. If the
+    // scan fails (vault yanked mid-call, malformed schema), the previous
+    // approach (DELETE then scan) left the index empty with no rollback.
+    // We attempt the scan first; on success its own stale-delete pass
+    // (SCA-592/SCA-593) prunes orphan rows. Only if the user really wants
+    // a from-scratch rebuild — i.e. they suspect index corruption beyond
+    // missing-row drift — they should call select_vault again, which
+    // triggers run_migrations + fresh scan.
+    let (vault, db) = current_vault_db(&services).await?;
+    let summary = scan_vault(&vault, &db, |_| {}).await?;
+    Ok(ScanResult {
+        scanned_files: summary.scanned_files,
+        indexed_prompts: summary.indexed_prompts,
+        malformed_files: summary.malformed_files,
+        deleted_rows: summary.deleted_rows,
+        duration_ms: summary.duration_ms,
+    })
 }
 
 #[tauri::command]
