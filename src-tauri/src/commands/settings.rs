@@ -4,14 +4,13 @@
 //! settings commands (get_settings / update_settings) remain L5 stubs.
 
 use std::collections::HashMap;
+use std::path::Path;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use tauri::State;
 
 use crate::app_state::ManagedState;
-use crate::commands::not_yet_implemented_stub;
 use crate::commands::vault::current_vault_db;
 use crate::domain::prompt::{ClaudeModelId, ClaudePermissionMode, LaunchDestination, VerifierMode};
 use crate::domain::settings::{
@@ -21,45 +20,118 @@ use crate::error::{AppError, AppErrorKind, Result};
 use crate::index::telemetry_repo;
 use crate::settings::keychain::{self, SecretKey};
 use crate::settings::secret_store::SecretStore;
+use crate::util::atomic_write::atomic_write_string;
+use crate::vault::paths::VaultPaths;
 
-/// SCA-735: `get_settings` returns the in-memory typed `AppSettings`
-/// payload built from the currently-loaded vault path with spec §13
-/// defaults for every other field. The frontend `useSettings()` hook
-/// previously errored on first render because this was a
-/// `not_yet_implemented_stub`.
+/// SCA-782: settings persistence.
 ///
-/// Disk persistence — local JSON at AppData and vault YAML at
-/// `<vault>/promptibrary/settings.yml` — is intentionally NOT
-/// implemented here. It's V2-deferred per `docs/notes/L5-observations.md`.
-/// Once persistence lands, this function will read/merge those two
-/// sources; for V1 the shape is honest about what's in memory.
+/// `get_settings` reads the user-scoped local JSON at
+/// `<app_data_dir>/settings.json` and (if a vault is selected) the
+/// vault-scoped YAML at `<vault>/promptibrary/settings.yml`. The two
+/// sources are merged into `AppSettings { local, vault, effective }`
+/// per spec §13 — `effective` flattens `local` + `vault_settings`.
+///
+/// Missing files are tolerated (treat as defaults). Malformed payloads
+/// log a warning and fall back to defaults rather than erroring the
+/// whole call — settings is the surface users open BECAUSE something's
+/// wrong, so it must not refuse to render on a bad config row.
 #[tauri::command]
 pub async fn get_settings(services: State<'_, ManagedState>) -> Result<AppSettings> {
-    let vault_path = {
+    let (vault_paths, app_data_dir) = {
         let state = services.state.read().await;
-        state.vault.as_ref().map(|v| v.vault_root.clone())
+        (
+            state.vault.clone(),
+            services.app_data_dir.clone(),
+        )
     };
-    Ok(build_default_settings(vault_path))
+    Ok(load_settings(&app_data_dir, vault_paths.as_ref()))
 }
 
-fn build_default_settings(vault_path: Option<std::path::PathBuf>) -> AppSettings {
-    let local = LocalSettings {
-        vault_path: vault_path.clone(),
-        default_destination: LaunchDestination::ClaudeCodeCli,
-        default_model: ClaudeModelId::ClaudeSonnet46,
-        default_verifier_mode: VerifierMode::Off,
-        default_permission_mode: ClaudePermissionMode::Default,
-        telemetry_enabled: true,
-        update_manifest_url: None,
-        version_history: VersionHistorySettings {
-            rename_detection_window: 200,
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateSettingsInput {
+    pub settings: AppSettings,
+}
+
+/// `update_settings` atomic-writes the local JSON and (if a vault is
+/// selected) the vault YAML, then re-reads to produce the merged
+/// `AppSettings` the frontend will hold. We re-read rather than echo
+/// the input so any default-fill or sanitisation lives in one path.
+#[tauri::command]
+pub async fn update_settings(
+    input: UpdateSettingsInput,
+    services: State<'_, ManagedState>,
+) -> Result<AppSettings> {
+    let (vault_paths, app_data_dir) = {
+        let state = services.state.read().await;
+        (state.vault.clone(), services.app_data_dir.clone())
+    };
+    persist_settings(&app_data_dir, vault_paths.as_ref(), &input.settings)?;
+    Ok(load_settings(&app_data_dir, vault_paths.as_ref()))
+}
+
+fn local_settings_path(app_data_dir: &Path) -> std::path::PathBuf {
+    app_data_dir.join("settings.json")
+}
+
+fn load_local(app_data_dir: &Path, fallback_vault: Option<&VaultPaths>) -> LocalSettings {
+    let path = local_settings_path(app_data_dir);
+    match std::fs::read_to_string(&path) {
+        Ok(contents) => match serde_json::from_str::<LocalSettings>(&contents) {
+            Ok(s) => s,
+            Err(e) => {
+                tracing::warn!(
+                    path = %path.display(),
+                    error = %e,
+                    "local settings.json is malformed; falling back to defaults"
+                );
+                default_local(fallback_vault)
+            }
         },
-        recent_prompt_ids: vec![],
-        recent_run_ids: vec![],
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => default_local(fallback_vault),
+        Err(e) => {
+            tracing::warn!(
+                path = %path.display(),
+                error = %e,
+                "local settings.json read failed; falling back to defaults"
+            );
+            default_local(fallback_vault)
+        }
+    }
+}
+
+fn load_vault(vault_paths: Option<&VaultPaths>) -> VaultSettings {
+    let Some(paths) = vault_paths else {
+        return default_vault();
     };
-    let vault = VaultSettings {
-        tag_colors: std::collections::HashMap::new(),
-    };
+    let path = paths.settings_yml();
+    match std::fs::read_to_string(&path) {
+        Ok(contents) => match serde_yaml::from_str::<VaultSettings>(&contents) {
+            Ok(s) => s,
+            Err(e) => {
+                tracing::warn!(
+                    path = %path.display(),
+                    error = %e,
+                    "vault settings.yml is malformed; falling back to defaults"
+                );
+                default_vault()
+            }
+        },
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => default_vault(),
+        Err(e) => {
+            tracing::warn!(
+                path = %path.display(),
+                error = %e,
+                "vault settings.yml read failed; falling back to defaults"
+            );
+            default_vault()
+        }
+    }
+}
+
+fn load_settings(app_data_dir: &Path, vault_paths: Option<&VaultPaths>) -> AppSettings {
+    let local = load_local(app_data_dir, vault_paths);
+    let vault = load_vault(vault_paths);
     let effective = EffectiveSettings {
         local: local.clone(),
         vault_settings: vault.clone(),
@@ -71,11 +143,58 @@ fn build_default_settings(vault_path: Option<std::path::PathBuf>) -> AppSettings
     }
 }
 
-#[tauri::command]
-pub async fn update_settings(_input: Value) -> Result<Value> {
-    // V2-deferred: disk persistence to local JSON + vault YAML.
-    not_yet_implemented_stub("commands::settings::update_settings")
+fn persist_settings(
+    app_data_dir: &Path,
+    vault_paths: Option<&VaultPaths>,
+    settings: &AppSettings,
+) -> Result<()> {
+    // Ensure app_data_dir exists before atomic_write_string (which
+    // requires the parent dir to already exist).
+    std::fs::create_dir_all(app_data_dir).map_err(AppError::from)?;
+    let local_path = local_settings_path(app_data_dir);
+    let local_json = serde_json::to_string_pretty(&settings.local).map_err(AppError::from)?;
+    atomic_write_string(&local_path, &local_json)?;
+
+    if let Some(paths) = vault_paths {
+        let yml_path = paths.settings_yml();
+        if let Some(parent) = yml_path.parent() {
+            std::fs::create_dir_all(parent).map_err(AppError::from)?;
+        }
+        let yml = serde_yaml::to_string(&settings.vault).map_err(|e| {
+            AppError::new(
+                AppErrorKind::SettingsInvalid,
+                format!("serialize vault settings yaml: {e}"),
+            )
+        })?;
+        atomic_write_string(&yml_path, &yml)?;
+    }
+    Ok(())
 }
+
+fn default_local(vault_paths: Option<&VaultPaths>) -> LocalSettings {
+    LocalSettings {
+        vault_path: vault_paths.map(|v| v.vault_root.clone()),
+        default_destination: LaunchDestination::ClaudeCodeCli,
+        default_model: ClaudeModelId::ClaudeSonnet46,
+        default_verifier_mode: VerifierMode::Off,
+        default_permission_mode: ClaudePermissionMode::Default,
+        telemetry_enabled: true,
+        update_manifest_url: None,
+        version_history: VersionHistorySettings {
+            rename_detection_window: 200,
+        },
+        recent_prompt_ids: vec![],
+        recent_run_ids: vec![],
+    }
+}
+
+fn default_vault() -> VaultSettings {
+    VaultSettings {
+        tag_colors: HashMap::new(),
+    }
+}
+
+// ─── Secret commands (set/clear/get_status) ───────────────────────────
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -118,8 +237,6 @@ impl SecretStatusDto {
     }
 }
 
-// --- Inner helpers — used by both #[tauri::command] wrappers and unit tests. ---
-
 fn set_secret_inner(input: SetSecretInput, store: &dyn SecretStore) -> Result<SecretStatusDto> {
     let trimmed = input.value.trim();
     if trimmed.is_empty() {
@@ -149,8 +266,6 @@ fn get_secret_status_inner(
         .collect()
 }
 
-// --- Tauri commands ---
-
 #[tauri::command]
 pub async fn set_secret(
     input: SetSecretInput,
@@ -173,22 +288,6 @@ pub async fn get_secret_status(
 ) -> Result<HashMap<SecretKey, SecretStatusDto>> {
     get_secret_status_inner(services.secrets.as_ref())
 }
-
-// ─── Destructive telemetry actions (patched spec §13) ─────────────────
-//
-// Two distinct actions, never bundled in the UI or in the backend
-// dispatcher:
-//   - `clear_telemetry_cache`  — drops the per-event detail
-//                                (`telemetry_events`), preserves runs +
-//                                transcripts. Single-click confirmation.
-//   - `delete_all_run_history` — drops `runs` AND deletes the on-disk
-//                                transcript files under
-//                                `<vault>/promptibrary/runs/`. The
-//                                backend requires the literal string
-//                                "delete" in the input as a typed
-//                                confirmation, so a frontend bug can't
-//                                trigger this destructive action on a
-//                                stray click.
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -375,6 +474,59 @@ mod tests {
         .unwrap();
         let status = get_secret_status_inner(&store).unwrap();
         assert!(status.iter().all(|(_, s)| !s.exists));
+    }
+
+    // ─── SCA-782 settings persistence ────────────────────────────────
+
+    #[test]
+    fn load_settings_returns_defaults_when_no_files_exist() {
+        let tmp = tempfile::tempdir().unwrap();
+        let s = load_settings(tmp.path(), None);
+        assert!(s.local.telemetry_enabled, "default telemetry_enabled = true");
+        assert_eq!(s.local.version_history.rename_detection_window, 200);
+        assert!(s.vault.tag_colors.is_empty());
+    }
+
+    #[test]
+    fn persist_settings_writes_local_json_atomically() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut s = load_settings(tmp.path(), None);
+        s.local.telemetry_enabled = false;
+        s.local.version_history.rename_detection_window = 500;
+        persist_settings(tmp.path(), None, &s).unwrap();
+
+        let path = tmp.path().join("settings.json");
+        assert!(path.exists(), "settings.json should exist after persist");
+        let reloaded = load_settings(tmp.path(), None);
+        assert!(!reloaded.local.telemetry_enabled);
+        assert_eq!(reloaded.local.version_history.rename_detection_window, 500);
+    }
+
+    #[test]
+    fn malformed_local_settings_falls_back_to_defaults() {
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join("settings.json");
+        std::fs::write(&path, b"{not valid json").unwrap();
+
+        let s = load_settings(tmp.path(), None);
+        // Defaults applied without panicking.
+        assert!(s.local.telemetry_enabled);
+        assert_eq!(s.local.version_history.rename_detection_window, 200);
+    }
+
+    #[test]
+    fn round_trip_preserves_recent_prompt_ids() {
+        use crate::ids::PromptId;
+        let tmp = tempfile::tempdir().unwrap();
+        let mut s = load_settings(tmp.path(), None);
+        s.local.recent_prompt_ids = vec![
+            PromptId("01ALPHA".into()),
+            PromptId("01BETA".into()),
+        ];
+        persist_settings(tmp.path(), None, &s).unwrap();
+        let reloaded = load_settings(tmp.path(), None);
+        assert_eq!(reloaded.local.recent_prompt_ids.len(), 2);
+        assert_eq!(reloaded.local.recent_prompt_ids[0].0, "01ALPHA");
     }
 
     #[tokio::test]

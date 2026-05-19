@@ -402,6 +402,13 @@ export const saveExtractedPrompt = (args: SaveExtractedPromptArgs) =>
 
 export const getSettings = () => invoke<AppSettings>("get_settings");
 
+export interface UpdateSettingsArgs {
+  settings: AppSettings;
+}
+
+export const updateSettings = (args: UpdateSettingsArgs) =>
+  invoke<AppSettings>("update_settings", { input: args });
+
 export interface SetSecretArgs {
   key: SecretKey;
   value: string;

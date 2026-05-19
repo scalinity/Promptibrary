@@ -50,6 +50,12 @@ pub struct AppServices {
     pub anthropic_transport: Arc<dyn AnthropicTransport>,
     /// Directory where yt-dlp drops transcript files. Created on demand.
     pub extraction_temp_dir: PathBuf,
+    /// SCA-782: AppData root for the local settings JSON, the embedding
+    /// model cache (V2), and any other host-machine-scoped state.
+    /// macOS: `~/Library/Application Support/com.promptibrary.app`;
+    /// Linux: `$XDG_CONFIG_HOME/promptibrary` or `~/.config/promptibrary`;
+    /// Windows: `%APPDATA%\promptibrary`. Tests use a tempdir override.
+    pub app_data_dir: PathBuf,
 }
 
 #[derive(Default)]
@@ -83,6 +89,7 @@ impl AppServices {
         let yt_dlp: Arc<dyn YtDlpRunner> = Arc::new(RealYtDlpRunner);
 
         let extraction_temp_dir = std::env::temp_dir().join("promptibrary").join("extraction");
+        let app_data_dir = default_app_data_dir();
 
         Self {
             state: RwLock::default(),
@@ -93,6 +100,7 @@ impl AppServices {
             yt_dlp,
             anthropic_transport,
             extraction_temp_dir,
+            app_data_dir,
         }
     }
 
@@ -115,6 +123,17 @@ impl AppServices {
             yt_dlp: Arc::new(RealYtDlpRunner),
             anthropic_transport,
             extraction_temp_dir: std::env::temp_dir().join("promptibrary").join("extraction"),
+            app_data_dir: default_app_data_dir(),
+        }
+    }
+
+    /// Test helper that overrides the AppData directory so disk-write
+    /// surfaces (settings persistence, embedding model cache) target
+    /// an isolated tempdir.
+    pub fn with_app_data_dir(self, app_data_dir: PathBuf) -> Self {
+        Self {
+            app_data_dir,
+            ..self
         }
     }
 
@@ -132,6 +151,46 @@ impl AppServices {
             ..self
         }
     }
+}
+
+/// Resolve the host-machine-scoped AppData directory for Promptibrary.
+///
+/// Per spec §16 *Build, package, distribution* the canonical paths are:
+/// - macOS: `~/Library/Application Support/com.promptibrary.app`
+/// - Linux: `$XDG_CONFIG_HOME/promptibrary` (else `~/.config/promptibrary`)
+/// - Windows: `%APPDATA%\promptibrary`
+///
+/// We use stdlib env probing rather than pulling in the `directories`
+/// crate — every platform has one or two well-known env vars and a
+/// `$HOME` fallback. If every probe fails we fall back to
+/// `std::env::temp_dir().join("promptibrary")` so the app still starts
+/// and the user can recover by setting `$HOME`.
+fn default_app_data_dir() -> PathBuf {
+    #[cfg(target_os = "macos")]
+    {
+        if let Ok(home) = std::env::var("HOME") {
+            return PathBuf::from(home)
+                .join("Library")
+                .join("Application Support")
+                .join("com.promptibrary.app");
+        }
+    }
+    #[cfg(target_os = "linux")]
+    {
+        if let Ok(dir) = std::env::var("XDG_CONFIG_HOME") {
+            return PathBuf::from(dir).join("promptibrary");
+        }
+        if let Ok(home) = std::env::var("HOME") {
+            return PathBuf::from(home).join(".config").join("promptibrary");
+        }
+    }
+    #[cfg(target_os = "windows")]
+    {
+        if let Ok(dir) = std::env::var("APPDATA") {
+            return PathBuf::from(dir).join("promptibrary");
+        }
+    }
+    std::env::temp_dir().join("promptibrary")
 }
 
 impl Default for AppServices {

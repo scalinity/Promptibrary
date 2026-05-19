@@ -335,6 +335,9 @@ const baseSettings: AppSettings = {
 
 export const getSettings: typeof Real.getSettings = () => ok(baseSettings);
 
+export const updateSettings: typeof Real.updateSettings = ({ settings }) =>
+  ok(settings);
+
 let secretState: SecretStatusMap = freshSecretState();
 
 function freshSecretState(): SecretStatusMap {
