@@ -16,7 +16,6 @@ use promptibrary_lib::domain::prompt::{
 use promptibrary_lib::domain::source::{ManualSource, Source};
 use promptibrary_lib::domain::variable::Variable;
 use promptibrary_lib::ids::PromptId;
-use promptibrary_lib::index::db::connect_options;
 use promptibrary_lib::index::migrations::run_migrations;
 use promptibrary_lib::index::prompts_repo;
 use promptibrary_lib::vault::paths::{prompt_path_for_slug, VaultPaths};
@@ -29,10 +28,9 @@ use promptibrary_lib::variables::renderer::{
 };
 
 async fn temp_db() -> SqlitePool {
-    let dir = tempfile::tempdir().unwrap();
-    let path = dir.path().join("index.sqlite");
-    std::mem::forget(dir);
-    let opts = connect_options(&path);
+    // SCA-598: in-memory SQLite — was tempfile + mem::forget which leaked
+    // a directory per integration-test run.
+    let opts = promptibrary_lib::index::db::in_memory_connect_options();
     let pool = SqlitePoolOptions::new()
         .max_connections(1)
         .connect_with(opts)

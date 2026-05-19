@@ -237,15 +237,14 @@ fn _keep_errkind_used(_k: AppErrorKind) {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::index::db::connect_options;
+    use crate::index::db::in_memory_connect_options;
     use crate::index::migrations::run_migrations;
     use sqlx::sqlite::SqlitePoolOptions;
 
     async fn temp_pool() -> SqlitePool {
-        let dir = tempfile::tempdir().expect("temp");
-        let path = dir.path().join("t.sqlite");
-        std::mem::forget(dir);
-        let opts = connect_options(&path);
+        // SCA-598: in-memory SQLite (was tempfile + mem::forget, which
+        // leaked a dir per test run on CI).
+        let opts = in_memory_connect_options();
         let pool = SqlitePoolOptions::new()
             .max_connections(1)
             .connect_with(opts)

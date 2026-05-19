@@ -237,16 +237,16 @@ mod tests {
     use crate::domain::source::{ManualSource, Source};
     use crate::ids::PromptId;
     use crate::index::db::connect_options;
+    use crate::index::db::in_memory_connect_options;
     use crate::index::migrations::run_migrations;
     use sqlx::sqlite::SqlitePoolOptions;
-    use std::str::FromStr;
 
     async fn temp_pool() -> SqlitePool {
-        let dir = tempfile::tempdir().expect("temp dir");
-        let path = dir.path().join("test.sqlite");
-        std::mem::forget(dir);
-        let opts = connect_options(&path);
-        let _ = path;
+        // SCA-598: switched from tempfile + mem::forget (which leaked the
+        // dir per run) to in-memory SQLite. max_connections=1 because
+        // separate connections to ':memory:' get separate databases —
+        // pooling > 1 would deadlock on the migration setup.
+        let opts = in_memory_connect_options();
         SqlitePoolOptions::new()
             .max_connections(1)
             .connect_with(opts)
