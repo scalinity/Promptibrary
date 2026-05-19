@@ -86,7 +86,7 @@ Keep it readable when opened in a browser — minimal styling is fine, but it sh
   | Layer | Parent ID | Title | Status |
   |---|---|---|---|
   | L0 | `SCA-543` | L0 — Foundations | filed |
-  | L1 | — | L1 — Vault and Variables | **not yet filed** |
+  | L1 | `SCA-585` | L1 — Vault and Variables | filed |
   | L2 | — | L2 — IPC and Frontend Shell | **not yet filed** |
   | L3 | — | L3 — Launch Pipeline | **not yet filed** |
   | L4 | — | L4 — Extraction | **not yet filed** |
