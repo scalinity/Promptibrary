@@ -108,6 +108,38 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn disk_pool_journal_mode_is_strictly_wal() {
+        // Regression test for SCA-611 — the in-memory pragma test accepts
+        // either "wal" or "memory" because SQLite forces memory for :memory:.
+        // Production pools always run against a file; assert WAL exactly
+        // there so a future regression in `connect_options` can't silently
+        // downgrade prod to journal_mode=delete or memory.
+        use crate::index::db::connect_options;
+        let dir = tempfile::tempdir().expect("temp dir");
+        let path = dir.path().join("strict_wal.sqlite");
+        let opts = connect_options(&path);
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect_with(opts)
+            .await
+            .expect("connect to disk sqlite");
+
+        let journal_mode: String = sqlx::query_scalar("PRAGMA journal_mode")
+            .fetch_one(&pool)
+            .await
+            .expect("read journal_mode");
+        assert_eq!(
+            journal_mode.to_lowercase(),
+            "wal",
+            "production disk pool must use journal_mode=WAL exactly"
+        );
+
+        // Close the pool before TempDir drops so SQLite releases the file
+        // handle cleanly on Windows-style filesystems.
+        pool.close().await;
+    }
+
+    #[tokio::test]
     async fn fts_triggers_mirror_inserts() {
         let pool = temp_pool().await;
         run_migrations(&pool).await.expect("migrations ok");
