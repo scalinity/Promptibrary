@@ -75,33 +75,29 @@ pub struct DependencyProbeOutput {
 pub async fn probe_dependencies(
     services: State<'_, ManagedState>,
 ) -> Result<DependencyProbeOutput> {
-    let mut probes = Vec::new();
-
-    probes.push(
+    // SCA-758: the three binary probes are independent and each has
+    // its own 5 s timeout (SCA-733). Run them concurrently so the
+    // wall-clock cost is ~max instead of ~sum (15 s worst case
+    // serial → 5 s worst case parallel).
+    let (claude, ytdlp, git) = tokio::join!(
         probe_binary(
             "claude",
             &["--version"],
             Some("Install Claude Code CLI: https://docs.anthropic.com/en/docs/claude-code"),
-        )
-        .await,
-    );
-    probes.push(
+        ),
         probe_binary(
             "yt-dlp",
             &["--version"],
             Some("Install yt-dlp: brew install yt-dlp / pipx install yt-dlp"),
-        )
-        .await,
-    );
-    probes.push(
+        ),
         probe_binary(
             "git",
             &["--version"],
             Some("Install Git: brew install git"),
-        )
-        .await,
+        ),
     );
 
+    let mut probes = vec![claude, ytdlp, git];
     probes.push(probe_keychain(services.secrets.as_ref()).await);
 
     let db_probe = match current_db(&services).await {
