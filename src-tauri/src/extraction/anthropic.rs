@@ -60,6 +60,11 @@ pub trait AnthropicTransport: Send + Sync {
 pub enum AnthropicTransportError {
     KeyMissing,
     AuthInvalid,
+    /// Anthropic returned 429. `reset_at` parsed from `retry-after` or
+    /// `anthropic-ratelimit-requests-reset` when present.
+    RateLimited {
+        reset_at: Option<chrono::DateTime<chrono::Utc>>,
+    },
     Network(String),
     Other(String),
 }
@@ -72,6 +77,9 @@ impl From<AnthropicTransportError> for AppError {
             }
             AnthropicTransportError::AuthInvalid => {
                 AppError::new(AppErrorKind::AnthropicAuthInvalid, "anthropic auth invalid")
+            }
+            AnthropicTransportError::RateLimited { .. } => {
+                AppError::new(AppErrorKind::RateLimited, "anthropic rate limited")
             }
             AnthropicTransportError::Network(m) => {
                 AppError::new(AppErrorKind::NetworkUnavailable, m)
@@ -140,6 +148,10 @@ impl AnthropicTransport for HttpAnthropicTransport {
         if status == reqwest::StatusCode::UNAUTHORIZED || status == reqwest::StatusCode::FORBIDDEN {
             return Err(AnthropicTransportError::AuthInvalid);
         }
+        if status == reqwest::StatusCode::TOO_MANY_REQUESTS {
+            let reset_at = parse_anthropic_rate_limit_reset(resp.headers());
+            return Err(AnthropicTransportError::RateLimited { reset_at });
+        }
         if !status.is_success() {
             let body = resp.text().await.unwrap_or_default();
             return Err(AnthropicTransportError::Other(format!(
@@ -160,6 +172,32 @@ impl AnthropicTransport for HttpAnthropicTransport {
         }
         Ok(combined)
     }
+}
+
+/// Parse the reset-at timestamp from Anthropic's rate-limit headers.
+/// Anthropic surfaces both `retry-after` (seconds until reset, RFC7231)
+/// and `anthropic-ratelimit-requests-reset` (ISO-8601 absolute). Prefer
+/// the absolute timestamp; fall back to relative.
+fn parse_anthropic_rate_limit_reset(
+    headers: &reqwest::header::HeaderMap,
+) -> Option<chrono::DateTime<chrono::Utc>> {
+    if let Some(reset) = headers
+        .get("anthropic-ratelimit-requests-reset")
+        .and_then(|v| v.to_str().ok())
+    {
+        if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(reset) {
+            return Some(dt.with_timezone(&chrono::Utc));
+        }
+    }
+    if let Some(retry_after) = headers
+        .get(reqwest::header::RETRY_AFTER)
+        .and_then(|v| v.to_str().ok())
+    {
+        if let Ok(secs) = retry_after.parse::<i64>() {
+            return Some(chrono::Utc::now() + chrono::Duration::seconds(secs));
+        }
+    }
+    None
 }
 
 // ─── Mock transport for tests ────────────────────────────────────────────────
@@ -252,6 +290,12 @@ impl AnthropicClient {
             Err(AnthropicTransportError::AuthInvalid) => {
                 return Ok(Err(ExtractionFailure::AnthropicAuthInvalid))
             }
+            Err(AnthropicTransportError::RateLimited { reset_at }) => {
+                return Ok(Err(ExtractionFailure::RateLimited {
+                    provider: "anthropic".into(),
+                    reset_at,
+                }))
+            }
             Err(AnthropicTransportError::Network(m)) => {
                 return Ok(Err(ExtractionFailure::NetworkUnavailable { message: m }))
             }
@@ -305,6 +349,12 @@ impl AnthropicClient {
                     Ok(s) => s,
                     Err(AnthropicTransportError::Network(m)) => {
                         return Ok(Err(ExtractionFailure::NetworkUnavailable { message: m }))
+                    }
+                    Err(AnthropicTransportError::RateLimited { reset_at }) => {
+                        return Ok(Err(ExtractionFailure::RateLimited {
+                            provider: "anthropic".into(),
+                            reset_at,
+                        }))
                     }
                     Err(e) => return Err(e.into()),
                 };
@@ -551,6 +601,29 @@ mod tests {
             result.unwrap_err(),
             ExtractionFailure::AnthropicAuthInvalid
         ));
+    }
+
+    #[tokio::test]
+    async fn rate_limited_surfaces_as_failure_with_reset() {
+        use chrono::TimeZone;
+        let reset = chrono::Utc.with_ymd_and_hms(2026, 5, 19, 12, 0, 0).unwrap();
+        let mock = Arc::new(MockAnthropicTransport::new(vec![Err(
+            AnthropicTransportError::RateLimited {
+                reset_at: Some(reset),
+            },
+        )]));
+        let client = AnthropicClient::new(mock);
+        let result = client
+            .extract_candidates(input(), false, None)
+            .await
+            .unwrap();
+        match result.unwrap_err() {
+            ExtractionFailure::RateLimited { provider, reset_at } => {
+                assert_eq!(provider, "anthropic");
+                assert_eq!(reset_at, Some(reset));
+            }
+            other => panic!("expected RateLimited, got {other:?}"),
+        }
     }
 
     #[tokio::test]
