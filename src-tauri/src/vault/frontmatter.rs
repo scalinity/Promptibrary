@@ -96,12 +96,34 @@ pub fn parse_run_frontmatter(yaml: &str) -> Result<RunFrontmatter> {
     Ok(fm)
 }
 
+/// ULID validator per the [ULID spec](https://github.com/ulid/spec):
+/// 26 chars in Crockford Base32, alphabet `0-9A-Z` minus `I`, `L`, `O`, `U`.
+/// SCA-617: the first character encodes the top 5 bits of a 48-bit
+/// timestamp. Since 10 base32 chars hold 50 bits and the timestamp is 48,
+/// the top 2 bits of the first char must be zero — so the first char is
+/// limited to `0..=7`. The previous check accepted `Z...` as valid.
 fn is_ulid(s: &str) -> bool {
-    s.len() == 26
-        && s.chars().all(|c| {
-            c.is_ascii_uppercase() && c != 'I' && c != 'L' && c != 'O' && c != 'U'
-                || c.is_ascii_digit()
-        })
+    if s.len() != 26 {
+        return false;
+    }
+    let mut chars = s.chars();
+    let first = match chars.next() {
+        Some(c) => c,
+        None => return false,
+    };
+    // First char must be in '0'..='7' (top 2 bits of the high byte are
+    // unused per ULID spec).
+    if !('0'..='7').contains(&first) {
+        return false;
+    }
+    let valid_crockford = |c: char| {
+        (c.is_ascii_uppercase() && c != 'I' && c != 'L' && c != 'O' && c != 'U')
+            || c.is_ascii_digit()
+    };
+    if !valid_crockford(first) {
+        return false;
+    }
+    chars.all(valid_crockford)
 }
 
 #[cfg(test)]
@@ -151,5 +173,30 @@ mod tests {
     fn malformed_yaml_returns_yaml_malformed() {
         let err = parse_prompt_frontmatter("not: : valid: yaml :::").unwrap_err();
         assert_eq!(err.kind, AppErrorKind::YamlMalformed);
+    }
+
+    #[test]
+    fn is_ulid_rejects_high_first_char() {
+        // SCA-617: ULID first char must be 0..=7 (top 2 bits unused).
+        // 'Z' is otherwise a valid Crockford char but invalid as the
+        // leading char of a ULID.
+        assert!(!super::is_ulid("ZZZZZZZZZZZZZZZZZZZZZZZZZZ"));
+        assert!(!super::is_ulid("8AAAAAAAAAAAAAAAAAAAAAAAAA"));
+        assert!(!super::is_ulid("9AAAAAAAAAAAAAAAAAAAAAAAAA"));
+    }
+
+    #[test]
+    fn is_ulid_accepts_canonical() {
+        assert!(super::is_ulid("01JZ7M1K6M8D4E9SZ7P1Q9KT4A"));
+        assert!(super::is_ulid("7ZZZZZZZZZZZZZZZZZZZZZZZZZ"));
+    }
+
+    #[test]
+    fn is_ulid_rejects_disallowed_crockford_chars() {
+        // I, L, O, U are excluded from Crockford Base32.
+        assert!(!super::is_ulid("01JZ7M1K6M8D4E9SZ7P1Q9KTIA"));
+        assert!(!super::is_ulid("01JZ7M1K6M8D4E9SZ7P1Q9KTLA"));
+        assert!(!super::is_ulid("01JZ7M1K6M8D4E9SZ7P1Q9KTOA"));
+        assert!(!super::is_ulid("01JZ7M1K6M8D4E9SZ7P1Q9KTUA"));
     }
 }
