@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use crate::error::IpcError;
+use crate::error::AppErrorDto;
 use crate::ids::{PromptId, RunId};
 
 use super::launch::LaunchProfile;
@@ -62,5 +62,5 @@ pub struct Run {
     pub stderr_bytes: u64,
     pub token_count: Option<TokenCount>,
     pub cost_usd: Option<f64>,
-    pub error: Option<IpcError>,
+    pub error: Option<AppErrorDto>,
 }

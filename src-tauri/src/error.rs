@@ -1,7 +1,7 @@
 //! Typed application error per spec §11.
 //!
 //! L0 scaffold — exhaustive `AppErrorKind` plus a serializable `AppError` /
-//! `IpcError`. Later layers extend the `From` conversions and use the
+//! `AppErrorDto`. Later layers extend the `From` conversions and use the
 //! per-variant constructors at the call sites.
 
 use std::collections::HashMap;
@@ -107,16 +107,20 @@ impl AppError {
     }
 }
 
-/// Wire-format error sent to the frontend.
+/// Wire-format error sent across the IPC boundary. Mirrors the TS
+/// `AppErrorDto` in `src/shared/types/ipc.ts` exactly. Lives in the error
+/// module rather than the domain layer because it's a *wire* type, not a
+/// business concept — domain modules that need to carry an error reference
+/// import it for serialization parity, not for layering coupling.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct IpcError {
+pub struct AppErrorDto {
     pub kind: AppErrorKind,
     pub message: String,
     pub details: HashMap<String, DetailValue>,
 }
 
-impl From<AppError> for IpcError {
+impl From<AppError> for AppErrorDto {
     fn from(e: AppError) -> Self {
         Self {
             kind: e.kind,
@@ -130,7 +134,7 @@ impl From<AppError> for IpcError {
 // `std::result::Result` avoids the `crate::error::Result` alias defined below.
 impl Serialize for AppError {
     fn serialize<S: serde::Serializer>(&self, s: S) -> std::result::Result<S::Ok, S::Error> {
-        IpcError::from(self.clone()).serialize(s)
+        AppErrorDto::from(self.clone()).serialize(s)
     }
 }
 
