@@ -43,6 +43,10 @@ interface ImportState {
   /** Live-edited candidate (candidate-editor patches; save commits). */
   draft: CandidatePrompt | null;
   savedPromptId: string | null;
+  /// Final slug as written by the backend (may differ from the client-
+  /// side guess when slug-collision suffixes apply). Set together with
+  /// `savedPromptId` so the "Saved" panel doesn't render a stale slug.
+  savedPromptSlug: string | null;
   failure: ExtractionFailure | null;
   extractionMode: ExtractionMode;
   phase: ImportPhase;
@@ -57,7 +61,7 @@ interface ImportState {
   setExtractionMode: (mode: ExtractionMode) => void;
   setFetchFailed: (failure: ExtractionFailure) => void;
   setExtractionFailed: (failure: ExtractionFailure) => void;
-  setSaved: (promptId: string) => void;
+  setSaved: (promptId: string, slug: string) => void;
   reset: () => void;
 }
 
@@ -69,6 +73,7 @@ const initial = {
   selectedCandidateIndex: null,
   draft: null,
   savedPromptId: null,
+  savedPromptSlug: null,
   failure: null,
   extractionMode: "standard" as ExtractionMode,
   phase: "empty" as ImportPhase,
@@ -121,7 +126,8 @@ export const useImportStore = create<ImportState>((set, get) => ({
   setFetchFailed: (failure) => set({ phase: "fetch_failed", failure }),
   setExtractionFailed: (failure) => set({ phase: "extraction_failed", failure }),
 
-  setSaved: (promptId) => set({ phase: "saved", savedPromptId: promptId }),
+  setSaved: (promptId, slug) =>
+    set({ phase: "saved", savedPromptId: promptId, savedPromptSlug: slug }),
 
   reset: () => set({ ...initial }),
 }));

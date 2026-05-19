@@ -37,6 +37,7 @@ export function ImportRoute(): React.JSX.Element {
   const url = useImportStore((s) => s.url);
   const extractionMode = useImportStore((s) => s.extractionMode);
   const savedPromptId = useImportStore((s) => s.savedPromptId);
+  const savedPromptSlug = useImportStore((s) => s.savedPromptSlug);
 
   const setPreview = useImportStore((s) => s.setPreview);
   const setExtracting = useImportStore((s) => s.setExtracting);
@@ -98,7 +99,7 @@ export function ImportRoute(): React.JSX.Element {
         candidate: draft,
         source: preview.source,
       });
-      setSaved(saved.id);
+      setSaved(saved.id, saved.slug);
     } catch (e: unknown) {
       setExtractionFailed({
         kind: "extraction_failed",
@@ -211,20 +212,20 @@ export function ImportRoute(): React.JSX.Element {
           <CandidateEditor candidate={draft} onConfirm={() => void saveDraft()} />
         )}
 
-        {phase === "saved" && savedPromptId != null && draft != null && (
-          <SaveCandidateDialog
-            promptId={savedPromptId}
-            title={draft.title}
-            slug={draft.title
-              .toLowerCase()
-              .replace(/[^a-z0-9]+/g, "-")
-              .replace(/^-|-$/g, "")}
-            onImportAnother={() => {
-              reset();
-              navigate("/import");
-            }}
-          />
-        )}
+        {phase === "saved" &&
+          savedPromptId != null &&
+          savedPromptSlug != null &&
+          draft != null && (
+            <SaveCandidateDialog
+              promptId={savedPromptId}
+              title={draft.title}
+              slug={savedPromptSlug}
+              onImportAnother={() => {
+                reset();
+                navigate("/import");
+              }}
+            />
+          )}
 
         {(phase === "fetch_failed" || phase === "extraction_failed") &&
           failure != null && (
