@@ -255,6 +255,30 @@ Pulled from the spec and from the verified `claude --help` reconciliation. Viola
 - If you need an additional token for a Tauri-only concern (e.g., terminal-specific), append it to `src/styles/tokens.css` under a `/* === Additions beyond canonical design system === */` comment block and note the divergence in `docs/notes/L<n>-observations.md`.
 - "No drift from the design system" is a hard rule. If a layout decision in your React port conflicts with `Promptibrary Design System/screens/`, flag it — don't choose the divergent path silently.
 
+### Use the `/promptibrary-design` skill (project-local)
+
+`.claude/skills/promptibrary-design/` contains the canonical design skill bundle (`SKILL.md`, `README.md`, `tokens.css`, `typography.css`, `base.css`, `app.css`, all 9 screen mockups in `screens/`, the components reference at `components/index.html`, and the per-token preview surfaces under `preview/`). It is byte-equivalent to `Promptibrary Design System/` at the project root — both are the canonical source.
+
+**Always consult this skill before writing or modifying any UI.** Before adding a new screen, route, modal, panel, or component:
+
+1. Read `.claude/skills/promptibrary-design/SKILL.md` for the aesthetic philosophy and visual rules.
+2. Open the corresponding screen mockup under `.claude/skills/promptibrary-design/screens/<N>-<name>.html` and follow its markup + inline `<style>` block verbatim. Screen-local CSS classes (e.g. `.import-modal`, `.cand`, `.stage-bar` in `screens/03-import.html`) are intentionally NOT promoted to `app.css`; port them to a feature-local CSS module (e.g. `src/features/import/import.css`) and keep that module 1:1 with the mockup.
+3. Universal primitives (`.modal-overlay`, `.modal`, `.btn`, `.btn-launch`, `.input`, `.kbd`, `.tag`, `.icon-btn`, the `pb-*` keyframes) already live in `src/styles/app.css` — use them, don't redefine them.
+
+**Skill registry quirk:** the `Skill` tool only loads plugin-registered skills; invoking `Skill({skill: "promptibrary-design"})` will error with `Unknown skill`. Open the SKILL.md file directly with the Read tool. The convention is project-local, not plugin-registered, and that's intentional — the skill is part of the repo, versioned with the code, and the canonical mockups live alongside.
+
+**Triggers** (the same set the skill's frontmatter description covers): any UI work, building components, designing surfaces, mocking screens, presentation/marketing artifacts that use the Promptibrary brand. If the task touches `.tsx` under `src/features/` or `src/shared/ui/` and isn't pure logic, the skill applies.
+
+**Hard rules (from the skill, repeated here for visibility — see `SKILL.md` for the full list):**
+- Dark mode only. No light mode, ever.
+- Three faces only: Boska (display), Switzer (UI), JetBrains Mono (runtime/identifier/numeric).
+- Sodium amber is the only accent. Chartreuse for running, warm red for danger, paper-warm cream for editorial.
+- No emoji icons — typographic glyphs (`§ ▸ ⌖ ⊟ ⎙ ↗ ▾ ⌗ ∿ ⏵ ⏸ ✓`) or Lucide outlines.
+- Film grain everywhere: include `<div class="grain"></div>` near `<body>`.
+- Motion ≤ 240ms for transitions; the slow ambient animations (pulse 1.8s, glow 2.4s, blink 1s) are statuses, not transitions.
+- Drop shadows only on a hovered `.btn-launch`.
+- No Lorem ipsum in user-facing artifacts. Use realistic Claude Code prompts.
+
 ---
 
 ## Visual regression discipline
@@ -326,11 +350,12 @@ Each has a spec section justifying the rule. These are the highest-value foot-gu
 ## Tooling priority (project-specific layering on top of global)
 
 1. **Sequential Thinking** for planning before non-trivial work. Especially L1 parser, L3 PTY pipeline, L4 extraction state machine, L5 hybrid ranking.
-2. **Linear MCP** — ticket creation *before* every work unit, transition to Done *after* push.
-3. **Morph (`filesystem-with-morph:edit_file`)** for multi-edit files (Cargo.toml, package.json, settings panels, ESLint config).
-4. **Documentation lookup (`context7`, `Ref`)** for unfamiliar APIs. High-likelihood targets: shadcn/ui + Tailwind v4, CodeMirror 6 `Decoration.replace` + `StateField`, `portable-pty` 0.9 API, `fastembed` 5.x, `git2` rename detection options, `tauri-plugin-updater` signing flow, Apple `notarytool` async submission.
-5. **Playwright** for E2E coverage at the end of each layer.
-6. **Filesystem MCP** for file operations not covered above.
+2. **`/promptibrary-design` skill** — for any UI work, read `.claude/skills/promptibrary-design/SKILL.md` directly via the Read tool (the `Skill` invocation tool can't load it; see *Design system discipline → Use the `/promptibrary-design` skill*). Required reading before building or modifying any component, route, or screen.
+3. **Linear MCP** — ticket creation *before* every work unit, transition to Done *after* push.
+4. **Morph (`filesystem-with-morph:edit_file`)** for multi-edit files (Cargo.toml, package.json, settings panels, ESLint config).
+5. **Documentation lookup (`context7`, `Ref`)** for unfamiliar APIs. High-likelihood targets: shadcn/ui + Tailwind v4, CodeMirror 6 `Decoration.replace` + `StateField`, `portable-pty` 0.9 API, `fastembed` 5.x, `git2` rename detection options, `tauri-plugin-updater` signing flow, Apple `notarytool` async submission.
+6. **Playwright** for E2E coverage at the end of each layer.
+7. **Filesystem MCP** for file operations not covered above.
 
 ---
 
