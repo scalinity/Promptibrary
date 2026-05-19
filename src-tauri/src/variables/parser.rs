@@ -303,6 +303,20 @@ fn parse_block(
         }
     }
 
+    // Text pattern: compile at parse time so a malformed regex surfaces
+    // immediately and the compiled form is warm in the cache. SCA-591.
+    if matches!(var_type, VariableType::Text) {
+        if let Some(pat) = constraints.get("pattern") {
+            if let Err(e) = crate::variables::regex_cache::ensure_compiled(pat) {
+                errors.push(VariableParseError::InvalidConstraint {
+                    key: "pattern".into(),
+                    value: pat.clone(),
+                    reason: format!("invalid regex: {}", e),
+                });
+            }
+        }
+    }
+
     let ref_id = compute_ref_id(&tok.raw, tok.start_byte, tok.end_byte);
 
     let r = VariableRef {

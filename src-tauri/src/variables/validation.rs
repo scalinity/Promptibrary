@@ -259,21 +259,15 @@ fn validate_text(
         }
     }
     if let Some(pat) = &v.pattern {
-        match regex::Regex::new(pat) {
-            Ok(re) => {
-                if !re.is_match(&value) {
-                    issues.push(ValidationIssue::PatternMismatch {
-                        key: v.key.clone(),
-                        pattern: pat.clone(),
-                    });
-                }
-            }
-            Err(_) => {
-                issues.push(ValidationIssue::PatternMismatch {
-                    key: v.key.clone(),
-                    pattern: pat.clone(),
-                });
-            }
+        // Compile via the cache (SCA-591). The cache compiles on demand
+        // if the parser didn't pre-warm it (e.g. frontmatter-only
+        // patterns); compile errors collapse into PatternMismatch since
+        // the user can't fix a compile error from the value field.
+        if !crate::variables::regex_cache::is_match(pat, &value) {
+            issues.push(ValidationIssue::PatternMismatch {
+                key: v.key.clone(),
+                pattern: pat.clone(),
+            });
         }
     }
     if !issues.is_empty() {

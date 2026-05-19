@@ -4,6 +4,7 @@
 
 pub mod lexer;
 pub mod parser;
+pub mod regex_cache;
 pub mod renderer;
 pub mod validation;
 #[cfg(test)]
