@@ -22,6 +22,48 @@ This document describes the V1 release process for future-you. The release flow 
    git push origin v0.1.0
    ```
 
+## First dry-run (v0.0.1-rc1) — do this once before the real v0.1.0 cut
+
+The L5 stop-condition requires verifying the release workflow end-to-end against a real `v*` tag push *before* the production release. The pre-release tag (`-rc*` / `-pre*`) ships as a draft release marked prerelease so it doesn't promote as `latest`.
+
+**One-time prerequisites:**
+
+1. Tauri signer keypair generated and pasted into `src-tauri/tauri.conf.json` (see *Signing keys* below).
+2. `TAURI_SIGNING_PRIVATE_KEY` (and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` if your key is passphrase-protected) added to GitHub Actions secrets.
+3. `src-tauri/tauri.conf.json::plugins.updater.pubkey` is non-empty.
+
+**Dry-run steps:**
+
+1. Push the dry-run tag:
+   ```bash
+   git tag v0.0.1-rc1
+   git push origin v0.0.1-rc1
+   ```
+2. Watch the workflow run: `gh run watch` or open the Actions tab. It should produce a draft release with `prerelease: true`.
+3. Verify the artifact set on the draft release page — every entry below should be present:
+   - `Promptibrary_0.0.1-rc1_aarch64.dmg`
+   - `Promptibrary_0.0.1-rc1_x64.dmg`
+   - `Promptibrary_0.0.1-rc1_aarch64.app.tar.gz` + `.sig`
+   - `Promptibrary_0.0.1-rc1_x64.app.tar.gz` + `.sig`
+   - `Promptibrary_0.0.1-rc1_amd64.AppImage.tar.gz` + `.sig`
+   - `Promptibrary_0.0.1-rc1_amd64.deb`
+   - `latest.json`
+4. Verify `latest.json` resolves and contains valid signatures:
+   ```bash
+   curl -L "https://github.com/scalinity/Promptibrary/releases/download/v0.0.1-rc1/latest.json" \
+     | jq '{version, platforms: (.platforms | keys), signatures: (.platforms | to_entries | map({(.key): (.value.signature | length)}) | add)}'
+   ```
+   The `signatures` map should report a positive length for each platform key.
+5. Install the dry-run `.dmg` on a clean Mac to confirm the first-launch Gatekeeper bypass documented in `docs/INSTALLING.md` works.
+6. Test the in-app updater path from a hypothetical "previous version" (just install rc1, confirm Settings → Check for updates resolves the manifest without errors).
+7. **Tear down before v0.1.0:** delete the draft release page and the `v0.0.1-rc1` tag locally and remotely:
+   ```bash
+   gh release delete v0.0.1-rc1 --cleanup-tag --yes
+   git tag -d v0.0.1-rc1
+   ```
+
+Only after this checklist is green should you cut the real `v0.1.0` per the Pre-flight section above.
+
 ## What the release workflow does
 
 `.github/workflows/release.yml` fires on `v*` tag pushes:
@@ -54,11 +96,16 @@ Promptibrary signs every update bundle with a **Tauri signer keypair**, distinct
 ### Generate the keypair (once, per repo)
 
 ```bash
+# 1. Install the Tauri CLI if you don't have it already.
 cargo install tauri-cli
+
+# 2. Generate the keypair. Writes ~/.tauri/promptibrary.key (private)
+#    and prints the public key to stdout.
+mkdir -p ~/.tauri
 tauri signer generate -w ~/.tauri/promptibrary.key
 ```
 
-The CLI prints the public key. Copy it into `src-tauri/tauri.conf.json`:
+The CLI prints the public key on the last line. Copy it into `src-tauri/tauri.conf.json`:
 
 ```json
 {
@@ -66,19 +113,30 @@ The CLI prints the public key. Copy it into `src-tauri/tauri.conf.json`:
     "updater": {
       "active": true,
       "endpoints": [
-        "https://github.com/<owner>/promptibrary/releases/latest/download/latest.json"
+        "https://github.com/scalinity/Promptibrary/releases/latest/download/latest.json"
       ],
-      "dialog": true,
       "pubkey": "<paste the public key here>"
     }
   }
 }
 ```
 
-The private key file (`~/.tauri/promptibrary.key`) is **never committed**. Instead:
+The private key file (`~/.tauri/promptibrary.key`) is **never committed**. Base64-encode it and add it as the GitHub Actions repository secret:
 
-- Encode it base64 and store it as the GitHub Actions secret `TAURI_SIGNING_PRIVATE_KEY`.
-- If your keypair has a passphrase, store the passphrase as `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`.
+```bash
+# macOS — copies the base64 directly to the clipboard.
+base64 -i ~/.tauri/promptibrary.key | pbcopy
+
+# Linux fallback — pipe to xclip or just print and copy manually.
+base64 ~/.tauri/promptibrary.key
+```
+
+Then go to **GitHub → repo Settings → Secrets and variables → Actions → New repository secret**:
+
+| Name                                     | Value                                                                                       |
+|------------------------------------------|---------------------------------------------------------------------------------------------|
+| `TAURI_SIGNING_PRIVATE_KEY`              | The base64 blob from the previous step.                                                     |
+| `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`     | Only if you set a passphrase when generating the key. Otherwise omit this secret entirely.  |
 
 ### Key rotation
 

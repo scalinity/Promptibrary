@@ -45,9 +45,11 @@
   },
   "plugins": {
     "updater": {
-      "_TODO_L5": "Wired up in L5 — see SCA-580 + spec §16. The endpoints and pubkey land at release-cut time; declaring the plugin block now means the L5 diff is the keys, not the structure. The Cargo.toml dep is already pulled in.",
-      "active": false,
-      "endpoints": [],
+      "_DEF6_PUBKEY_REPLACE_BEFORE_RELEASE": "Run `tauri signer generate -w ~/.tauri/promptibrary.key` and paste the public key into the `pubkey` field below. See docs/RELEASING.md → 'Generate the keypair (once, per repo)' for the full procedure including base64-encoding the private key into the GitHub Actions secret TAURI_SIGNING_PRIVATE_KEY. The release workflow will fail at `pnpm tauri build` if this is empty.",
+      "active": true,
+      "endpoints": [
+        "https://github.com/scalinity/Promptibrary/releases/latest/download/latest.json"
+      ],
       "pubkey": "",
       "windows": {
         "installMode": "passive"
