@@ -261,8 +261,14 @@ pub struct ExtractionResponse {
 
 /// Discriminated failure surface used by the IPC commands; the frontend
 /// maps each variant to a tailored panel per spec §6 *Failure modes*.
+///
+/// `rename_all` controls the variant *tag* (snake_case for the wire),
+/// `rename_all_fields` controls the inner struct-variant *fields*
+/// (camelCase to match the TS contract). Without the second attribute,
+/// fields like `install_hint` would leak through as `install_hint` on the
+/// wire while TS expects `installHint`, silently dropping the data.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "kind", rename_all = "snake_case")]
+#[serde(tag = "kind", rename_all = "snake_case", rename_all_fields = "camelCase")]
 pub enum ExtractionFailure {
     NetworkUnavailable {
         message: String,
@@ -349,6 +355,50 @@ mod tests {
         let v = serde_json::to_value(&c).unwrap();
         assert_eq!(v["kind"], "transcript");
         assert_eq!(v["timestampSeconds"], 12.34);
+    }
+
+    #[test]
+    fn failure_dependency_missing_uses_camelcase_install_hint() {
+        // Regression guard for SCA-699 — the L4 review caught that the
+        // wire format was emitting `install_hint` (snake_case) because the
+        // enum-level `rename_all = "snake_case"` only renames the variant
+        // tag, not the fields inside struct variants. The TS contract has
+        // always used camelCase (`installHint`), so the UI silently
+        // dropped the install hint on every DependencyMissing. The fix is
+        // `rename_all_fields = "camelCase"`; this test pins the wire format.
+        let f = ExtractionFailure::DependencyMissing {
+            name: "yt-dlp".into(),
+            install_hint: "brew install yt-dlp".into(),
+        };
+        let v = serde_json::to_value(&f).unwrap();
+        assert_eq!(v["kind"], "dependency_missing");
+        assert_eq!(v["name"], "yt-dlp");
+        assert_eq!(v["installHint"], "brew install yt-dlp");
+        assert!(v.get("install_hint").is_none(), "snake_case field name must NOT appear on the wire");
+
+        // Round trip from the camelCase wire form back into Rust.
+        let back: ExtractionFailure = serde_json::from_value(v).unwrap();
+        match back {
+            ExtractionFailure::DependencyMissing { name, install_hint } => {
+                assert_eq!(name, "yt-dlp");
+                assert_eq!(install_hint, "brew install yt-dlp");
+            }
+            _ => panic!("variant mismatch"),
+        }
+    }
+
+    #[test]
+    fn failure_rate_limited_uses_camelcase_reset_at() {
+        use chrono::TimeZone;
+        let reset = Utc.with_ymd_and_hms(2026, 5, 19, 12, 0, 0).unwrap();
+        let f = ExtractionFailure::RateLimited {
+            provider: "x_twitter".into(),
+            reset_at: Some(reset),
+        };
+        let v = serde_json::to_value(&f).unwrap();
+        assert_eq!(v["kind"], "rate_limited");
+        assert!(v["resetAt"].is_string());
+        assert!(v.get("reset_at").is_none(), "snake_case field name must NOT appear on the wire");
     }
 
     #[test]
