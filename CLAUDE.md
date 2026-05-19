@@ -90,7 +90,7 @@ Keep it readable when opened in a browser — minimal styling is fine, but it sh
   | L2 | `SCA-594` | L2 — IPC and Frontend Shell | filed |
   | L3 | — | L3 — Launch Pipeline | filed |
   | L4 | `SCA-680` | L4 — Extraction | filed |
-  | L5 | — | L5 — Polish and Ship | **not yet filed** |
+  | L5 | `SCA-729` | L5 — Polish and Ship | filed |
 
   When you start a new layer, file the parent ticket first, then update this table in the same commit as the first sub-issue's work.
 
@@ -243,8 +243,9 @@ Pulled from the spec and from the verified `claude --help` reconciliation. Viola
 ### Updater (L5)
 
 - tauri-plugin-updater, GitHub Releases, manifest URL embedded at build time.
-- Signature verification **mandatory**. No trust-on-first-use escape hatch. Refuse install on verification failure.
+- **Tauri signer signature** verification on update bundles **mandatory**. No trust-on-first-use escape hatch. Refuse install on verification failure. This is the Tauri-internal keypair (`tauri signer generate`) — it is **not** Apple code signing and has nothing to do with macOS Gatekeeper.
 - Private signing key in GH Actions secret `TAURI_SIGNING_PRIVATE_KEY`. Public key embedded in `tauri.conf.json`.
+- **macOS builds are intentionally unsigned by Apple** for V1's personal-use posture. No Apple Developer account, no notarization, no `APPLE_*` secrets. First-launch Gatekeeper bypass documented in `docs/INSTALLING.md`. See L5 *Installation and Gatekeeper* for the full rationale.
 
 ---
 
@@ -344,6 +345,7 @@ Each has a spec section justifying the rule. These are the highest-value foot-gu
 | Use hex colors anywhere | OKLCH tokens via CSS variables | §8 *Design tokens* |
 | Render `bool` as literal `true`/`false` | Use `renderTrue`/`renderFalse` strings | §5 *Renderer* |
 | Skip the §15 fake-claude integration test | The PTY pipeline must be exercised, not simulated | §15 *Fake Claude launch* |
+| Add Apple code signing or notarization to V1 | Explicit V2 candidate per personal-use posture; not in scope | L5 *Installation and Gatekeeper* + §16 (patched) |
 
 ---
 
