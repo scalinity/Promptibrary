@@ -13,7 +13,7 @@
 //!     failed. Issues are surface-grade messages designed for the
 //!     variable-control UI, not raw stack traces.
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process;
 
 use serde::{Deserialize, Serialize};

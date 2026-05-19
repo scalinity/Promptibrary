@@ -133,7 +133,6 @@ pub fn lex_template(template: &str, offsets: &OffsetMap) -> (Vec<Token>, Vec<Lex
                     });
                     push_text(&mut tokens, template, offsets, block_start, template.len());
                     text_start = template.len();
-                    i = template.len();
                     break;
                 }
             }
