@@ -39,15 +39,21 @@ const MAX_BODY_BYTES: usize = 10 * 1024 * 1024; // 10 MB
 const PAYWALL_TEXT_THRESHOLD: usize = 1000;
 const SUBTREE_MIN_TEXT: usize = 500;
 const USER_AGENT: &str = "Promptibrary/1.0 (+local desktop importer)";
+/// High-specificity paywall markers — vendor classes (`tp-modal`,
+/// `tp-meter`, `paywall`) and unambiguous prose CTAs that almost never
+/// appear in benign content. The previous list included `"members only"`
+/// and `"members-only"` which false-positive on any blog mentioning the
+/// phrase. Narrowed per SCA-713. The CTA strings are scoped enough that
+/// hitting one is a strong paywall signal regardless of context.
 const PAYWALL_MARKERS: &[&str] = &[
     "paywall",
-    "subscribe to read",
-    "members-only",
-    "members only",
     "tp-modal",
     "tp-meter",
+    "piano-modal",
+    "subscribe to read",
     "this is a subscriber-only",
-    "to continue reading",
+    "to continue reading,",
+    "to continue reading this",
 ];
 
 #[derive(Debug)]
