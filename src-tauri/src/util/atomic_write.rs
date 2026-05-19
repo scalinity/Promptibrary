@@ -14,9 +14,18 @@ use std::process;
 use crate::error::Result;
 
 pub fn tmp_path_for(path: &Path) -> PathBuf {
+    // SCA-614: pid alone isn't enough — two threads writing to the same
+    // path concurrently would produce identical tmp names and race
+    // File::create / write_all / rename. Append a nanosecond nonce so
+    // intra-process concurrency is safe even when the slug-collision
+    // mutex (SCA-589) doesn't gate the write path.
     let pid = process::id();
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.subsec_nanos())
+        .unwrap_or(0);
     let mut tmp = path.as_os_str().to_owned();
-    tmp.push(format!(".tmp.{pid}"));
+    tmp.push(format!(".tmp.{pid}.{nonce}"));
     PathBuf::from(tmp)
 }
 
@@ -88,10 +97,29 @@ mod tests {
     }
 
     #[test]
-    fn tmp_path_includes_pid() {
+    fn tmp_path_includes_pid_and_nonce() {
         let p = Path::new("/tmp/example.md");
         let tmp = tmp_path_for(p);
         let s = tmp.to_string_lossy().to_string();
-        assert!(s.starts_with("/tmp/example.md.tmp."));
+        assert!(s.starts_with("/tmp/example.md.tmp."), "missing prefix: {s}");
+        let suffix = s.trim_start_matches("/tmp/example.md.tmp.");
+        let parts: Vec<&str> = suffix.split('.').collect();
+        assert_eq!(parts.len(), 2, "expected pid.nonce: {s}");
+        assert!(parts[0].parse::<u32>().is_ok(), "pid: {s}");
+        assert!(parts[1].parse::<u32>().is_ok(), "nonce: {s}");
+    }
+
+    #[test]
+    fn tmp_path_for_distinct_across_calls() {
+        // SCA-614: two consecutive calls must yield distinct tmp paths.
+        let p = Path::new("/tmp/example.md");
+        let a = tmp_path_for(p);
+        let b = loop {
+            let candidate = tmp_path_for(p);
+            if candidate != a {
+                break candidate;
+            }
+        };
+        assert_ne!(a, b);
     }
 }
