@@ -84,11 +84,11 @@ mod tests {
         assert_eq!(parsed, id);
     }
 
-    #[test]
-    fn ids_are_not_mixable() {
-        // Compile-time check: assigning across types would not compile.
-        let p = PromptId::new();
-        let r = RunId::new();
-        assert_ne!(p.as_str(), r.as_str());
-    }
+    // Note: the cross-type non-mixability of PromptId / RunId / SourceId is
+    // enforced by the Rust type system (each is a distinct `#[serde(transparent)]`
+    // newtype). A runtime test of `assert_ne!(p.as_str(), r.as_str())` would
+    // only confirm that two random ULIDs differ; it can't test the compile-time
+    // property. The property is verified by the fact that this file compiles:
+    // attempting `let p: PromptId = RunId::new();` produces an E0308 type-mismatch
+    // error at build time, before any test runs.
 }
