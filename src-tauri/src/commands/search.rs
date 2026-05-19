@@ -99,6 +99,15 @@ const W_TEXT: f64 = 0.55;
 const W_SEMANTIC: f64 = 0.35;
 const RRF_K: f64 = 60.0;
 
+/// Score bonus added to the exact-title-match pin so any pinned
+/// result outranks every non-pinned one regardless of weights and
+/// boosts. The natural score range is bounded by
+/// `W_TEXT * (1/(RRF_K+1)) + W_SEMANTIC + recency_boost_max + usage_boost_max`,
+/// which is ≈ 0.209 today (semantic=0 while the embedding service is
+/// deferred) and ≈ 0.559 in the future (semantic=0.35). 1_000.0
+/// gives multiple orders of magnitude of headroom either way.
+const EXACT_TITLE_PIN_BONUS: f64 = 1_000.0;
+
 fn effective_limit(input: Option<u32>) -> usize {
     input.unwrap_or(DEFAULT_LIMIT).clamp(1, MAX_LIMIT) as usize
 }
@@ -202,12 +211,9 @@ async fn hybrid(
         // case-foldable script consistently.
         let pin = meta.title.to_lowercase() == query_lower;
 
-        // Pin score: large enough that any pinned result outranks every
-        // non-pinned one regardless of the score weights and boosts. The
-        // numeric value is chosen so it stays out of the natural score
-        // range (which is bounded by 0.55 * (1/60) + 0.35 + 0.10 + 0.10 ≈
-        // 0.56).
-        let pin_bonus = if pin { 1_000.0 } else { 0.0 };
+        // Pin score: stays well clear of the natural score range
+        // (see EXACT_TITLE_PIN_BONUS docstring for the math).
+        let pin_bonus = if pin { EXACT_TITLE_PIN_BONUS } else { 0.0 };
 
         let score =
             pin_bonus + W_TEXT * text_component + W_SEMANTIC * semantic + recency + usage_b;
