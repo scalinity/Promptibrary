@@ -6,7 +6,7 @@ use serde_json::Value;
 use crate::domain::variable::Variable;
 use crate::error::Result;
 use crate::variables::parser::{
-    parse_template_variables, ParseVariablesInput, ParseVariablesOutput, VariableRef,
+    parse_template_variables, variable_key, ParseVariablesInput, ParseVariablesOutput, VariableRef,
 };
 use crate::variables::renderer::{
     render_prompt, BoolRenderMode, RenderPromptInput, RenderPromptOutput, ResolvedVariableValue,
@@ -55,15 +55,9 @@ pub async fn validate_launch_inputs(
     let mut resolved = Vec::new();
     let mut issues = Vec::new();
     for variable in input.variables {
-        let key = match &variable {
-            Variable::File(v) => v.key.clone(),
-            Variable::Folder(v) => v.key.clone(),
-            Variable::Text(v) => v.key.clone(),
-            Variable::Multiline(v) => v.key.clone(),
-            Variable::Select(v) => v.key.clone(),
-            Variable::Bool(v) => v.key.clone(),
-            Variable::Number(v) => v.key.clone(),
-        };
+        // SCA-605: use parser::variable_key instead of duplicating the
+        // 7-arm match here.
+        let key = variable_key(&variable);
         let value = input.values.get(&key).cloned().unwrap_or(Value::Null);
         match validate_value(ValidateValueInput { variable, value }) {
             Ok(v) => resolved.push(v),
