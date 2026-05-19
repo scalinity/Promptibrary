@@ -133,6 +133,10 @@ pub struct PromptAggregateRow {
 
 /// Compute per-prompt aggregates across the entire `runs` table.
 ///
+/// TODO(scale): full-table scan with `GROUP BY prompt_id` every call.
+/// Acceptable at V1 (~hundreds of runs); V2 should land the spec §10
+/// `prompt_stats` cache table per `docs/V2-CANDIDATES.md`.
+///
 /// Per §10:
 /// - `launch_count` — total runs for this prompt.
 /// - `last_used_at` — `MAX(started_at)`.
