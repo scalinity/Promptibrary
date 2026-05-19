@@ -23,6 +23,19 @@
 //!
 //! Exact (case-insensitive) title matches are pinned to the top, ahead
 //! of every score-based result.
+//!
+//! ## V1 perf note (SCA-760)
+//!
+//! The hybrid path runs three sequential round-trips per query:
+//!   1. `index::fts::search_fts` — FTS5 bm25.
+//!   2. `fetch_prompt_meta`     — pull titles for the hit ids.
+//!   3. `fetch_usage_stats`     — pull launch_count + last_used_at.
+//!
+//! At V1 scale (hundreds of prompts, hundreds of runs) this is
+//! comfortably fast on a hot SQLite pool. V2 candidate: fold all
+//! three into one CTE-based query returning
+//! `(prompt_id, title, bm25_rank, launch_count, last_used_at)`
+//! — see `docs/V2-CANDIDATES.md`.
 
 use std::collections::HashMap;
 
