@@ -9,7 +9,21 @@
 //! weighting) → `<body>` minus stripped tags.
 
 use chrono::Utc;
+use once_cell::sync::Lazy;
 use scraper::{ElementRef, Html, Node, Selector};
+
+// Static selectors — parsed once at first access, reused for every
+// `parse_html_article` call. The dynamic `meta[property/name]` selectors
+// stay inline because they interpolate field names at call time.
+static SEL_TITLE: Lazy<Selector> = Lazy::new(|| Selector::parse("title").expect("title"));
+static SEL_ARTICLE: Lazy<Selector> = Lazy::new(|| Selector::parse("article").expect("article"));
+static SEL_MAIN: Lazy<Selector> = Lazy::new(|| Selector::parse("main").expect("main"));
+static SEL_ROLE_MAIN: Lazy<Selector> =
+    Lazy::new(|| Selector::parse("[role=\"main\"]").expect("[role=main]"));
+static SEL_BODY: Lazy<Selector> = Lazy::new(|| Selector::parse("body").expect("body"));
+static SEL_JSONLD: Lazy<Selector> = Lazy::new(|| {
+    Selector::parse("script[type=\"application/ld+json\"]").expect("script[type=application/ld+json]")
+});
 
 use crate::domain::source::{ArticleSource, Source};
 use crate::error::{AppError, AppErrorKind, Result};
@@ -103,7 +117,7 @@ pub fn parse_html_article(html_text: &str) -> ParsedArticle {
     let doc = Html::parse_document(html_text);
 
     let title_tag = doc
-        .select(&selector("title"))
+        .select(&SEL_TITLE)
         .next()
         .map(|t| collect_text(t).trim().to_string())
         .filter(|s| !s.is_empty());
@@ -182,13 +196,13 @@ fn into_fetched(parsed: ParsedArticle, canonical_url: &str) -> FetchedSourceCont
 // ─── Subtree selection ───────────────────────────────────────────────────────
 
 fn select_subtree(doc: &Html) -> Option<ElementRef<'_>> {
-    if let Some(el) = doc.select(&selector("article")).next() {
+    if let Some(el) = doc.select(&SEL_ARTICLE).next() {
         return Some(el);
     }
-    if let Some(el) = doc.select(&selector("main")).next() {
+    if let Some(el) = doc.select(&SEL_MAIN).next() {
         return Some(el);
     }
-    if let Some(el) = doc.select(&selector("[role=\"main\"]")).next() {
+    if let Some(el) = doc.select(&SEL_ROLE_MAIN).next() {
         return Some(el);
     }
     densest_descendant(doc)
@@ -239,7 +253,7 @@ fn serialize_subtree(el: ElementRef<'_>) -> String {
 }
 
 fn serialize_body_fallback(doc: &Html) -> String {
-    if let Some(body) = doc.select(&selector("body")).next() {
+    if let Some(body) = doc.select(&SEL_BODY).next() {
         return serialize_subtree(body);
     }
     String::new()
@@ -519,7 +533,7 @@ fn jsonld_date_published(doc: &Html) -> Option<String> {
 }
 
 fn extract_jsonld_string(doc: &Html, path: &[&str]) -> Option<String> {
-    for script in doc.select(&selector("script[type=\"application/ld+json\"]")) {
+    for script in doc.select(&SEL_JSONLD) {
         let raw = collect_text(script);
         if let Ok(v) = serde_json::from_str::<serde_json::Value>(&raw) {
             if let Some(s) = traverse_path(&v, path) {
