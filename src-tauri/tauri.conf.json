@@ -41,5 +41,15 @@
     "shortDescription": "Agentic-coding operator console for Claude Code.",
     "longDescription": "Promptibrary is a Tauri desktop app that organizes, launches, and observes Claude Code sessions from a library of typed prompt profiles."
   },
-  "plugins": {}
+  "plugins": {
+    "updater": {
+      "_TODO_L5": "Wired up in L5 — see SCA-580 + spec §16. The endpoints and pubkey land at release-cut time; declaring the plugin block now means the L5 diff is the keys, not the structure. The Cargo.toml dep is already pulled in.",
+      "active": false,
+      "endpoints": [],
+      "pubkey": "",
+      "windows": {
+        "installMode": "passive"
+      }
+    }
+  }
 }

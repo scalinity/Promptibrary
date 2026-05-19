@@ -6,5 +6,6 @@
   "permissions": [
     "core:default",
     "dialog:default"
-  ]
+  ],
+  "_TODO_L5_updater": "When the updater is activated in L5, add 'updater:default' (or the narrower allowlist) here."
 }
