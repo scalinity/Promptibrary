@@ -119,7 +119,7 @@ mod tests {
 
         // Small delay to let notify settle.
         tokio::time::sleep(Duration::from_millis(100)).await;
-        std::fs::write(v.absolute("promptibrary/prompts/hi.md"), b"hello").unwrap();
+        std::fs::write(v.absolute("promptibrary/prompts/hi.md").unwrap(), b"hello").unwrap();
 
         // Wait up to 2s for a debounced emit.
         let received = tokio::time::timeout(Duration::from_secs(2), watcher.events.recv()).await;

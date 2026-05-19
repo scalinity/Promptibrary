@@ -245,7 +245,7 @@ mod tests {
 
     fn write_prompt_file(vault: &VaultPaths, slug: &str, body: &str, archived: bool, id: &str) {
         std::fs::create_dir_all(vault.prompts_dir()).unwrap();
-        let path = vault.absolute(&format!("promptibrary/prompts/{slug}.md"));
+        let path = vault.absolute(&format!("promptibrary/prompts/{slug}.md")).unwrap();
         let archived_line = if archived {
             "archived_at: 2026-05-18T15:00:00Z\n"
         } else {
@@ -279,7 +279,7 @@ mod tests {
         write_prompt_file(&v, "beta", "body\n", true, "01JZ7M1K6M8D4E9SZ7P1Q9KT4B");
         // Malformed file.
         std::fs::write(
-            v.absolute("promptibrary/prompts/junk.md"),
+            v.absolute("promptibrary/prompts/junk.md").unwrap(),
             "not yaml at all\n",
         )
         .unwrap();
@@ -297,7 +297,7 @@ mod tests {
         let v = VaultPaths::new(dir.path());
         write_prompt_file(&v, "alpha", "body\n", false, "01JZ7M1K6M8D4E9SZ7P1Q9KT4A");
         scan_vault(&v, &pool, |_| {}).await.unwrap();
-        std::fs::remove_file(v.absolute("promptibrary/prompts/alpha.md")).unwrap();
+        std::fs::remove_file(v.absolute("promptibrary/prompts/alpha.md").unwrap()).unwrap();
         let summary = scan_vault(&v, &pool, |_| {}).await.unwrap();
         assert_eq!(summary.deleted_rows, 1);
     }

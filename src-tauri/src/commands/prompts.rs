@@ -124,7 +124,15 @@ pub async fn get_prompt(
     let row = get_prompt_index(&db, &input.id)
         .await?
         .ok_or_else(|| AppError::new(AppErrorKind::PromptNotFound, "prompt not found"))?;
-    let abs = vault.absolute(&row.vault_path);
+    let abs = vault
+        .absolute(&row.vault_path)
+        .ok_or_else(|| {
+            AppError::new(
+                AppErrorKind::PromptMalformed,
+                "vault_path failed traversal check",
+            )
+            .with_detail("vault_path", row.vault_path.clone())
+        })?;
     let content = std::fs::read_to_string(&abs).map_err(|_| {
         AppError::new(
             AppErrorKind::PromptNotFound,
@@ -188,7 +196,15 @@ pub async fn update_prompt(
     let row = get_prompt_index(&db, &input.id)
         .await?
         .ok_or_else(|| AppError::new(AppErrorKind::PromptNotFound, "prompt not found"))?;
-    let abs = vault.absolute(&row.vault_path);
+    let abs = vault
+        .absolute(&row.vault_path)
+        .ok_or_else(|| {
+            AppError::new(
+                AppErrorKind::PromptMalformed,
+                "vault_path failed traversal check",
+            )
+            .with_detail("vault_path", row.vault_path.clone())
+        })?;
     let content = std::fs::read_to_string(&abs).map_err(AppError::from)?;
     let mut prompt = prompt_from_file(&row.vault_path, &content)?;
     if let Some(t) = input.title {
@@ -221,7 +237,15 @@ pub async fn archive_prompt_cmd(
     let row = get_prompt_index(&db, &input.id)
         .await?
         .ok_or_else(|| AppError::new(AppErrorKind::PromptNotFound, "prompt not found"))?;
-    let abs = vault.absolute(&row.vault_path);
+    let abs = vault
+        .absolute(&row.vault_path)
+        .ok_or_else(|| {
+            AppError::new(
+                AppErrorKind::PromptMalformed,
+                "vault_path failed traversal check",
+            )
+            .with_detail("vault_path", row.vault_path.clone())
+        })?;
     let content = std::fs::read_to_string(&abs).map_err(AppError::from)?;
     let mut prompt = prompt_from_file(&row.vault_path, &content)?;
     archive_prompt(&vault, &mut prompt)?;
@@ -238,7 +262,15 @@ pub async fn delete_prompt(
     let row = get_prompt_index(&db, &input.id)
         .await?
         .ok_or_else(|| AppError::new(AppErrorKind::PromptNotFound, "prompt not found"))?;
-    let abs = vault.absolute(&row.vault_path);
+    let abs = vault
+        .absolute(&row.vault_path)
+        .ok_or_else(|| {
+            AppError::new(
+                AppErrorKind::PromptMalformed,
+                "vault_path failed traversal check",
+            )
+            .with_detail("vault_path", row.vault_path.clone())
+        })?;
     if abs.exists() {
         std::fs::remove_file(&abs).map_err(AppError::from)?;
     }

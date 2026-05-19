@@ -76,7 +76,13 @@ pub fn repair_orphaned_transcripts(
             Err(_) => continue,
         };
         let rel = crate::vault::paths::run_path_for_date(&fm.id, fm.started_at);
-        let dest = vault.absolute(&rel);
+        let dest = match vault.absolute(&rel) {
+            Some(p) => p,
+            None => {
+                tracing::warn!(rel = %rel, "transcript vault_path failed traversal check; orphan left in spool");
+                continue;
+            }
+        };
         if let Some(parent) = dest.parent() {
             if !parent.exists() {
                 std::fs::create_dir_all(parent).map_err(crate::error::AppError::from)?;
@@ -136,7 +142,7 @@ mod tests {
         assert_eq!(summary.orphans_moved, 1);
         assert!(!orphan_file.exists());
         assert!(v
-            .absolute("promptibrary/runs/2026/05/18/01RUN.md")
+            .absolute("promptibrary/runs/2026/05/18/01RUN.md").unwrap()
             .exists());
     }
 }

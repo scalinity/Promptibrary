@@ -100,7 +100,7 @@ async fn round_trip_write_scan_get_render() {
     let body = "Refactor {{file:target}} inside {{folder:root}}.\nNotes:\n{{multiline:notes}}\n";
     let mut p = make_prompt("All vars", "all-vars", body);
     write_prompt(&vault, &mut p).unwrap();
-    assert!(vault.absolute(&p.vault_path).exists());
+    assert!(vault.absolute(&p.vault_path).unwrap().exists());
 
     // Scan picks it up.
     let summary = scan_vault(&vault, &db, |_| {}).await.unwrap();

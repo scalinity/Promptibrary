@@ -56,7 +56,13 @@ pub fn write_prompt(vault: &VaultPaths, prompt: &mut Prompt) -> Result<()> {
     h.update(serialized.as_bytes());
     prompt.checksum_sha256 = format!("sha256:{}", hex_lower(&h.finalize()));
 
-    let abs = vault.absolute(&prompt.vault_path);
+    let abs = vault.absolute(&prompt.vault_path).ok_or_else(|| {
+        crate::error::AppError::new(
+            crate::error::AppErrorKind::PromptMalformed,
+            "vault_path failed traversal check",
+        )
+        .with_detail("vault_path", prompt.vault_path.clone())
+    })?;
     if let Some(parent) = abs.parent() {
         std::fs::create_dir_all(parent).map_err(crate::error::AppError::from)?;
     }
@@ -83,7 +89,13 @@ pub fn write_run_transcript_header(
         body: format!("# Promptibrary Run {}\n\n", header.id),
     };
     let serialized = serialize_markdown_document(&doc);
-    let abs = vault.absolute(relative_vault_path);
+    let abs = vault.absolute(relative_vault_path).ok_or_else(|| {
+        crate::error::AppError::new(
+            crate::error::AppErrorKind::PromptMalformed,
+            "transcript vault_path failed traversal check",
+        )
+        .with_detail("vault_path", relative_vault_path.to_string())
+    })?;
     if let Some(parent) = abs.parent() {
         std::fs::create_dir_all(parent).map_err(crate::error::AppError::from)?;
     }
@@ -186,10 +198,10 @@ mod tests {
         let v = VaultPaths::new(dir.path());
         let mut p = sample_prompt("promptibrary/prompts/hello.md");
         write_prompt(&v, &mut p).unwrap();
-        assert!(v.absolute(&p.vault_path).exists());
+        assert!(v.absolute(&p.vault_path).unwrap().exists());
         assert!(p.checksum_sha256.starts_with("sha256:"));
         // Round-trip: read the file and find the frontmatter id.
-        let read = std::fs::read_to_string(v.absolute(&p.vault_path)).unwrap();
+        let read = std::fs::read_to_string(v.absolute(&p.vault_path).unwrap()).unwrap();
         assert!(read.contains("id: 01JZ7M1K6M8D4E9SZ7P1Q9KT4A"));
         assert!(read.contains("Body content"));
     }
@@ -202,7 +214,7 @@ mod tests {
         write_prompt(&v, &mut p).unwrap();
         archive_prompt(&v, &mut p).unwrap();
         assert!(p.archived_at.is_some());
-        let read = std::fs::read_to_string(v.absolute(&p.vault_path)).unwrap();
+        let read = std::fs::read_to_string(v.absolute(&p.vault_path).unwrap()).unwrap();
         assert!(read.contains("archived_at: "));
     }
 
@@ -219,7 +231,7 @@ mod tests {
             resolved_prompt_sha256: Some("sha256:abc".into()),
         };
         write_run_transcript_header(&v, "promptibrary/runs/2026/05/18/01RUN.md", &header).unwrap();
-        let abs = v.absolute("promptibrary/runs/2026/05/18/01RUN.md");
+        let abs = v.absolute("promptibrary/runs/2026/05/18/01RUN.md").unwrap();
         assert!(abs.exists());
     }
 }
