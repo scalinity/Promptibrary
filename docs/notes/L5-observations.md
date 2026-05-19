@@ -95,3 +95,60 @@ This is a previous-layer gap (L3 tagged complete but missing this surface), so p
 - Option B: carry forward — accept the gap into L5 and treat the runs persistence as part of the telemetry ticket. This blurs the layer boundary but avoids retagging L3.
 
 Recommend Option A — the persistence belongs to L3 conceptually and the runs table is what L5 reads, not what L5 owns. The reviewer makes the call.
+
+---
+
+## End-of-session summary (2026-05-19)
+
+This session landed the L5 surfaces reachable without enabling commented-out native deps (fastembed, git2) and without user-interactive infrastructure (Tauri signer keypair, real release dry-run, visual baselines). **Layer 5 is not complete.** The `layer-5-complete` tag is deliberately NOT cut.
+
+### What landed (commits on `main`)
+
+| Commit | Subject | Lines |
+|---|---|---|
+| `0b9bd6a` | `chore(branding): replace app icon assets with new brand image (SCA-728)` | 53 files |
+| `7a455ec` | `docs(L5): file parent ticket SCA-729 and open observations log (SCA-729)` | 2 files |
+| `74a82c3` | `feat(search): FTS5 read surface + search_prompts/suggest_tags IPC (SCA-729)` | +791/-10 |
+| `0d863c6` | `feat(search): hybrid ranking score formula + cmdk_search backend (SCA-729)` | +687/-96 |
+| `876f744` | `feat(search): wire Cmd-K palette to cmdk_search IPC + ScoreParts contract (SCA-729)` | +214/-56 |
+| `1e28472` | `feat(telemetry): event log + per-prompt aggregates + destructive actions (SCA-729)` | +641/-2 |
+| `654d3f7` | `feat(system): probe_dependencies + reveal_in_terminal + open_path (SCA-729)` | +371/-11 |
+| `2d1f19c` | `docs(L5): INSTALLING + RELEASING + V2 candidates for ship readiness (SCA-729)` | +161/-0 |
+| `678a116` | `ci(release): tag-triggered release workflow with Tauri signer (SCA-729)` | +136/-0 |
+
+Lib test count: 248 → 262 (14 new tests). JS Vitest: 26/26. Typecheck + lint clean.
+
+### Linear back-fill needed
+
+The Linear MCP server's token went stale partway through the session and never recovered cleanly. The commits all reference the L5 parent `SCA-729`; sub-tickets should be filed retroactively from this list. Suggested sub-ticket titles, one per logical-change commit (paired by SHA):
+
+- `74a82c3` → "Wire FTS5 text search read surface + search_prompts/suggest_tags IPC"
+- `0d863c6` → "Hybrid ranking score formula + cmdk_search backend"
+- `876f744` → "Wire Cmd-K palette to cmdk_search IPC + ScoreParts contract"
+- `1e28472` → "Telemetry event log + per-prompt aggregates + destructive actions"
+- `654d3f7` → "System commands: probe_dependencies + reveal_in_terminal + open_path"
+- `2d1f19c` → "Docs trio: INSTALLING.md + RELEASING.md + V2-CANDIDATES updates"
+- `678a116` → "Tag-triggered CI release workflow with Tauri signer"
+
+### Explicit handoff list (what next session needs to do)
+
+1. **Enable `fastembed`** (`src-tauri/Cargo.toml`) and land semantic search per the spec §9 model-download + sqlite-vec wiring described in this file's *Deferred to follow-up sessions* section. Flip the semantic component in `commands/search::hybrid` from the constant 0 to the real cosine value.
+2. **Enable `git2`** (`src-tauri/Cargo.toml`) and land Git history / diff / revert per spec §10. Three IPC commands; revert must validate the blob as a Promptibrary prompt before atomic write and trigger a watcher reindex without auto-committing.
+3. **Reconcile the L3 launch-pipeline runs-persistence gap** (stop-and-surface item above). Either amend `layer-3-complete` with `index/runs_repo.rs` + hooks, or accept the gap and carry forward.
+4. **Generate the Tauri signer keypair** (`tauri signer generate`), paste the public key into `src-tauri/tauri.conf.json::plugins.updater.pubkey`, and store the private key in GitHub Actions secret `TAURI_SIGNING_PRIVATE_KEY`. Until then the release workflow's `pnpm tauri build` will fail at the signing step.
+5. **Settings disk persistence** — wire `get_settings`/`update_settings` to actually read/write the local JSON (AppData) + vault YAML (`<vault>/promptibrary/settings.yml`) per spec §13. Currently typed surface only.
+6. **Visual regression**: add specs for `05-history-diff`, `06-command-palette`, `07-settings-{vault,secrets,telemetry,telemetry-confirm,diagnostics,diagnostics-failures,updater}`, `08-empty`, `09-disconnected`. Each baseline must be manually verified against the corresponding `Promptibrary Design System/screens/*.html` mockup before commit. The release workflow already gates on `pnpm test:visual` so missing baselines will surface as failures.
+7. **Release dry-run** against a real `v0.0.1-rc1` tag push — verify all artifacts, `latest.json` resolution, and the in-app updater path from a previous build. Spec stop-condition requires this before cutting `v0.1.0`.
+8. **`docs/V1-VERIFICATION.md`** — write the report after the above lands, with the command + output for each of the 10 spec §1 success criteria.
+9. **Tag** `layer-5-complete` AND `v0.1.0-pre` only after the verification report is green.
+
+### Why this session stopped here
+
+The remaining items each need infrastructure outside the build agent's reach:
+- Tauri signer keypair generation is interactive.
+- The release dry-run requires pushing a real tag and watching GH Actions.
+- Visual regression baselines need manual human verification against mockups before commit (the design-system contract is the source of truth, not the captured baseline).
+- The V1 verification report needs the above to actually be green.
+- Native-dep tickets (fastembed, git2) are each multi-hour focused work with their own test infrastructure cost.
+
+A deeper-but-still-incomplete L5 would be net worse than the explicit handoff this leaves behind. The acceptance-criteria pass at the top of `Prompts/L5.md` is unchecked except for what specifically landed; the reviewer should walk it before unlocking the V1 ship gate.
