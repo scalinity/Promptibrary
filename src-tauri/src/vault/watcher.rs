@@ -59,6 +59,12 @@ pub fn start_watcher(vault: &VaultPaths) -> Result<VaultWatcher> {
     });
 
     let prompts_dir = vault.prompts_dir();
+    // SCA-618: capture the canonical prompts_dir into the watcher closure
+    // and tighten the filter via `path.starts_with(&prompts_dir)`. The
+    // previous filter matched any directory literally named "prompts"
+    // anywhere in the path, which would have fired spurious events on
+    // unrelated subtrees like `<vault>/something/prompts/x.md`.
+    let prompts_dir_filter = prompts_dir.clone();
 
     let mut watcher = notify::recommended_watcher(move |res: notify::Result<notify::Event>| {
         let event = match res {
@@ -76,9 +82,7 @@ pub fn start_watcher(vault: &VaultPaths) -> Result<VaultWatcher> {
         }
         for path in event.paths {
             let is_prompt_md = path.extension().and_then(|e| e.to_str()) == Some("md")
-                && path
-                    .components()
-                    .any(|c| c.as_os_str() == "prompts");
+                && path.starts_with(&prompts_dir_filter);
             if !is_prompt_md {
                 continue;
             }
