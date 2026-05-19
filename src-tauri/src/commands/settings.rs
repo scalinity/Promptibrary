@@ -278,8 +278,12 @@ pub async fn delete_all_run_history(
 async fn delete_transcript_files(root: &std::path::Path) -> Result<(u64, u64)> {
     let mut files_deleted = 0u64;
     let mut bytes_freed = 0u64;
+    // SCA-748: cache directory depth at push time. Pre-fix sorted by
+    // `path.components().count()`, which re-walked each path on every
+    // comparison — O(N² log N) on deep trees. The depth is fixed at
+    // discovery time so we capture it once.
     let mut stack: Vec<std::path::PathBuf> = vec![root.to_path_buf()];
-    let mut to_remove_dirs: Vec<std::path::PathBuf> = Vec::new();
+    let mut to_remove_dirs: Vec<(usize, std::path::PathBuf)> = Vec::new();
 
     while let Some(dir) = stack.pop() {
         let mut entries = tokio::fs::read_dir(&dir).await.map_err(AppError::from)?;
@@ -287,12 +291,13 @@ async fn delete_transcript_files(root: &std::path::Path) -> Result<(u64, u64)> {
             let path = entry.path();
             let file_type = entry.file_type().await.map_err(AppError::from)?;
             if file_type.is_dir() {
+                let depth = path.components().count();
                 stack.push(path.clone());
-                to_remove_dirs.push(path);
+                to_remove_dirs.push((depth, path));
             } else if file_type.is_file() {
                 let meta = entry.metadata().await.map_err(AppError::from)?;
-                bytes_freed = bytes_freed.saturating_add(meta.len());
                 tokio::fs::remove_file(&path).await.map_err(AppError::from)?;
+                bytes_freed = bytes_freed.saturating_add(meta.len());
                 files_deleted += 1;
             }
         }
@@ -300,8 +305,8 @@ async fn delete_transcript_files(root: &std::path::Path) -> Result<(u64, u64)> {
 
     // Remove now-empty subdirectories deepest-first, but leave the
     // top-level `root` itself in place.
-    to_remove_dirs.sort_by(|a, b| b.components().count().cmp(&a.components().count()));
-    for dir in to_remove_dirs {
+    to_remove_dirs.sort_by(|a, b| b.0.cmp(&a.0));
+    for (_depth, dir) in to_remove_dirs {
         // remove_dir errors loudly if the dir still has children; that
         // would mean someone wrote a file between the walk and the
         // removal. Surface as a real error rather than swallowing.
