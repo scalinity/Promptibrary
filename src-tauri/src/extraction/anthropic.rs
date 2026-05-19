@@ -356,8 +356,6 @@ fn build_repair_request(
     invalid_raw: &str,
     errors: &[ValidationError],
 ) -> AnthropicRequest {
-    // Mode-agnostic repair: same model + temperature, smaller-ish max_tokens
-    // so we don't accidentally re-stream a giant invalid response.
     let mut error_lines = String::new();
     for e in errors {
         error_lines.push_str(&format!("- {e:?}\n"));
@@ -367,7 +365,12 @@ fn build_repair_request(
     );
     AnthropicRequest {
         model: input.extraction_mode.model().as_wire().to_string(),
-        max_tokens: input.extraction_mode.max_tokens(),
+        // Cap repair budget at half of the original. The repair user
+        // message is much smaller than the original payload and we want
+        // a faster + cheaper second attempt — if the model can't produce
+        // valid JSON in 3 KB of output, it won't in 6 KB either. Floor at
+        // 2048 so we don't accidentally truncate a borderline-OK response.
+        max_tokens: (input.extraction_mode.max_tokens() / 2).max(2048),
         temperature: 0.2,
         system: EXTRACTION_SYSTEM_PROMPT.to_string(),
         messages: vec![AnthropicMessage {
