@@ -59,6 +59,19 @@ fn hex(bytes: impl AsRef<[u8]>) -> String {
     s
 }
 
+// ─── Timestamp helpers ───────────────────────────────────────────────────────
+
+/// Normalize a `DateTime<Utc>` to a fixed-precision RFC3339 string
+/// (`YYYY-MM-DDTHH:MM:SSZ`, no subseconds, always UTC `Z` suffix). SQLite
+/// compares cache `expires_at` lexicographically — that only works if
+/// every timestamp uses the same precision and offset. `to_rfc3339()`
+/// emits variable subsecond precision depending on chrono version and
+/// build settings, so a put-side stamp with millis and a get-side stamp
+/// without millis would compare wrong (SCA-709).
+fn rfc3339_secs(dt: chrono::DateTime<Utc>) -> String {
+    dt.format("%Y-%m-%dT%H:%M:%SZ").to_string()
+}
+
 // ─── Fetched source ──────────────────────────────────────────────────────────
 
 pub async fn get_fetched_source(
@@ -75,7 +88,7 @@ pub async fn get_fetched_source(
         "#,
     )
     .bind(cache_key)
-    .bind(now.to_rfc3339())
+    .bind(rfc3339_secs(now))
     .fetch_optional(pool)
     .await?;
 
@@ -114,8 +127,8 @@ pub async fn put_fetched_source(
     .bind(source_kind)
     .bind(origin_url)
     .bind(&json)
-    .bind(now.to_rfc3339())
-    .bind(expires.to_rfc3339())
+    .bind(rfc3339_secs(now))
+    .bind(rfc3339_secs(expires))
     .execute(pool)
     .await?;
     Ok(())
@@ -143,7 +156,7 @@ pub async fn get_candidates(
         "#,
     )
     .bind(cache_key)
-    .bind(now.to_rfc3339())
+    .bind(rfc3339_secs(now))
     .fetch_optional(pool)
     .await?;
 
@@ -189,8 +202,8 @@ pub async fn put_candidates(
     .bind(model)
     .bind(prompt_version as i64)
     .bind(&json)
-    .bind(now.to_rfc3339())
-    .bind(expires.to_rfc3339())
+    .bind(rfc3339_secs(now))
+    .bind(rfc3339_secs(expires))
     .execute(pool)
     .await?;
     Ok(())
@@ -199,7 +212,7 @@ pub async fn put_candidates(
 /// Best-effort purge of all expired rows in both cache tables. Run from a
 /// background task or at startup.
 pub async fn purge_expired(pool: &SqlitePool) -> Result<u64> {
-    let now = Utc::now().to_rfc3339();
+    let now = rfc3339_secs(Utc::now());
     let r1 = sqlx::query("DELETE FROM extraction_cache WHERE expires_at <= ?1")
         .bind(&now)
         .execute(pool)
@@ -374,8 +387,8 @@ mod tests {
         let pool = pool().await;
         let key = compute_source_cache_key("article", "https://example.com/x");
         let json = serde_json::to_string(&sample_content()).unwrap();
-        let past = (Utc::now() - Duration::days(1)).to_rfc3339();
-        let fetched = (Utc::now() - Duration::days(10)).to_rfc3339();
+        let past = rfc3339_secs(Utc::now() - Duration::days(1));
+        let fetched = rfc3339_secs(Utc::now() - Duration::days(10));
         sqlx::query(
             r#"INSERT INTO extraction_cache
                (cache_key, source_kind, origin_url, fetched_content_json, fetched_at, expires_at)
