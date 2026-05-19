@@ -133,11 +133,13 @@ pub async fn get_prompt(
             )
             .with_detail("vault_path", row.vault_path.clone())
         })?;
-    let content = std::fs::read_to_string(&abs).map_err(|_| {
-        AppError::new(
-            AppErrorKind::PromptNotFound,
-            format!("vault file missing: {}", row.vault_path),
-        )
+    let content = std::fs::read_to_string(&abs).map_err(|e| {
+        // SCA-597: don't echo the vault_path into the wire — if the path
+        // was attacker-influenced (despite the C-1 guard) it would leak
+        // the target. Log full detail via tracing and surface a generic
+        // PromptNotFound on the wire.
+        tracing::warn!(vault_path = %row.vault_path, error = ?e, "get_prompt: file read failed");
+        AppError::new(AppErrorKind::PromptNotFound, "vault file missing")
     })?;
     prompt_from_file(&row.vault_path, &content)
 }

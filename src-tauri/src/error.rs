@@ -144,7 +144,15 @@ pub type Result<T> = std::result::Result<T, AppError>;
 
 impl From<std::io::Error> for AppError {
     fn from(e: std::io::Error) -> Self {
-        Self::internal(format!("io: {}", e))
+        // SCA-597: do NOT leak the OS error message verbatim across the
+        // IPC wire. std::io::Error often contains absolute filesystem
+        // paths (e.g. "No such file or directory (os error 2)" or
+        // "Permission denied (os error 13)") which is CWE-209 information
+        // disclosure. Log the full error via tracing for backend debugging
+        // and surface only the ErrorKind name on the wire.
+        tracing::warn!(error = ?e, "io error converted to AppError");
+        let kind_label = format!("{:?}", e.kind());
+        Self::internal(format!("io: {}", kind_label))
     }
 }
 
@@ -253,10 +261,18 @@ mod tests {
 
     #[test]
     fn io_error_collapses_to_internal() {
+        // SCA-597: the wire message must NOT include the OS error string
+        // (which often carries an absolute filesystem path). It surfaces
+        // only the ErrorKind label; the full error is logged via tracing.
         let io = std::io::Error::other("disk gone");
         let err: AppError = io.into();
         assert_eq!(err.kind, AppErrorKind::Internal);
-        assert!(err.message.contains("disk gone"));
+        assert!(
+            !err.message.contains("disk gone"),
+            "io error message must not be echoed: {}",
+            err.message
+        );
+        assert!(err.message.starts_with("io: "));
     }
 
     #[test]

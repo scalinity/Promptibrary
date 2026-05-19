@@ -44,12 +44,17 @@ pub async fn select_vault(
     services: State<'_, ManagedState>,
 ) -> Result<VaultStatus> {
     if !input.vault_root.exists() {
+        // SCA-597: don't leak the user-supplied path into the wire message
+        // — the user supplied it, but the pattern would set a bad precedent
+        // for paths derived from indexed rows or runtime state.
+        tracing::warn!(path = %input.vault_root.display(), "select_vault: path does not exist");
         return Err(AppError::new(
             AppErrorKind::VaultMissing,
-            format!("vault path does not exist: {}", input.vault_root.display()),
+            "vault path does not exist",
         ));
     }
     if !input.vault_root.is_dir() {
+        tracing::warn!(path = %input.vault_root.display(), "select_vault: not a directory");
         return Err(AppError::new(
             AppErrorKind::VaultInvalid,
             "vault path is not a directory",
