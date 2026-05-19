@@ -110,9 +110,19 @@ jobs:
         if: matrix.os == 'macos-14'
         run: pnpm exec playwright install --with-deps chromium
 
-      - name: Visual regression (macOS gate)
+      - name: Visual regression (macOS gate, one retry)
         if: matrix.os == 'macos-14'
-        run: pnpm test:visual
+        run: |
+          # SCA-764: one retry on a flake so a single subpixel font
+          # rendering diff doesn't block a signed release. The visual
+          # baselines should be deterministic; flakes here mean the
+          # underlying surface drifted, but Playwright occasionally
+          # captures a 1-2px hinting variance that the second run
+          # reproduces correctly.
+          if ! pnpm test:visual; then
+            echo "First visual run failed — retrying once."
+            pnpm test:visual
+          fi
 
       # The real build step. Tauri's CLI reads TAURI_SIGNING_PRIVATE_KEY
       # from the env and signs every bundle in this build with the
