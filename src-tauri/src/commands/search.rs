@@ -446,6 +446,16 @@ async fn fetch_prompt_meta(
     if ids.is_empty() {
         return Ok(HashMap::new());
     }
+    // SCA-765: SQLite's default SQLITE_MAX_VARIABLE_NUMBER is 32766 on
+    // recent builds, but the FTS-layer cap means ids.len() is bounded
+    // by MAX_LIMIT * 4 (the 4× tag-filter window). The assert surfaces
+    // as a test failure if a future regression removes the clamp.
+    debug_assert!(
+        ids.len() <= (MAX_LIMIT as usize) * 4,
+        "fetch_prompt_meta got {} ids, exceeds MAX_LIMIT*4={}",
+        ids.len(),
+        (MAX_LIMIT as usize) * 4
+    );
     let placeholders = vec!["?"; ids.len()].join(",");
     let archived_clause = if include_archived {
         ""
@@ -498,6 +508,13 @@ async fn fetch_usage_stats(
     if ids.is_empty() {
         return Ok(HashMap::new());
     }
+    // SCA-765: see fetch_prompt_meta — same MAX_LIMIT * 4 invariant.
+    debug_assert!(
+        ids.len() <= (MAX_LIMIT as usize) * 4,
+        "fetch_usage_stats got {} ids, exceeds MAX_LIMIT*4={}",
+        ids.len(),
+        (MAX_LIMIT as usize) * 4
+    );
     let placeholders = vec!["?"; ids.len()].join(",");
     let sql = format!(
         "SELECT prompt_id,
