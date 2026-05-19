@@ -392,9 +392,13 @@ fn build_thread_chain(root: Tweet, all: Vec<Tweet>) -> Vec<Tweet> {
     }
 
     let mut out = vec![root.clone()];
-    let mut frontier: Vec<&str> = vec![root.id.as_str()];
+    // Owned `Vec<String>` frontier — the previous `Vec<&str>` + `Box::leak`
+    // pattern leaked up to 100 strings per call into the process heap on
+    // every X-thread fetch (SCA-700). `String` is cheap here; the cap is
+    // 100 IDs, IDs are short, and the borrow checker is happy.
+    let mut frontier: Vec<String> = vec![root.id.clone()];
     while let Some(parent_id) = frontier.pop() {
-        if let Some(children) = by_replied.get_mut(parent_id) {
+        if let Some(children) = by_replied.get_mut(&parent_id) {
             children.sort_by(|a, b| a.created_at.cmp(&b.created_at));
             for child in children.iter() {
                 out.push(child.clone());
@@ -402,22 +406,10 @@ fn build_thread_chain(root: Tweet, all: Vec<Tweet>) -> Vec<Tweet> {
                     return out;
                 }
             }
-            // Push children IDs onto frontier for further descent.
-            let child_ids: Vec<String> = children.iter().map(|c| c.id.clone()).collect();
-            for id in child_ids {
-                frontier.push(string_leak(id));
-            }
+            frontier.extend(children.iter().map(|c| c.id.clone()));
         }
     }
     out
-}
-
-/// Leak a String to get a 'static-ish &str slice that lives until the end
-/// of `build_thread_chain`. The leaked memory is bounded by the 100-post
-/// cap, so this is a deliberate trade for code clarity in a single
-/// short-lived call.
-fn string_leak(s: String) -> &'static str {
-    Box::leak(s.into_boxed_str())
 }
 
 fn build_oembed_source(
