@@ -18,7 +18,11 @@ interface Field {
   help: string;
 }
 
-const FIELDS: Field[] = [
+interface ExtendedField extends Field {
+  advanced?: boolean;
+}
+
+const FIELDS: ExtendedField[] = [
   {
     key: "anthropic_api_key",
     label: "Anthropic API key",
@@ -27,25 +31,52 @@ const FIELDS: Field[] = [
   {
     key: "x_bearer_token",
     label: "X bearer token",
-    help: "Required for X/Twitter source extraction. Optional.",
+    help: "Optional. Required only for thread reconstruction on X/Twitter — oEmbed handles single tweets without a token. X API access is paid.",
+    advanced: true,
   },
 ];
 
 export function SecretsSettings(): React.JSX.Element {
   const status = useSecretStatus();
+  const xBearerSet = status.data?.x_bearer_token?.exists ?? false;
+  // Reveal the advanced field by default when the user already stored
+  // a value for it — hiding it would orphan the existing secret.
+  const [showAdvanced, setShowAdvanced] = useState(xBearerSet);
+
+  const visibleFields = FIELDS.filter((f) => !f.advanced || showAdvanced);
+
   return (
     <section id="secrets" aria-labelledby="secrets-h">
       <div className="section-label" id="secrets-h">
         secrets
       </div>
       <div style={{ display: "grid", gap: "var(--sp-4)", marginTop: 8 }}>
-        {FIELDS.map((field) => (
+        {visibleFields.map((field) => (
           <SecretRow
             key={field.key}
             field={field}
             exists={status.data?.[field.key]?.exists ?? false}
           />
         ))}
+        {!showAdvanced && (
+          <button
+            type="button"
+            onClick={() => setShowAdvanced(true)}
+            style={{
+              alignSelf: "flex-start",
+              background: "transparent",
+              border: 0,
+              padding: 0,
+              fontFamily: "var(--font-mono)",
+              fontSize: 11,
+              color: "var(--ink-tertiary)",
+              cursor: "pointer",
+              letterSpacing: "0.02em",
+            }}
+          >
+            + show advanced secret fields
+          </button>
+        )}
       </div>
     </section>
   );
