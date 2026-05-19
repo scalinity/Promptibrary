@@ -138,7 +138,7 @@ impl YtDlpRunner for RealYtDlpRunner {
         // to vtt. Manual subs (e.g. `<id>.en.json3`) precede auto
         // (`<id>.en.json3` is the same filename — yt-dlp picks the best
         // single track per `--sub-format` arg).
-        let candidates = find_transcript_files(temp_dir, video_id)?;
+        let candidates = find_transcript_files(temp_dir, video_id).await?;
         if let Some(path) = candidates.into_iter().next() {
             Ok(Ok(path))
         } else {
@@ -157,14 +157,14 @@ fn install_hint_for_current_os() -> String {
     }
 }
 
-fn find_transcript_files(temp_dir: &Path, video_id: &str) -> Result<Vec<PathBuf>> {
+async fn find_transcript_files(temp_dir: &Path, video_id: &str) -> Result<Vec<PathBuf>> {
     let mut json3: Vec<PathBuf> = vec![];
     let mut vtt: Vec<PathBuf> = vec![];
-    let entries = match std::fs::read_dir(temp_dir) {
+    let mut entries = match tokio::fs::read_dir(temp_dir).await {
         Ok(e) => e,
         Err(_) => return Ok(vec![]),
     };
-    for entry in entries.flatten() {
+    while let Some(entry) = entries.next_entry().await.ok().flatten() {
         let path = entry.path();
         let Some(name) = path.file_name().and_then(|s| s.to_str()) else {
             continue;
