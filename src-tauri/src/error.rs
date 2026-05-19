@@ -185,6 +185,13 @@ impl From<sqlx::migrate::MigrateError> for AppError {
 
 impl From<reqwest::Error> for AppError {
     fn from(e: reqwest::Error) -> Self {
+        // TODO(L4): refine when the real extraction call path lands. Today only
+        // is_connect() and is_timeout() route to NetworkUnavailable — DNS
+        // resolution failures, TLS handshake errors, and "couldn't reach the
+        // server" cases fall through to Internal. The right shape once L4 has
+        // real callsites is roughly:
+        //   is_connect() || is_timeout() || (is_request() && status().is_none())
+        // so reachability problems all classify as NetworkUnavailable.
         if e.is_connect() || e.is_timeout() {
             Self::new(AppErrorKind::NetworkUnavailable, format!("network: {}", e))
         } else {
