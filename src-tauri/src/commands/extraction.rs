@@ -4,24 +4,25 @@
 
 use serde_json::Value;
 
-use crate::error::{AppError, Result};
+use crate::commands::not_yet_implemented_stub;
+use crate::error::Result;
 
 #[tauri::command]
 pub async fn detect_source(_input: Value) -> Result<Value> {
-    Err(AppError::internal("not_yet_implemented"))
+    not_yet_implemented_stub("commands::extraction::detect_source")
 }
 
 #[tauri::command]
 pub async fn fetch_source_preview(_input: Value) -> Result<Value> {
-    Err(AppError::internal("not_yet_implemented"))
+    not_yet_implemented_stub("commands::extraction::fetch_source_preview")
 }
 
 #[tauri::command]
 pub async fn extract_prompt_candidates(_input: Value) -> Result<Value> {
-    Err(AppError::internal("not_yet_implemented"))
+    not_yet_implemented_stub("commands::extraction::extract_prompt_candidates")
 }
 
 #[tauri::command]
 pub async fn save_extracted_prompt(_input: Value) -> Result<Value> {
-    Err(AppError::internal("not_yet_implemented"))
+    not_yet_implemented_stub("commands::extraction::save_extracted_prompt")
 }

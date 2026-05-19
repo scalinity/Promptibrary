@@ -4,29 +4,30 @@
 
 use serde_json::Value;
 
-use crate::error::{AppError, Result};
+use crate::commands::not_yet_implemented_stub;
+use crate::error::Result;
 
 #[tauri::command]
 pub async fn get_settings() -> Result<Value> {
-    Err(AppError::internal("not_yet_implemented"))
+    not_yet_implemented_stub("commands::settings::get_settings")
 }
 
 #[tauri::command]
 pub async fn update_settings(_input: Value) -> Result<Value> {
-    Err(AppError::internal("not_yet_implemented"))
+    not_yet_implemented_stub("commands::settings::update_settings")
 }
 
 #[tauri::command]
 pub async fn set_secret(_input: Value) -> Result<Value> {
-    Err(AppError::internal("not_yet_implemented"))
+    not_yet_implemented_stub("commands::settings::set_secret")
 }
 
 #[tauri::command]
 pub async fn clear_secret(_input: Value) -> Result<Value> {
-    Err(AppError::internal("not_yet_implemented"))
+    not_yet_implemented_stub("commands::settings::clear_secret")
 }
 
 #[tauri::command]
 pub async fn get_secret_status() -> Result<Value> {
-    Err(AppError::internal("not_yet_implemented"))
+    not_yet_implemented_stub("commands::settings::get_secret_status")
 }
