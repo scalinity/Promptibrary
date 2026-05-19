@@ -36,6 +36,7 @@ pub enum AppErrorKind {
     MalformedModelOutput,
     SqliteLocked,
     SqliteCorrupt,
+    ForeignKeyViolation,
     GitError,
     SettingsInvalid,
     KeychainError,
@@ -169,6 +170,9 @@ impl From<sqlx::Error> for AppError {
         // - 6  = SQLITE_LOCKED (table-level lock conflict)
         // - 11 = SQLITE_CORRUPT (database disk image is malformed)
         // - 26 = SQLITE_NOTADB (file is not a database, treat as corrupt)
+        // - 787 = SQLITE_CONSTRAINT_FOREIGNKEY (extended result code; SCA-750
+        //   — surface FK violations distinctly so callers can recognize
+        //   "referenced row doesn't exist" rather than masking as Internal)
         // Reference: https://sqlite.org/rescode.html
         match &e {
             sqlx::Error::Database(db_err) => match db_err.code().as_deref() {
@@ -178,6 +182,10 @@ impl From<sqlx::Error> for AppError {
                 Some("11") | Some("26") => {
                     Self::new(AppErrorKind::SqliteCorrupt, db_err.message().to_string())
                 }
+                Some("787") => Self::new(
+                    AppErrorKind::ForeignKeyViolation,
+                    db_err.message().to_string(),
+                ),
                 _ => Self::new(AppErrorKind::Internal, format!("sqlx: {}", e)),
             },
             _ => Self::new(AppErrorKind::Internal, format!("sqlx: {}", e)),
