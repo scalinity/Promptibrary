@@ -188,11 +188,57 @@ export const detectSource: typeof Real.detectSource = (url) => {
   return ok({ kind: "unsupported" as const, url, reason: "not a URL" });
 };
 
+export const detectSourceTyped: typeof Real.detectSourceTyped = (url) => {
+  if (url.includes("youtube") || url.includes("youtu.be")) {
+    return ok({
+      kind: "youtube",
+      canonicalUrl: url,
+      videoId: "fixture",
+    });
+  }
+  if (url.includes("twitter") || url.includes("x.com")) {
+    return ok({
+      kind: "x_twitter",
+      canonicalUrl: url,
+      postId: "1",
+      username: "fixture",
+    });
+  }
+  if (url.startsWith("http")) {
+    return ok({
+      kind: "article",
+      canonicalUrl: url,
+      hostname: new URL(url).hostname.replace(/^www\./, ""),
+    });
+  }
+  return ok({ kind: "unsupported", reason: "invalid_url" });
+};
+
+export const fetchSourcePreview: typeof Real.fetchSourcePreview = ({ url }) => {
+  // Lazy import to avoid pulling the fixture bundle into prod builds.
+  return import("../../../tests/fixtures/visual/sources").then((mod) =>
+    ok(mod.fetchedSourceFixtureFor(url)),
+  );
+};
+
 export const extractPromptCandidates: typeof Real.extractPromptCandidates = () =>
-  Promise.reject({
-    kind: "Internal",
-    message: "not_yet_implemented",
-    details: { layer: "L4" },
+  import("../../../tests/fixtures/visual/extractions").then((mod) =>
+    ok(mod.candidatesFixtureResult()),
+  );
+
+export const saveExtractedPrompt: typeof Real.saveExtractedPrompt = ({ candidate }) =>
+  Promise.all([
+    import("../../../tests/fixtures/visual/prompts"),
+    import("@/shared/types/ids"),
+  ]).then(([mod, ids]) => {
+    const fixture = mod.PROMPT_FIXTURES[0];
+    return {
+      ...fixture,
+      title: candidate.title,
+      summary: candidate.summary,
+      body: candidate.body,
+      tags: [...candidate.tags, "imported"].map((t) => ids.asTagName(t)),
+    };
   });
 
 // ─── Settings + Secrets ───────────────────────────────────────────────────
@@ -331,7 +377,10 @@ export type {
   DetectedSourceKind,
   DetectSourceResult,
   ExtractPromptCandidatesArgs,
-  PromptCandidate,
+  FetchSourcePreviewArgs,
+  FetchSourcePreviewResult,
+  ExtractCandidatesResult,
+  SaveExtractedPromptArgs,
   SetSecretArgs,
   GitCommitInfo,
   RevertPromptArgs,

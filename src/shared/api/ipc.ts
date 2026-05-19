@@ -309,12 +309,21 @@ export const repairOrphanedTranscripts = () =>
 
 // ─── Extraction ───────────────────────────────────────────────────────────
 
-export type DetectedSourceKind =
-  | "manual"
-  | "youtube"
-  | "x_twitter"
-  | "article"
-  | "unsupported";
+import type * as ExtractionTypes from "@/shared/types/extraction";
+
+// Re-export so feature code can `import { … } from "@/shared/api/ipc"`.
+export type {
+  CandidatePrompt,
+  ExtractionFailure,
+  ExtractionMode,
+  ExtractionResponse,
+  FetchedSourceContent,
+  SourceDetection,
+  SourceChunk,
+  LaunchDefaultsPatch,
+} from "@/shared/types/extraction";
+
+export type DetectedSourceKind = ExtractionTypes.SourceDetection["kind"];
 
 export interface DetectSourceResult {
   kind: DetectedSourceKind;
@@ -322,25 +331,59 @@ export interface DetectSourceResult {
   reason: string | null;
 }
 
-export const detectSource = (url: string) =>
-  invoke<DetectSourceResult>("detect_source", { input: { url } });
+// Legacy `DetectSourceResult` shape kept for the L2 placeholder route;
+// `detectSource` adapts the new typed response back into it. Prefer
+// `detectSourceTyped` (returns the discriminated union directly) in new code.
+function toLegacyDetect(d: ExtractionTypes.SourceDetection, url: string): DetectSourceResult {
+  return {
+    kind: d.kind,
+    url: "canonicalUrl" in d && d.canonicalUrl ? d.canonicalUrl : url,
+    reason: d.kind === "unsupported" ? d.reason : null,
+  };
+}
+
+export const detectSource = async (url: string): Promise<DetectSourceResult> => {
+  const d = await invoke<ExtractionTypes.SourceDetection>("detect_source", {
+    input: { url },
+  });
+  return toLegacyDetect(d, url);
+};
+
+export const detectSourceTyped = (url: string) =>
+  invoke<ExtractionTypes.SourceDetection>("detect_source", { input: { url } });
+
+export interface FetchSourcePreviewArgs {
+  url: string;
+  forceRefresh?: boolean;
+}
+
+export type FetchSourcePreviewResult =
+  | { outcome: "ok"; content: ExtractionTypes.FetchedSourceContent }
+  | { outcome: "failed"; failure: ExtractionTypes.ExtractionFailure };
+
+export const fetchSourcePreview = (args: FetchSourcePreviewArgs) =>
+  invoke<FetchSourcePreviewResult>("fetch_source_preview", { input: args });
 
 export interface ExtractPromptCandidatesArgs {
-  url: string;
-  deep?: boolean;
+  content: ExtractionTypes.FetchedSourceContent;
+  extractionMode?: ExtractionTypes.ExtractionMode;
+  forceRefresh?: boolean;
 }
 
-export interface PromptCandidate {
-  title: string;
-  body: string;
-  tags: string[];
-  summary: string;
-  variables: Variable[];
-  rationale: string | null;
-}
+export type ExtractCandidatesResult =
+  | { outcome: "ok"; response: ExtractionTypes.ExtractionResponse }
+  | { outcome: "failed"; failure: ExtractionTypes.ExtractionFailure };
 
 export const extractPromptCandidates = (args: ExtractPromptCandidatesArgs) =>
-  invoke<PromptCandidate[]>("extract_prompt_candidates", { input: args });
+  invoke<ExtractCandidatesResult>("extract_prompt_candidates", { input: args });
+
+export interface SaveExtractedPromptArgs {
+  candidate: ExtractionTypes.CandidatePrompt;
+  source: import("@/shared/types/source").Source;
+}
+
+export const saveExtractedPrompt = (args: SaveExtractedPromptArgs) =>
+  invoke<Prompt>("save_extracted_prompt", { input: args });
 
 // ─── Settings + Secrets ───────────────────────────────────────────────────
 

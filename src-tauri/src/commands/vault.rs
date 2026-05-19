@@ -146,6 +146,15 @@ pub async fn get_vault_status(services: State<'_, ManagedState>) -> Result<Vault
 pub(crate) async fn current_vault_db(
     services: &State<'_, ManagedState>,
 ) -> Result<(VaultPaths, SqlitePool)> {
+    current_vault_db_inner(services.inner()).await
+}
+
+/// Inner helper that takes the underlying `Arc<AppServices>` directly so
+/// non-command code paths (notably `commands::extraction::save_extracted_prompt`'s
+/// private helper) can call into the same vault-resolution logic.
+pub(crate) async fn current_vault_db_inner(
+    services: &ManagedState,
+) -> Result<(VaultPaths, SqlitePool)> {
     let state = services.state.read().await;
     let vault = state
         .vault

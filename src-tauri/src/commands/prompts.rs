@@ -330,6 +330,13 @@ pub async fn export_prompt(
 
 // ---------- Helpers --------------------------------------------------------
 
+/// Public re-export of `unique_slug` so other command modules
+/// (`commands::extraction::save_extracted_prompt`) can share the
+/// collision-avoiding slug logic without duplicating it.
+pub async fn unique_slug_public(db: &sqlx::SqlitePool, base: &str) -> Result<String> {
+    unique_slug(db, base).await
+}
+
 async fn unique_slug(db: &sqlx::SqlitePool, base: &str) -> Result<String> {
     if !prompts_repo::slug_in_use(db, base).await? {
         return Ok(base.to_string());
