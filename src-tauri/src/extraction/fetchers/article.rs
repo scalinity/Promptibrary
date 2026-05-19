@@ -564,8 +564,21 @@ fn traverse_path(value: &serde_json::Value, path: &[&str]) -> Option<String> {
 
 // ─── Paywall heuristic ───────────────────────────────────────────────────────
 
+/// Paywall markers always appear in the page chrome (subscribe banners,
+/// modal containers, vendor classes) — scanning the full body would
+/// allocate up to 10 MB of lowercase string for no payoff. Limit to the
+/// first 64 KB which captures the entire `<head>` and the above-the-fold
+/// `<body>` content for any real paywalled page.
+const PAYWALL_SCAN_BYTES: usize = 65_536;
+
 fn looks_paywalled(html_text: &str) -> bool {
-    let lower = html_text.to_ascii_lowercase();
+    let limit = html_text.len().min(PAYWALL_SCAN_BYTES);
+    // Truncate at a char boundary so the slice is valid UTF-8.
+    let mut cut = limit;
+    while cut > 0 && !html_text.is_char_boundary(cut) {
+        cut -= 1;
+    }
+    let lower = html_text[..cut].to_ascii_lowercase();
     PAYWALL_MARKERS.iter().any(|m| lower.contains(m))
 }
 
