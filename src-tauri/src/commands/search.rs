@@ -157,7 +157,7 @@ async fn hybrid(
     include_archived: bool,
 ) -> Result<Vec<PromptSearchResult>> {
     // Pull a 4× window from FTS so post-tag-filter we still fill the limit.
-    let raw_limit = if tag.is_some() { limit * 4 } else { limit }.max(limit);
+    let raw_limit = if tag.is_some() { limit * 4 } else { limit };
     let hits = search_fts(db, query, raw_limit).await?;
     if hits.is_empty() {
         return Ok(Vec::new());
