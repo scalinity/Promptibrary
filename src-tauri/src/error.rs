@@ -156,11 +156,22 @@ impl From<serde_json::Error> for AppError {
 
 impl From<sqlx::Error> for AppError {
     fn from(e: sqlx::Error) -> Self {
-        // SQLite busy/locked is its own variant; everything else collapses into Internal.
+        // Classify SQLite errors by their numeric code rather than message text:
+        // - 5  = SQLITE_BUSY (database is locked)
+        // - 6  = SQLITE_LOCKED (table-level lock conflict)
+        // - 11 = SQLITE_CORRUPT (database disk image is malformed)
+        // - 26 = SQLITE_NOTADB (file is not a database, treat as corrupt)
+        // Reference: https://sqlite.org/rescode.html
         match &e {
-            sqlx::Error::Database(db_err) if db_err.message().contains("locked") => {
-                Self::new(AppErrorKind::SqliteLocked, db_err.message().to_string())
-            }
+            sqlx::Error::Database(db_err) => match db_err.code().as_deref() {
+                Some("5") | Some("6") => {
+                    Self::new(AppErrorKind::SqliteLocked, db_err.message().to_string())
+                }
+                Some("11") | Some("26") => {
+                    Self::new(AppErrorKind::SqliteCorrupt, db_err.message().to_string())
+                }
+                _ => Self::new(AppErrorKind::Internal, format!("sqlx: {}", e)),
+            },
             _ => Self::new(AppErrorKind::Internal, format!("sqlx: {}", e)),
         }
     }
