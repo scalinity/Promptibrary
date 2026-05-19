@@ -181,8 +181,8 @@ pub async fn prompt_aggregates(db: &SqlitePool) -> Result<Vec<PromptAggregateRow
                     prompt_id,
                     launch_count,
                     last_used_at: last_used_at
-                        .and_then(|s| DateTime::parse_from_rfc3339(&s).ok())
-                        .map(|d| d.with_timezone(&Utc)),
+                        .as_deref()
+                        .and_then(crate::time::parse_db_timestamp),
                     success_rate,
                     avg_run_seconds,
                     avg_token_count: avg_token_count.map(|v| v.round() as i64),
