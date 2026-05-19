@@ -258,4 +258,26 @@ mod tests {
         assert_eq!(err.kind, AppErrorKind::Internal);
         assert!(err.message.contains("disk gone"));
     }
+
+    #[test]
+    fn detail_value_null_serializes_as_json_null() {
+        // Lock in serde's untagged-unit-variant → JSON null behavior so a
+        // future serde change can't silently flip it to the string "Null"
+        // (which the TS Record<string, ... | null> shape would not parse).
+        let v = DetailValue::Null;
+        let json = serde_json::to_value(&v).unwrap();
+        assert!(json.is_null(), "DetailValue::Null must wire as JSON null, got {json:?}");
+    }
+
+    #[test]
+    fn detail_value_roundtrip_through_app_error() {
+        // Belt-and-suspenders: ensure Null and string variants both survive
+        // the full IpcError wire conversion.
+        let err = AppError::new(AppErrorKind::Internal, "x")
+            .with_detail("nothing", DetailValue::Null)
+            .with_detail("something", "value");
+        let wire = serde_json::to_value(&err).unwrap();
+        assert!(wire["details"]["nothing"].is_null());
+        assert_eq!(wire["details"]["something"], "value");
+    }
 }
