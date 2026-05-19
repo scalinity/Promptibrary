@@ -139,3 +139,29 @@ hr {
   display: grid;
   grid-template-rows: var(--topbar-h) 1fr var(--statusbar-h);
 }
+
+/* === Additions beyond canonical design system === */
+/* SCA-DEF9 — runtime .app-frame override.
+ *
+ * The canonical .app-frame above renders as a fixed 1360×880 canvas
+ * because Promptibrary Design System/screens/*.html mockup pages
+ * embed the frame as a standalone preview rectangle. The running
+ * Tauri/Vite app mounts the same class under <div id="root">, where
+ * "fixed 1360×880" forces a horizontal AND vertical scroll the
+ * moment the window is anything narrower/shorter than that.
+ *
+ * Discriminating on #root > .app-frame keeps the design-system
+ * canvas behavior intact (mockup pages have no #root ancestor) and
+ * lets the runtime fill the viewport edge-to-edge. The border +
+ * border-radius come off too — the desktop-window chrome supplies
+ * the rounded corner; an inner border would double up.
+ *
+ * Document the divergence per CLAUDE.md *Design system discipline*.
+ * Also lives in docs/notes/L5-observations.md under the SCA-DEF9
+ * entry. */
+#root > .app-frame {
+  width: 100vw;
+  height: 100vh;
+  border: none;
+  border-radius: 0;
+}
