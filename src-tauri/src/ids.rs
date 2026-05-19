@@ -45,23 +45,11 @@ impl SourceId {
     }
 }
 
-impl Default for PromptId {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl Default for RunId {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl Default for SourceId {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+// Deliberately no `Default` impls: `..Default::default()` on a struct that
+// contains a PromptId / RunId / SourceId would silently allocate a fresh
+// ULID via the CSPRNG, which is surprising behavior for a trait that is
+// conventionally zero-cost. Callers must invoke `::new()` explicitly to
+// signal that ID generation is happening.
 
 /// Generates a fresh Crockford-Base32 ULID. 26 ASCII chars, uppercase.
 pub fn new_ulid() -> String {
