@@ -78,3 +78,20 @@ Reachable without native-dep tickets or user-interactive infra:
 - ⏭ `.github/workflows/release.yml` YAML (un-dry-run-verified)
 
 Tagging `layer-5-complete` happens **only after** the deferred set above also lands; this session ends with an explicit handoff list, not a tag.
+
+### Stop-and-surface: L3 launch pipeline never persists `runs` rows
+
+Discovered while wiring L5 telemetry hooks: the launch pipeline (under `src-tauri/src/launch/`) does **not** insert into the `runs` table at any lifecycle moment. `index/runs_repo.rs` is still a 3-line stub from L0. The only `INSERT INTO runs` statements in the codebase live in migration test helpers and in this layer's own test fixtures.
+
+This is a previous-layer gap (L3 tagged complete but missing this surface), so per CLAUDE.md *Layer scope discipline* — *"If a problem in a previous layer surfaces, stop and surface."* — I am not silently patching the launch pipeline.
+
+**Impact on L5:**
+- L5 telemetry repo (`record_event` + `prompt_aggregates`) can be implemented and tested correctly against synthetic `runs` rows in unit tests.
+- The end-to-end acceptance criterion *"launch the same prompt 3× ; library row shows launch_count: 3"* cannot pass until L3 is reconciled — runs aren't being persisted to count.
+- Per-prompt usage stats consumed by the hybrid-ranking commit are likewise inert in production until run rows land.
+
+**Reconciliation path (for the human reviewer):**
+- Option A: amend `layer-3-complete` with a follow-up commit that implements `index/runs_repo.rs::{insert_run, update_run_status, complete_run}` and wires the three call sites (start, first-output, finish) into the L3 launch pipeline. File this as a sub-issue of `SCA-729` (or under the L3 parent if it was tracked).
+- Option B: carry forward — accept the gap into L5 and treat the runs persistence as part of the telemetry ticket. This blurs the layer boundary but avoids retagging L3.
+
+Recommend Option A — the persistence belongs to L3 conceptually and the runs table is what L5 reads, not what L5 owns. The reviewer makes the call.

@@ -79,6 +79,8 @@ pub fn run() {
             commands::settings::set_secret,
             commands::settings::clear_secret,
             commands::settings::get_secret_status,
+            commands::settings::clear_telemetry_cache,
+            commands::settings::delete_all_run_history,
             // commands::git
             commands::git::get_prompt_history,
             commands::git::get_prompt_diff,
