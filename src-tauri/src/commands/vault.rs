@@ -167,6 +167,15 @@ fn app_support_dir() -> Result<PathBuf> {
             .map_err(|_| AppError::new(AppErrorKind::Internal, "HOME env var not set"))?;
         Ok(PathBuf::from(home).join("Library/Application Support/promptibrary"))
     } else if cfg!(target_os = "linux") {
+        // SCA-602: honor $XDG_DATA_HOME per XDG Base Directory spec, falling
+        // back to $HOME/.local/share only when XDG_DATA_HOME is unset or
+        // empty. Managed Linux environments and Flatpak/snap-style sandboxes
+        // depend on this override to point apps at their own data prefix.
+        if let Ok(xdg) = std::env::var("XDG_DATA_HOME") {
+            if !xdg.is_empty() {
+                return Ok(PathBuf::from(xdg).join("promptibrary"));
+            }
+        }
         let home = std::env::var("HOME")
             .map_err(|_| AppError::new(AppErrorKind::Internal, "HOME env var not set"))?;
         Ok(PathBuf::from(home).join(".local/share/promptibrary"))
