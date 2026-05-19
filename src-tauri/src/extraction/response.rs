@@ -57,10 +57,15 @@ static SECRET_PATTERNS: Lazy<Vec<(&'static str, Regex)>> = Lazy::new(|| {
         ("aws_key", Regex::new(r"AKIA[0-9A-Z]{16}").unwrap()),
         ("slack_bot_token", Regex::new(r"xox[baprs]-[A-Za-z0-9-]{10,}").unwrap()),
         ("github_token", Regex::new(r"gh[pousr]_[A-Za-z0-9]{30,}").unwrap()),
+        // SCA-715: narrow with `\b` word boundaries so the keyword can't
+        // match inside `mytoken_name`, `apikey_id`, etc. — those phrases
+        // appear constantly in valid auth-API docs. We still reject any
+        // unambiguous `secret: <32+ char blob>` shape that's almost
+        // certainly a credential pasted into source material.
         (
             "generic_kv",
             Regex::new(
-                r#"(?i)(?:key|token|secret|bearer)\s*[:=]\s*['"]?[A-Za-z0-9+/=_-]{32,}"#,
+                r#"(?i)\b(?:api[_-]?key|access[_-]?token|secret[_-]?key|bearer[_-]?token|client[_-]?secret)\b\s*[:=]\s*['"]?[A-Za-z0-9+/=_-]{32,}"#,
             )
             .unwrap(),
         ),
@@ -364,12 +369,33 @@ mod tests {
     #[test]
     fn generic_kv_near_key_word_rejected() {
         let leak_body = format!(
-            "Configure secret: AAAA1111BBBB2222CCCC3333DDDD4444 then {}",
+            "Configure api_key: AAAA1111BBBB2222CCCC3333DDDD4444 then {}",
             "x".repeat(BODY_MIN)
         );
         let raw = good_candidate("Refactor X for perf", &leak_body);
         let err = parse_and_validate(&raw).unwrap_err();
         assert!(err.iter().any(|e| matches!(e, ValidationError::SecretLeak { .. })));
+    }
+
+    #[test]
+    fn generic_kv_does_not_false_positive_on_auth_api_prose() {
+        // SCA-715 — prompts that mention `mytoken` or `api_key_name` in
+        // prose must NOT be rejected. The pre-narrowing pattern would
+        // hit on `(?i)(?:key|token|secret|bearer)\s*[:=]\s*…` which fires
+        // on any place those words appeared with a long alphanum.
+        let safe_body = format!(
+            "Document the auth flow: the `mytoken` parameter accepts a string longer than 32 chars (like AAAA1111BBBB2222CCCC3333DDDD4444). The `secret_name` field stores the same. {}",
+            "x".repeat(BODY_MIN)
+        );
+        let raw = good_candidate("Refactor X for perf", &safe_body);
+        // Should NOT trip the secret scanner.
+        let result = parse_and_validate(&raw);
+        if let Err(errs) = &result {
+            assert!(
+                !errs.iter().any(|e| matches!(e, ValidationError::SecretLeak { .. })),
+                "auth-API prose with no real credential must not trip the secret scanner"
+            );
+        }
     }
 
     #[test]
