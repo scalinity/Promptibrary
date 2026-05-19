@@ -188,23 +188,33 @@ pub async fn delete_all_run_history(
 
     let (vault, db) = current_vault_db(&services).await?;
 
-    // 1. Drop runs rows. `telemetry_events` cascades via the FK
-    //    (migration 0005_fk_cascade declares ON DELETE CASCADE).
-    let runs_res = sqlx::query("DELETE FROM runs")
-        .execute(&db)
-        .await
-        .map_err(AppError::from)?;
-    let runs_deleted = runs_res.rows_affected();
-
-    // 2. Recursively delete transcript files under the vault's runs/
-    //    directory. The directory itself is preserved so the next run
-    //    can drop a fresh transcript without re-mkdir gymnastics.
+    // SCA-732 — FS-first ordering. The pre-fix design ran the DB
+    // DELETE first (auto-commit), then the FS walk. Any FS error
+    // mid-walk left the DB drained while transcripts remained
+    // orphaned, and the user had no signal that the partial state
+    // existed (the second invocation reported runs_deleted: 0).
+    //
+    // FS-first means: a walk failure surfaces BEFORE we touch the
+    // DB, so a retry sees the runs + transcripts still consistent.
+    // The transaction wrapping the DELETE is belt-and-suspenders:
+    // even though `DELETE FROM runs` is one statement, opening an
+    // explicit tx documents the atomicity intent for the next
+    // contributor and makes rollback explicit if the commit ever
+    // fails (e.g. WAL flush error on a network FS).
     let runs_dir = vault.runs_dir();
     let (files_deleted, bytes_freed) = if runs_dir.exists() {
         delete_transcript_files(&runs_dir).await?
     } else {
         (0, 0)
     };
+
+    let mut tx = db.begin().await.map_err(AppError::from)?;
+    let runs_res = sqlx::query("DELETE FROM runs")
+        .execute(&mut *tx)
+        .await
+        .map_err(AppError::from)?;
+    let runs_deleted = runs_res.rows_affected();
+    tx.commit().await.map_err(AppError::from)?;
 
     Ok(DeleteAllRunHistoryResult {
         runs_deleted,
@@ -330,6 +340,31 @@ mod tests {
         // Root itself preserved; subdirs gone.
         assert!(root.exists());
         assert!(!root.join("2026").exists());
+    }
+
+    /// SCA-732 invariant: if the FS walk fails partway through,
+    /// `delete_all_run_history` must NOT have touched the DB. The
+    /// pre-fix design ran `DELETE FROM runs` first (auto-commit),
+    /// then the walk — any FS error left the DB drained while
+    /// transcripts remained orphaned. The fix re-orders FS-first so
+    /// a walk failure surfaces before the DB transaction opens.
+    ///
+    /// We exercise this at the helper-function granularity: a
+    /// non-existent vault subdir makes `read_dir` return ENOENT, and
+    /// the test asserts we get the propagated Err without having
+    /// touched anything. The full end-to-end test (real DB + real
+    /// vault) is gated on the L3 runs-persistence reconciliation;
+    /// this helper test is the most we can assert without a live
+    /// AppServices ManagedState.
+    #[tokio::test]
+    async fn delete_transcript_files_returns_err_on_missing_root() {
+        let tmp = tempfile::tempdir().unwrap();
+        let nonexistent = tmp.path().join("does-not-exist");
+        let result = delete_transcript_files(&nonexistent).await;
+        assert!(
+            result.is_err(),
+            "expected Err on missing root, got {result:?}"
+        );
     }
 
     #[test]
