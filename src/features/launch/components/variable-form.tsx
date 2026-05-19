@@ -8,18 +8,18 @@ import { useMemo } from "react";
 
 import { VariableControl } from "./variable-control";
 import { useLaunchDraftStore } from "@/features/launch/stores/launch-draft-store";
-import { useLaunchValidation } from "@/features/launch/hooks/use-launch-validation";
+import type { LaunchValidation } from "@/features/launch/hooks/use-launch-validation";
 import type { Prompt } from "@/shared/types/prompt";
 
 interface Props {
   prompt: Prompt;
+  validation: LaunchValidation;
 }
 
-export function VariableForm({ prompt }: Props): React.JSX.Element {
+export function VariableForm({ prompt, validation }: Props): React.JSX.Element {
   const values = useLaunchDraftStore((s) => s.values);
   const setValue = useLaunchDraftStore((s) => s.setValue);
   const clearValue = useLaunchDraftStore((s) => s.clearValue);
-  const validation = useLaunchValidation(prompt);
 
   const ordered = useMemo(
     () => [...prompt.variables].sort((a, b) => a.order - b.order),

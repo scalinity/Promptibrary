@@ -11,6 +11,7 @@ import { InlineTweakEditor } from "./inline-tweak-editor";
 import { PermissionFlagsEditor } from "./permission-flags-editor";
 import { McpConfigEditor } from "./mcp-config-editor";
 import { useLaunchDraftStore } from "@/features/launch/stores/launch-draft-store";
+import { useLaunchValidation } from "@/features/launch/hooks/use-launch-validation";
 import type { Prompt } from "@/shared/types/prompt";
 
 interface LaunchDrawerProps {
@@ -19,6 +20,9 @@ interface LaunchDrawerProps {
 
 export function LaunchDrawer({ prompt }: LaunchDrawerProps): React.JSX.Element {
   const close = useLaunchDraftStore((s) => s.close);
+  // SCA-654 — single source of validation truth for the drawer; passed
+  // down to VariableForm (for field errors) and LaunchButton (for ready).
+  const validation = useLaunchValidation(prompt);
 
   return (
     <aside
@@ -67,7 +71,7 @@ export function LaunchDrawer({ prompt }: LaunchDrawerProps): React.JSX.Element {
           gap: "var(--sp-6)",
         }}
       >
-        <VariableForm prompt={prompt} />
+        <VariableForm prompt={prompt} validation={validation} />
         <WorkingDirPicker prompt={prompt} />
         <InlineTweakEditor prompt={prompt} />
         <PermissionFlagsEditor prompt={prompt} />
@@ -79,7 +83,7 @@ export function LaunchDrawer({ prompt }: LaunchDrawerProps): React.JSX.Element {
           borderTop: "var(--hairline)",
         }}
       >
-        <LaunchButton prompt={prompt} />
+        <LaunchButton prompt={prompt} validation={validation} />
       </footer>
     </aside>
   );

@@ -7,17 +7,17 @@ import { useState } from "react";
 import { useHotkeys } from "react-hotkeys-hook";
 
 import { useStartLaunch } from "@/features/launch/hooks/use-start-launch";
-import { useLaunchValidation } from "@/features/launch/hooks/use-launch-validation";
+import type { LaunchValidation } from "@/features/launch/hooks/use-launch-validation";
 import { useLaunchDraftStore } from "@/features/launch/stores/launch-draft-store";
 import type { Prompt } from "@/shared/types/prompt";
 import { isAppError } from "@/shared/api/errors";
 
 interface Props {
   prompt: Prompt;
+  validation: LaunchValidation;
 }
 
-export function LaunchButton({ prompt }: Props): React.JSX.Element {
-  const validation = useLaunchValidation(prompt);
+export function LaunchButton({ prompt, validation }: Props): React.JSX.Element {
   const overrides = useLaunchDraftStore((s) => s.overrides);
   const values = useLaunchDraftStore((s) => s.values);
   const inlineTweak = useLaunchDraftStore((s) => s.inlineTweakBody);
