@@ -1,0 +1,136 @@
+name: release
+
+# Triggered on any `v*` tag push. Builds the platform bundles, signs
+# them with the Tauri-signer keypair, generates `latest.json`, and
+# uploads everything to a GitHub Release.
+#
+# NO APPLE CODE SIGNING. The macOS bundle is intentionally unsigned by
+# Apple's authority for the V1 personal-use posture (see
+# docs/INSTALLING.md + docs/RELEASING.md + docs/V2-CANDIDATES.md).
+# This workflow has no `APPLE_CERTIFICATE` / `APPLE_ID` / notarytool
+# step — that's a deliberate V2 candidate, not a release-blocker.
+#
+# Security note: every reference to `github.ref_name` / `github.repository`
+# below is bound into a top-level `env:` block first and then consumed
+# from the env, rather than interpolated directly into a `run:`. This
+# pattern is overkill for ref/repository (both are GitHub-validated and
+# can't carry shell metachars in practice), but it sets the precedent so
+# future steps that consume genuinely user-controlled input (PR titles,
+# commit messages) follow the same shape.
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+env:
+  RELEASE_TAG: ${{ github.ref_name }}
+  RELEASE_REPO: ${{ github.repository }}
+
+jobs:
+  release:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            target: universal-apple-darwin
+            args: "--target universal-apple-darwin"
+          - os: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+            args: ""
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Linux Tauri system deps
+        if: matrix.os == 'ubuntu-24.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libxdo-dev \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.os == 'macos-14' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: Cargo cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm typecheck
+
+      - run: pnpm lint
+
+      - run: pnpm test
+
+      - run: cargo test --manifest-path src-tauri/Cargo.toml
+
+      # Visual regression runs only on macOS — cross-platform font
+      # rendering doesn't allow stable Linux baselines. Failure here
+      # blocks the release; the design-system contract is non-optional
+      # on a tagged build.
+      - name: Install Playwright browsers
+        if: matrix.os == 'macos-14'
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Visual regression (macOS gate)
+        if: matrix.os == 'macos-14'
+        run: pnpm test:visual
+
+      # The real build step. Tauri's CLI reads TAURI_SIGNING_PRIVATE_KEY
+      # from the env and signs every bundle in this build with the
+      # configured keypair, dropping a `.sig` file alongside each
+      # bundle. The bundles themselves are intentionally NOT
+      # Apple-signed — see the file-level comment for the rationale.
+      - name: Compose release body
+        id: body
+        env:
+          TAG: ${{ env.RELEASE_TAG }}
+          REPO: ${{ env.RELEASE_REPO }}
+        run: |
+          {
+            echo "body<<EOF"
+            echo "See [CHANGELOG.md](https://github.com/${REPO}/blob/${TAG}/CHANGELOG.md) for the changelog entry."
+            echo ""
+            echo "**First launch on macOS:** the bundle is intentionally unsigned by Apple. See [docs/INSTALLING.md](https://github.com/${REPO}/blob/${TAG}/docs/INSTALLING.md) for the right-click → Open Gatekeeper bypass (one-time per install)."
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build + sign with Tauri signer
+        uses: tauri-apps/tauri-action@v0
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ env.RELEASE_TAG }}
+          releaseName: "Promptibrary ${{ env.RELEASE_TAG }}"
+          releaseBody: ${{ steps.body.outputs.body }}
+          releaseDraft: true
+          prerelease: ${{ contains(github.ref_name, '-rc') || contains(github.ref_name, '-pre') }}
+          includeUpdaterJson: true
+          args: ${{ matrix.args }}
