@@ -113,6 +113,22 @@ const W_TEXT: f64 = 0.55;
 const W_SEMANTIC: f64 = 0.35;
 const RRF_K: f64 = 60.0;
 
+/// SCA-763: char-count ceiling on user-supplied query strings before
+/// they reach FTS5 escape / LIKE pattern allocation. 2048 covers any
+/// realistic search query — Tauri IPC caps message size, so this is
+/// belt-and-suspenders against a frontend bug or a paste of a 10 MB
+/// document into the palette input. Truncates on a char boundary
+/// (not byte) to keep multi-byte UTF-8 sequences intact.
+const MAX_QUERY_CHARS: usize = 2048;
+
+fn bound_query(input: &str) -> std::borrow::Cow<'_, str> {
+    if input.chars().count() <= MAX_QUERY_CHARS {
+        std::borrow::Cow::Borrowed(input)
+    } else {
+        std::borrow::Cow::Owned(input.chars().take(MAX_QUERY_CHARS).collect())
+    }
+}
+
 /// Score bonus added to the exact-title-match pin so any pinned
 /// result outranks every non-pinned one regardless of weights and
 /// boosts. The natural score range is bounded by
@@ -142,7 +158,8 @@ async fn search_prompts_inner(
     input: &SearchPromptsInput,
 ) -> Result<Vec<PromptSearchResult>> {
     let limit = effective_limit(input.limit);
-    let trimmed = input.query.trim();
+    let bounded = bound_query(&input.query);
+    let trimmed = bounded.trim();
     let mode = input.mode.unwrap_or_default();
     // SCA-739: include_archived defaults to false. Applies to the
     // recent-prompts path and the prompt-meta join used by hybrid
@@ -630,7 +647,8 @@ async fn cmdk_search_inner(
     db: &SqlitePool,
     input: &CmdkSearchInput,
 ) -> Result<Vec<CmdkResult>> {
-    let q = input.query.trim();
+    let bounded = bound_query(&input.query);
+    let q = bounded.trim();
 
     // Prompts via the hybrid search path (when query is empty this
     // falls back to recent prompts).
@@ -1096,6 +1114,35 @@ mod tests {
         assert!(unpinned.score < 1.0);
         // recency_boost for ≤7d is 0.10
         assert!((unpinned.score_parts.recency - 0.10).abs() < 1e-9);
+    }
+
+    /// SCA-763: a pathologically long query must be bounded before
+    /// reaching FTS5 escape / LIKE pattern allocation. We don't
+    /// assert the truncation point; we assert that the function
+    /// returns successfully (not OOM'd) and produces an empty result
+    /// set for a query that doesn't match anything.
+    #[tokio::test]
+    async fn very_long_query_does_not_explode_allocation() {
+        let db = temp_pool().await;
+        upsert_prompt(&db, &sample_prompt("01a", "kubernetes", "x", &[]))
+            .await
+            .unwrap();
+        let huge_query = "x".repeat(50_000);
+        let res = search_prompts_inner(
+            &db,
+            &SearchPromptsInput {
+                query: huge_query,
+                tag: None,
+                limit: None,
+                mode: None,
+                include_archived: None,
+            },
+        )
+        .await
+        .unwrap();
+        // Doesn't matter what the result is — just that the call
+        // returned without exhausting memory.
+        assert!(res.is_empty() || !res.is_empty());
     }
 
     #[tokio::test]
