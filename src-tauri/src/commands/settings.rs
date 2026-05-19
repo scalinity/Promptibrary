@@ -13,18 +13,67 @@ use tauri::State;
 use crate::app_state::ManagedState;
 use crate::commands::not_yet_implemented_stub;
 use crate::commands::vault::current_vault_db;
+use crate::domain::prompt::{ClaudeModelId, ClaudePermissionMode, LaunchDestination, VerifierMode};
+use crate::domain::settings::{
+    AppSettings, EffectiveSettings, LocalSettings, VaultSettings, VersionHistorySettings,
+};
 use crate::error::{AppError, AppErrorKind, Result};
 use crate::index::telemetry_repo;
 use crate::settings::keychain::{self, SecretKey};
 use crate::settings::secret_store::SecretStore;
 
+/// SCA-735: `get_settings` returns the in-memory typed `AppSettings`
+/// payload built from the currently-loaded vault path with spec §13
+/// defaults for every other field. The frontend `useSettings()` hook
+/// previously errored on first render because this was a
+/// `not_yet_implemented_stub`.
+///
+/// Disk persistence — local JSON at AppData and vault YAML at
+/// `<vault>/promptibrary/settings.yml` — is intentionally NOT
+/// implemented here. It's V2-deferred per `docs/notes/L5-observations.md`.
+/// Once persistence lands, this function will read/merge those two
+/// sources; for V1 the shape is honest about what's in memory.
 #[tauri::command]
-pub async fn get_settings() -> Result<Value> {
-    not_yet_implemented_stub("commands::settings::get_settings")
+pub async fn get_settings(services: State<'_, ManagedState>) -> Result<AppSettings> {
+    let vault_path = {
+        let state = services.state.read().await;
+        state.vault.as_ref().map(|v| v.vault_root.clone())
+    };
+    Ok(build_default_settings(vault_path))
+}
+
+fn build_default_settings(vault_path: Option<std::path::PathBuf>) -> AppSettings {
+    let local = LocalSettings {
+        vault_path: vault_path.clone(),
+        default_destination: LaunchDestination::ClaudeCodeCli,
+        default_model: ClaudeModelId::ClaudeSonnet46,
+        default_verifier_mode: VerifierMode::Off,
+        default_permission_mode: ClaudePermissionMode::Default,
+        telemetry_enabled: true,
+        update_manifest_url: None,
+        version_history: VersionHistorySettings {
+            rename_detection_window: 200,
+        },
+        recent_prompt_ids: vec![],
+        recent_run_ids: vec![],
+    };
+    let vault = VaultSettings {
+        tag_colors: std::collections::HashMap::new(),
+    };
+    let effective = EffectiveSettings {
+        local: local.clone(),
+        vault_settings: vault.clone(),
+    };
+    AppSettings {
+        local,
+        vault,
+        effective,
+    }
 }
 
 #[tauri::command]
 pub async fn update_settings(_input: Value) -> Result<Value> {
+    // V2-deferred: disk persistence to local JSON + vault YAML.
     not_yet_implemented_stub("commands::settings::update_settings")
 }
 

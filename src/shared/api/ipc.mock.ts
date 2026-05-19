@@ -406,15 +406,45 @@ export const revertPromptToCommit: typeof Real.revertPromptToCommit = () =>
 // ─── System ───────────────────────────────────────────────────────────────
 
 export const probeDependencies: typeof Real.probeDependencies = () =>
-  ok([
-    { name: "claude", ok: true, version: "1.4.0", message: null },
-    { name: "git", ok: true, version: "2.43.0", message: null },
-    { name: "yt-dlp", ok: false, version: null, message: "not on PATH" },
-    { name: "keychain", ok: true, version: null, message: null },
-    { name: "sqlite", ok: true, version: "3.46.0", message: null },
-  ]);
+  ok({
+    probes: [
+      { name: "claude", status: "ok" as const, version: "1.4.0", installHint: null },
+      { name: "git", status: "ok" as const, version: "2.43.0", installHint: null },
+      {
+        name: "yt-dlp",
+        status: "missing" as const,
+        version: null,
+        installHint: "Install yt-dlp: brew install yt-dlp",
+      },
+      { name: "keychain", status: "ok" as const, version: null, installHint: null },
+      { name: "sqlite", status: "ok" as const, version: "3.46.0", installHint: null },
+    ],
+  });
 
 export const openPath: typeof Real.openPath = () => ok(undefined);
+
+export const revealInTerminal: typeof Real.revealInTerminal = () => ok(undefined);
+
+// Telemetry destructive actions
+export const clearTelemetryCache: typeof Real.clearTelemetryCache = () =>
+  ok({ eventsDeleted: 0 });
+
+export const deleteAllRunHistory: typeof Real.deleteAllRunHistory = ({
+  confirmation,
+}) => {
+  if (confirmation !== "delete") {
+    return Promise.reject({
+      kind: "SettingsInvalid",
+      message: "delete_all_run_history requires confirmation == \"delete\"",
+      details: {},
+    });
+  }
+  return ok({
+    runsDeleted: 0,
+    transcriptFilesDeleted: 0,
+    transcriptBytesFreed: 0,
+  });
+};
 
 // Tag fixtures re-exported so the sidebar mock route can read them directly.
 export const _TAG_FIXTURES = TAG_FIXTURES;

@@ -1,5 +1,5 @@
-// Dependency probe diagnostics — runs `probe_dependencies` (L0 stub for
-// now; the L5 implementation populates real version + path info).
+// Dependency probe diagnostics — runs `probe_dependencies` from the
+// L5 system commands (SCA-734 aligned wire shape).
 
 import { useDependencyProbes } from "@/features/settings/hooks/use-dependency-probes";
 
@@ -19,7 +19,7 @@ export function DiagnosticsPanel(): React.JSX.Element {
             color: "var(--status-warn)",
           }}
         >
-          probing not yet implemented — L5 wires this surface.
+          probing failed — check that a vault is selected and try again.
         </p>
       )}
       {probes.data != null && (
@@ -32,48 +32,51 @@ export function DiagnosticsPanel(): React.JSX.Element {
             gap: 8,
           }}
         >
-          {probes.data.map((p) => (
-            <li
-              key={p.name}
-              style={{
-                background: "var(--bg-sunken)",
-                border: "var(--hairline)",
-                borderRadius: "var(--r-md)",
-                padding: "var(--sp-3) var(--sp-4)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-              }}
-            >
-              <span
+          {probes.data.probes.map((p) => {
+            const ok = p.status === "ok";
+            return (
+              <li
+                key={p.name}
                 style={{
-                  fontFamily: "var(--font-mono)",
-                  fontSize: "12.5px",
-                  color: "var(--ink-primary)",
+                  background: "var(--bg-sunken)",
+                  border: "var(--hairline)",
+                  borderRadius: "var(--r-md)",
+                  padding: "var(--sp-3) var(--sp-4)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
                 }}
               >
                 <span
-                  aria-hidden="true"
                   style={{
-                    color: p.ok ? "var(--status-running)" : "var(--status-warn)",
-                    marginRight: 6,
+                    fontFamily: "var(--font-mono)",
+                    fontSize: "12.5px",
+                    color: "var(--ink-primary)",
                   }}
                 >
-                  {p.ok ? "✓" : "⚠"}
+                  <span
+                    aria-hidden="true"
+                    style={{
+                      color: ok ? "var(--status-running)" : "var(--status-warn)",
+                      marginRight: 6,
+                    }}
+                  >
+                    {ok ? "✓" : "⚠"}
+                  </span>
+                  {p.name}
                 </span>
-                {p.name}
-              </span>
-              <span
-                style={{
-                  fontFamily: "var(--font-mono)",
-                  fontSize: "11px",
-                  color: "var(--ink-tertiary)",
-                }}
-              >
-                {p.version ?? p.message ?? "no info"}
-              </span>
-            </li>
-          ))}
+                <span
+                  style={{
+                    fontFamily: "var(--font-mono)",
+                    fontSize: "11px",
+                    color: "var(--ink-tertiary)",
+                  }}
+                >
+                  {p.version ?? p.installHint ?? "no info"}
+                </span>
+              </li>
+            );
+          })}
         </ul>
       )}
     </section>

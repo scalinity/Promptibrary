@@ -439,15 +439,48 @@ export const revertPromptToCommit = (args: RevertPromptArgs) =>
 
 // ─── System ───────────────────────────────────────────────────────────────
 
+export type ProbeStatus = "ok" | "missing" | "error";
+
 export interface DependencyProbe {
   name: string;
-  ok: boolean;
+  status: ProbeStatus;
   version: string | null;
-  message: string | null;
+  installHint: string | null;
+}
+
+export interface DependencyProbeOutput {
+  probes: DependencyProbe[];
 }
 
 export const probeDependencies = () =>
-  invoke<DependencyProbe[]>("probe_dependencies");
+  invoke<DependencyProbeOutput>("probe_dependencies");
 
 export const openPath = (path: AbsolutePath) =>
   invoke<void>("open_path", { input: { path } });
+
+export const revealInTerminal = (path: AbsolutePath) =>
+  invoke<void>("reveal_in_terminal", { input: { path } });
+
+// ─── Telemetry destructive actions (patched spec §13) ─────────────────────
+
+export interface ClearTelemetryCacheResult {
+  eventsDeleted: number;
+}
+
+export const clearTelemetryCache = () =>
+  invoke<ClearTelemetryCacheResult>("clear_telemetry_cache");
+
+export interface DeleteAllRunHistoryArgs {
+  /** Must be the literal string "delete" — the Rust backend rejects
+   * anything else with AppErrorKind::SettingsInvalid. */
+  confirmation: string;
+}
+
+export interface DeleteAllRunHistoryResult {
+  runsDeleted: number;
+  transcriptFilesDeleted: number;
+  transcriptBytesFreed: number;
+}
+
+export const deleteAllRunHistory = (args: DeleteAllRunHistoryArgs) =>
+  invoke<DeleteAllRunHistoryResult>("delete_all_run_history", { input: args });
