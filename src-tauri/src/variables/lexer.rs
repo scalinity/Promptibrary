@@ -28,10 +28,23 @@ impl OffsetMap {
         Self { byte, utf16 }
     }
 
+    /// Convert a byte offset to its UTF-16 code-unit offset.
+    ///
+    /// `byte` MUST land on a UTF-8 char boundary — the lexer only ever
+    /// calls this at codepoint boundaries (block_start / end positions,
+    /// which align by construction). A non-boundary byte triggers a
+    /// `debug_assert!` so future misuse surfaces in dev builds; release
+    /// builds fall back to the next char boundary's UTF-16 offset, which
+    /// matches the previous behavior. SCA-604.
     pub fn to_utf16(&self, byte: usize) -> usize {
         match self.byte.binary_search(&byte) {
             Ok(i) => self.utf16[i],
             Err(i) => {
+                debug_assert!(
+                    false,
+                    "OffsetMap::to_utf16 called with non-boundary byte offset {} (next boundary at index {})",
+                    byte, i
+                );
                 if i >= self.utf16.len() {
                     *self.utf16.last().unwrap_or(&0)
                 } else {
