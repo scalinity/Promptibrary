@@ -62,7 +62,7 @@ pub async fn select_vault(
     }
     let vault = VaultPaths::new(input.vault_root.clone());
     repair_missing_dirs(&vault)?;
-    let db = open_pool_for_vault(&vault).await?;
+    let db = open_index_pool().await?;
     run_migrations(&db).await?;
 
     let mut state = services.state.write().await;
@@ -158,8 +158,14 @@ pub(crate) async fn current_vault_db(
     Ok((vault, db))
 }
 
-async fn open_pool_for_vault(vault: &VaultPaths) -> Result<SqlitePool> {
-    let _ = vault;
+/// Open the L1 single-vault index pool at the canonical app-support path.
+///
+/// SCA-620: this took a `&VaultPaths` parameter that was immediately
+/// dropped (`let _ = vault;`). L1 uses a single shared index DB regardless
+/// of which vault is open; multi-vault DB routing would land in L5 with a
+/// hash-keyed filename. Renamed to `open_index_pool` and dropped the
+/// unused parameter.
+async fn open_index_pool() -> Result<SqlitePool> {
     let dir = app_support_dir()?;
     std::fs::create_dir_all(&dir).map_err(AppError::from)?;
     let path = dir.join("index.sqlite");
