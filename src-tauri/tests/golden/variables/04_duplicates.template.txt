@@ -1,0 +1,1 @@
+Use {{text:name}} once. Use {{text:name}} twice. Then conflict {{file:name}}.

@@ -80,13 +80,31 @@ pub fn lex_template(template: &str, offsets: &OffsetMap) -> (Vec<Token>, Vec<Lex
             }
             let block_start = i;
             let mut found: Option<usize> = None;
+            let mut nested_open = false;
             let mut j = i + 2;
             while j + 1 < bytes.len() {
                 if bytes[j] == b'}' && bytes[j + 1] == b'}' {
                     found = Some(j + 2);
                     break;
                 }
+                if bytes[j] == b'{' && bytes[j + 1] == b'{' {
+                    // Another `{{` before any `}}` means the current ref is
+                    // unclosed. Treat as unclosed at block_start and re-enter
+                    // the outer loop at the nested `{{` position.
+                    nested_open = true;
+                    break;
+                }
                 j += 1;
+            }
+            if nested_open {
+                errors.push(LexError {
+                    start_byte: block_start,
+                    start_utf16: offsets.to_utf16(block_start),
+                });
+                push_text(&mut tokens, template, offsets, block_start, j);
+                text_start = j;
+                i = j;
+                continue;
             }
             // Edge: closing `}}` at the very end.
             if found.is_none() && bytes.len() >= i + 4 {

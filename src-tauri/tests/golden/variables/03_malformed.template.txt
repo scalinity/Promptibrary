@@ -1,0 +1,7 @@
+prefix {{file:foo
+{{unknown}}
+{{text:9bad}}
+{{select}}
+{{select:}}
+{{number:n?min=10,max=1}}
+{{select:dup=a|a|b}}

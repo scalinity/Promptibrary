@@ -1,0 +1,7 @@
+Refactor `{{file:target_file}}` inside `{{folder:repo_root?mustBeWritable=true}}`.
+Module: {{text:module_name?maxLength=120}}
+Depth: {{select:refactor_depth=minimal|moderate|deep}}
+Tests: {{bool:write_tests}}
+Iterations: {{number:max_iterations?min=1,max=12,integer=true}}
+Acceptance:
+{{multiline:acceptance_criteria}}
