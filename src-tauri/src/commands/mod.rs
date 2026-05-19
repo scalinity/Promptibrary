@@ -49,3 +49,18 @@ pub mod extraction;
 pub mod settings;
 pub mod git;
 pub mod system;
+
+use crate::error::{AppError, Result};
+
+/// Helper for L2-L5 stub commands. Logs a tracing warning so dev builds
+/// surface premature frontend wiring (SCA-599), then returns the
+/// standard `not_yet_implemented` error.
+pub fn not_yet_implemented_stub<T>(command: &'static str) -> Result<T> {
+    tracing::warn!(
+        command,
+        "IPC stub invoked — the backing layer (L2-L5) has not landed yet"
+    );
+    Err(AppError::internal(format!(
+        "not_yet_implemented: {command}"
+    )))
+}
