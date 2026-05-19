@@ -337,6 +337,13 @@ fn validate_select(
         if v.required {
             return Err(vec![ValidationIssue::Required { key: v.key }]);
         }
+        // SCA-595: optional select must accept empty as "left blank".
+        // The previous code fell through to the options lookup and
+        // returned SelectValueNotInOptions, breaking spec §5.
+        return Ok(ResolvedVariableValue::Select {
+            key: v.key,
+            value: raw,
+        });
     }
     let allowed: Vec<String> = v.options.iter().map(|o| o.value.clone()).collect();
     if !allowed.iter().any(|a| a == &raw) {
@@ -556,6 +563,33 @@ mod tests {
             value: serde_json::json!("Z"),
         });
         assert!(matches!(bad, Err(ref i) if i.iter().any(|x| matches!(x, ValidationIssue::SelectValueNotInOptions { .. }))));
+    }
+
+    #[test]
+    fn optional_select_accepts_empty_value() {
+        // SCA-595 regression: an optional select with empty input must
+        // resolve to "" without erroring against the declared options.
+        let v = SelectVariable {
+            key: "depth".into(),
+            label: "Depth".into(),
+            description: None,
+            required: false,
+            default_value: None,
+            order: 0,
+            source: VariableSource::Parsed,
+            options: vec![SelectOption {
+                value: "a".into(),
+                label: "A".into(),
+            }],
+        };
+        let r = validate_value(ValidateValueInput {
+            variable: Variable::Select(v),
+            value: serde_json::json!(""),
+        });
+        assert!(matches!(
+            r,
+            Ok(ResolvedVariableValue::Select { ref value, .. }) if value.is_empty()
+        ));
     }
 
     #[test]
