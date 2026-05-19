@@ -1,9 +1,12 @@
-// Route: `/import` — full L4 state machine per spec §12.
+// Route: `/import` — renders the canonical modal overlay per
+// `Promptibrary Design System/screens/03-import.html`. The modal floats
+// above the app shell (which keeps painting in the background) and
+// closes by navigating back to the previous route.
 //
-// Phases: empty → detected → preview_ready → extracting → candidates_ready
-//                → editing_candidate → saved
-//                                    \
-//                                     fetch_failed | extraction_failed
+// Phases: empty → detected → preview_ready → extracting →
+// candidates_ready → saving → saved (+ fetch_failed / extraction_failed).
+// All transitions live in `useImportStore`. The route owns side-effects
+// (IPC calls) and keyboard shortcuts; everything else is pure render.
 
 import { useCallback, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -16,10 +19,10 @@ import {
   type ExtractionFailure,
 } from "@/shared/api/ipc";
 import { isAppError } from "@/shared/api/errors";
-import { EmptyState } from "@/shared/ui/empty-state";
+
+import "@/features/import/import.css";
 
 import { useImportStore } from "@/features/import/stores/import-store";
-import { CandidateEditor } from "@/features/import/components/candidate-editor";
 import { CandidateList } from "@/features/import/components/candidate-list";
 import { ImportFailurePanel } from "@/features/import/components/import-failure-panel";
 import { SaveCandidateDialog } from "@/features/import/components/save-candidate-dialog";
@@ -32,19 +35,20 @@ export function ImportRoute(): React.JSX.Element {
   const detection = useImportStore((s) => s.detection);
   const preview = useImportStore((s) => s.preview);
   const candidates = useImportStore((s) => s.candidates);
-  const draft = useImportStore((s) => s.draft);
+  const selectedIndices = useImportStore((s) => s.selectedIndices);
+  const savedRecords = useImportStore((s) => s.savedRecords);
   const failure = useImportStore((s) => s.failure);
   const url = useImportStore((s) => s.url);
   const extractionMode = useImportStore((s) => s.extractionMode);
-  const savedPromptId = useImportStore((s) => s.savedPromptId);
-  const savedPromptSlug = useImportStore((s) => s.savedPromptSlug);
+  const statusLine = useImportStore((s) => s.statusLine);
 
   const setPreview = useImportStore((s) => s.setPreview);
   const setExtracting = useImportStore((s) => s.setExtracting);
   const setCandidates = useImportStore((s) => s.setCandidates);
+  const setSaving = useImportStore((s) => s.setSaving);
+  const setSaved = useImportStore((s) => s.setSaved);
   const setFetchFailed = useImportStore((s) => s.setFetchFailed);
   const setExtractionFailed = useImportStore((s) => s.setExtractionFailed);
-  const setSaved = useImportStore((s) => s.setSaved);
   const reset = useImportStore((s) => s.reset);
 
   const [topError, setTopError] = useState<string | null>(null);
@@ -92,291 +96,260 @@ export function ImportRoute(): React.JSX.Element {
     setExtractionFailed,
   ]);
 
-  const saveDraft = useCallback(async () => {
-    if (!draft || !preview) return;
+  const saveSelected = useCallback(async () => {
+    if (!preview || selectedIndices.size === 0) return;
+    setSaving();
     try {
-      const saved = await saveExtractedPrompt({
-        candidate: draft,
-        source: preview.source,
-      });
-      setSaved(saved.id, saved.slug);
+      const chosen = Array.from(selectedIndices)
+        .sort((a, b) => a - b)
+        .map((idx) => candidates[idx])
+        .filter(
+          (c): c is (typeof candidates)[number] => c != null,
+        );
+      const saved = await Promise.all(
+        chosen.map((candidate) =>
+          saveExtractedPrompt({ candidate, source: preview.source }),
+        ),
+      );
+      setSaved(
+        saved.map((p) => ({ id: p.id, slug: p.slug, title: p.title })),
+      );
     } catch (e: unknown) {
       setExtractionFailed({
         kind: "extraction_failed",
         reason: isAppError(e) ? e.message : "save failed",
       });
     }
-  }, [draft, preview, setSaved, setExtractionFailed]);
+  }, [
+    preview,
+    candidates,
+    selectedIndices,
+    setSaving,
+    setSaved,
+    setExtractionFailed,
+  ]);
 
-  // ⌘Enter advances by phase; Esc cancels back to empty.
+  const close = useCallback(() => {
+    reset();
+    navigate(-1);
+  }, [reset, navigate]);
+
+  // ⌘Enter advances by phase; Esc closes the modal (equivalent to
+  // pressing the X button in the header).
   useHotkeys(
     "meta+enter, ctrl+enter",
     (e) => {
       e.preventDefault();
       if (phase === "preview_ready") void runExtraction();
-      else if (phase === "editing_candidate") void saveDraft();
+      else if (phase === "candidates_ready" && selectedIndices.size > 0) {
+        void saveSelected();
+      }
     },
     { enableOnFormTags: true },
-    [phase, runExtraction, saveDraft],
+    [phase, selectedIndices.size, runExtraction, saveSelected],
   );
 
   useHotkeys(
     "esc",
     (e) => {
-      if (phase !== "empty") {
-        e.preventDefault();
-        reset();
-      }
+      e.preventDefault();
+      close();
     },
     { enableOnFormTags: true },
-    [phase, reset],
+    [close],
   );
 
-  return (
-    <section
-      className="detail-pane"
-      aria-label="Import"
-      style={{ padding: "var(--sp-7) var(--sp-7)", overflow: "auto" }}
-    >
-      <div style={{ maxWidth: 720, margin: "0 auto", display: "grid", gap: 20 }}>
-        <header>
-          <div className="section-label">import</div>
-          <h1
-            style={{
-              fontFamily: "var(--font-display)",
-              fontWeight: 500,
-              fontSize: 26,
-              letterSpacing: "-0.015em",
-              margin: "4px 0 8px",
-            }}
-          >
-            Pull a prompt from a URL
-          </h1>
-          <p
-            style={{
-              fontFamily: "var(--font-ui)",
-              fontSize: 13.5,
-              color: "var(--ink-secondary)",
-              lineHeight: 1.55,
-            }}
-          >
-            YouTube, X/Twitter, or any article. The extractor is the LLM —
-            it reads the page and proposes one or more launch-profile
-            candidates you can edit before saving.
-          </p>
-        </header>
+  const candidateCount =
+    phase === "candidates_ready" ||
+    phase === "saving" ||
+    phase === "saved"
+      ? candidates.length
+      : null;
+  const selectedCount = selectedIndices.size;
+  const saveLabel =
+    phase === "saving"
+      ? "saving…"
+      : selectedCount === 1
+        ? "save 1 prompt"
+        : `save ${selectedCount} prompts`;
 
-        <StageBar phase={phase} />
-
-        <SourceUrlForm
-          onError={setTopError}
-          onDetectionReady={() => void fetchPreview()}
-        />
-
-        {detection != null && <DetectionChip detection={detection} />}
-
-        {topError != null && (
-          <div
-            role="alert"
-            style={{
-              padding: "var(--sp-3) var(--sp-4)",
-              background: "var(--bg-sunken)",
-              border: "1px solid var(--status-warn)",
-              borderRadius: "var(--r-md)",
-              fontFamily: "var(--font-mono)",
-              fontSize: 12,
-              color: "var(--status-warn)",
-            }}
-          >
-            {topError}
-          </div>
-        )}
-
-        {phase === "preview_ready" && preview != null && (
-          <SourcePreview
-            content={preview}
-            onExtract={() => void runExtraction()}
-            extracting={false}
-          />
-        )}
-
-        {phase === "extracting" && preview != null && (
-          <SourcePreview content={preview} onExtract={() => {}} extracting={true} />
-        )}
-
-        {phase === "candidates_ready" && (
-          <CandidateList candidates={candidates} />
-        )}
-
-        {phase === "editing_candidate" && draft != null && (
-          <CandidateEditor candidate={draft} onConfirm={() => void saveDraft()} />
-        )}
-
-        {phase === "saved" &&
-          savedPromptId != null &&
-          savedPromptSlug != null &&
-          draft != null && (
-            <SaveCandidateDialog
-              promptId={savedPromptId}
-              title={draft.title}
-              slug={savedPromptSlug}
-              onImportAnother={() => {
-                reset();
-                navigate("/import");
-              }}
-            />
-          )}
-
-        {(phase === "fetch_failed" || phase === "extraction_failed") &&
-          failure != null && (
-            <ImportFailurePanel
-              failure={failure}
-              onRetry={
-                phase === "fetch_failed"
-                  ? () => void fetchPreview()
-                  : phase === "extraction_failed"
-                    ? () => void runExtraction()
-                    : undefined
-              }
-              onReset={() => reset()}
-            />
-          )}
-
-        {phase === "empty" && (
-          <EmptyState
-            glyph="∿"
-            title="Paste any URL to start"
-            body="YouTube videos, X threads, blog posts — Promptibrary turns them into launch profiles."
-          />
-        )}
-      </div>
-    </section>
-  );
-}
-
-function DetectionChip({
-  detection,
-}: {
-  detection: NonNullable<
-    ReturnType<typeof useImportStore.getState>["detection"]
-  >;
-}) {
   return (
     <div
-      style={{
-        padding: "var(--sp-3) var(--sp-4)",
-        background: "var(--bg-sunken)",
-        border: "var(--hairline)",
-        borderRadius: "var(--r-md)",
-        display: "flex",
-        alignItems: "center",
-        gap: 12,
+      className="modal-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="import-modal-title"
+      onClick={(e) => {
+        // Click-outside closes; clicks inside the modal stop propagation.
+        if (e.target === e.currentTarget) close();
       }}
     >
-      <span
-        style={{
-          fontFamily: "var(--font-mono)",
-          fontSize: 10.5,
-          letterSpacing: "0.06em",
-          textTransform: "uppercase",
-          color: "var(--accent)",
-        }}
-      >
-        {detection.kind}
-      </span>
-      <span
-        style={{
-          fontFamily: "var(--font-mono)",
-          fontSize: 12.5,
-          color: "var(--ink-secondary)",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          whiteSpace: "nowrap",
-        }}
-      >
-        {detection.kind === "unsupported"
-          ? `unsupported: ${detection.reason}`
-          : (detection.canonicalUrl ?? "")}
-      </span>
+      <div className="modal import-modal">
+        <div className="modal-header">
+          <h2 className="modal-title" id="import-modal-title">
+            Import prompts from link
+          </h2>
+          <button
+            type="button"
+            className="icon-btn"
+            aria-label="Close"
+            onClick={close}
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="modal-body">
+          <div className="import-stage">
+            <StageBar phase={phase} />
+
+            <SourceUrlForm
+              onError={setTopError}
+              onDetectionReady={() => void fetchPreview()}
+            />
+
+            {detection && detection.kind !== "unsupported" && preview != null ? (
+              <SourcePreview
+                content={preview}
+                candidateCount={candidateCount}
+                onExtract={() => void runExtraction()}
+                extracting={phase === "extracting"}
+              />
+            ) : null}
+
+            {statusLine != null ? (
+              <div className="extract-line">{statusLine}</div>
+            ) : null}
+
+            {topError != null ? (
+              <div
+                className="extract-line"
+                role="alert"
+                style={{ color: "var(--status-warn)" }}
+              >
+                {topError}
+              </div>
+            ) : null}
+          </div>
+
+          {phase === "candidates_ready" || phase === "saving" ? (
+            <CandidateList candidates={candidates} />
+          ) : null}
+
+          {phase === "saved" ? <SaveCandidateDialog saved={savedRecords} /> : null}
+
+          {(phase === "fetch_failed" || phase === "extraction_failed") &&
+          failure != null ? (
+            <div style={{ padding: "20px 24px" }}>
+              <ImportFailurePanel
+                failure={failure}
+                onRetry={
+                  phase === "fetch_failed"
+                    ? () => void fetchPreview()
+                    : phase === "extraction_failed"
+                      ? () => void runExtraction()
+                      : undefined
+                }
+                onReset={() => reset()}
+              />
+            </div>
+          ) : null}
+        </div>
+
+        <ImportFooter
+          phase={phase}
+          selectedCount={selectedCount}
+          totalCount={candidates.length}
+          saveLabel={saveLabel}
+          onCancel={close}
+          onSave={() => void saveSelected()}
+          onImportAnother={() => reset()}
+        />
+      </div>
     </div>
   );
 }
 
+function ImportFooter({
+  phase,
+  selectedCount,
+  totalCount,
+  saveLabel,
+  onCancel,
+  onSave,
+  onImportAnother,
+}: {
+  phase: string;
+  selectedCount: number;
+  totalCount: number;
+  saveLabel: string;
+  onCancel: () => void;
+  onSave: () => void;
+  onImportAnother: () => void;
+}): React.JSX.Element | null {
+  if (phase === "candidates_ready" || phase === "saving") {
+    return (
+      <div className="modal-footer">
+        <span className="import-footer-status">
+          {selectedCount} of {totalCount} selected · will be tagged{" "}
+          <span className="tag" style={{ margin: "0 4px" }}>
+            imported
+          </span>
+        </span>
+        <button type="button" className="btn" onClick={onCancel}>
+          cancel
+        </button>
+        <button
+          type="button"
+          className="btn-launch compact"
+          onClick={onSave}
+          disabled={selectedCount === 0 || phase === "saving"}
+        >
+          {saveLabel}
+        </button>
+      </div>
+    );
+  }
+  if (phase === "saved") {
+    return (
+      <div className="modal-footer">
+        <span className="import-footer-status">imported.</span>
+        <button type="button" className="btn" onClick={onImportAnother}>
+          import another
+        </button>
+        <button type="button" className="btn-launch compact" onClick={onCancel}>
+          done
+        </button>
+      </div>
+    );
+  }
+  // Empty / detected / preview_ready / extracting / failure phases —
+  // no footer actions yet; closing happens via the X or Esc.
+  return null;
+}
+
 function StageBar({ phase }: { phase: string }) {
   const order: { id: string; label: string; phases: string[] }[] = [
+    { id: "source", label: "source", phases: ["empty", "detected", "preview_ready"] },
+    { id: "extracting", label: "extracting", phases: ["extracting"] },
     {
-      id: "source",
-      label: "source",
-      phases: ["empty", "detected", "preview_ready"],
+      id: "review",
+      label: "review",
+      phases: ["candidates_ready", "saving"],
     },
-    { id: "extract", label: "extract", phases: ["extracting", "candidates_ready"] },
-    { id: "review", label: "review", phases: ["editing_candidate"] },
     { id: "save", label: "save", phases: ["saved"] },
   ];
   const activeIdx = order.findIndex((s) => s.phases.includes(phase));
   return (
-    <div
-      role="navigation"
-      aria-label="Import stages"
-      style={{
-        display: "flex",
-        gap: 18,
-        fontFamily: "var(--font-mono)",
-        fontSize: 10.5,
-        letterSpacing: "0.04em",
-        color: "var(--ink-dim)",
-        textTransform: "lowercase",
-        marginBottom: 4,
-      }}
-    >
+    <div className="stage-bar" aria-label="Import stages">
       {order.map((s, i) => {
-        const isActive = i === activeIdx;
-        const isDone = i < activeIdx && activeIdx >= 0;
-        const color = isActive
-          ? "var(--accent-warm)"
-          : isDone
-            ? "var(--ink-secondary)"
-            : "var(--ink-dim)";
+        const className =
+          i === activeIdx ? "step now" : i < activeIdx ? "step done" : "step";
         return (
-          <span
-            key={s.id}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              color,
-            }}
-          >
-            <span
-              style={{
-                display: "inline-grid",
-                placeItems: "center",
-                width: 18,
-                height: 18,
-                borderRadius: "50%",
-                border: isActive
-                  ? "1px solid var(--accent)"
-                  : isDone
-                    ? "1px solid var(--accent-deep)"
-                    : "1px solid var(--border-subtle)",
-                color: isActive
-                  ? "var(--bg-base)"
-                  : isDone
-                    ? "var(--accent)"
-                    : "var(--ink-dim)",
-                background: isActive
-                  ? "var(--accent)"
-                  : isDone
-                    ? "var(--accent-tint)"
-                    : "transparent",
-              }}
-            >
-              {i + 1}
-            </span>
+          <span key={s.id} className={className}>
+            <span className="n">{i + 1}</span>
             {s.label}
-            {i < order.length - 1 ? (
-              <span style={{ color: "var(--ink-dim)", marginLeft: 4 }}>→</span>
-            ) : null}
+            {i < order.length - 1 ? <span className="sep">→</span> : null}
           </span>
         );
       })}

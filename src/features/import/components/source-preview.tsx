@@ -1,136 +1,89 @@
-// Preview of normalized source content: title, author, chunk count, and
-// the extract button that fires the mode-aware LLM call.
+// Source preview badge row — matches the `.source-badge` markup in the
+// mockup. Two pills side by side: the live-pulsing "detected · <kind>"
+// indicator on the left, the muted "N candidate prompts" pill on the
+// right (only shown once candidates exist). The "extract candidates"
+// CTA + mode toggle sit beside the badges.
 
 import type { FetchedSourceContent } from "@/shared/api/ipc";
 import { ExtractionModeToggle } from "@/features/import/components/extraction-mode-toggle";
 
 interface Props {
   content: FetchedSourceContent;
+  candidateCount: number | null;
   onExtract: () => void;
   extracting: boolean;
 }
 
+function sourceKindLabel(content: FetchedSourceContent): string {
+  // The mockup renders e.g. "detected · github gist · markdown". We
+  // approximate with kind + author/title hint where available so the
+  // badge stays specific without misrepresenting source-detection.
+  const kind = content.source.kind.replace("_", "/");
+  if (content.source.kind === "youtube") {
+    return `detected · youtube · ${content.author ?? "video"}`;
+  }
+  if (content.source.kind === "x_twitter") {
+    return `detected · x/twitter · ${content.author ?? "post"}`;
+  }
+  if (content.source.kind === "article") {
+    const host = (() => {
+      try {
+        return new URL(content.canonicalUrl).hostname.replace(/^www\./, "");
+      } catch {
+        return null;
+      }
+    })();
+    return `detected · article${host ? ` · ${host}` : ""}`;
+  }
+  return `detected · ${kind}`;
+}
+
 export function SourcePreview({
   content,
+  candidateCount,
   onExtract,
   extracting,
 }: Props): React.JSX.Element {
-  const kind = content.source.kind;
   return (
-    <section
-      aria-label="Source preview"
-      style={{
-        display: "grid",
-        gap: 12,
-        padding: "var(--sp-4)",
-        background: "var(--bg-sunken)",
-        border: "var(--hairline)",
-        borderRadius: "var(--r-md)",
-      }}
-    >
-      <header
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 12,
-        }}
-      >
-        <span
-          className="source-badge"
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 6,
-            padding: "4px 8px",
-            border: "1px solid var(--accent-deep)",
-            background: "var(--accent-tint)",
-            borderRadius: "var(--r-xs)",
-            fontFamily: "var(--font-mono)",
-            fontSize: 10.5,
-            color: "var(--accent-warm)",
-            letterSpacing: "0.04em",
-            textTransform: "lowercase",
-          }}
-        >
-          detected · {kind.replace("_", "/")}
-        </span>
-        <span
-          style={{
-            fontFamily: "var(--font-mono)",
-            fontSize: 10.5,
-            color: "var(--ink-tertiary)",
-            letterSpacing: "0.04em",
-          }}
-        >
-          {content.chunks.length} chunk{content.chunks.length === 1 ? "" : "s"}
+    <>
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+        <span className="source-badge">
+          <span className="dot" aria-hidden="true" />
+          {sourceKindLabel(content)}
           {content.cached ? " · cached" : ""}
         </span>
-      </header>
-
-      <div style={{ display: "grid", gap: 4 }}>
-        {content.title != null ? (
-          <h2
-            style={{
-              margin: 0,
-              fontFamily: "var(--font-display)",
-              fontWeight: 500,
-              fontSize: 18,
-              color: "var(--ink-primary)",
-              letterSpacing: "-0.01em",
-            }}
-          >
-            {content.title}
-          </h2>
+        {candidateCount != null ? (
+          <span className="source-badge muted">
+            {candidateCount} candidate {candidateCount === 1 ? "prompt" : "prompts"}
+          </span>
         ) : null}
-        {content.author != null ? (
-          <div
-            style={{
-              fontFamily: "var(--font-ui)",
-              fontSize: 12,
-              color: "var(--ink-secondary)",
-            }}
-          >
-            {content.author}
-          </div>
-        ) : null}
-        <div
-          style={{
-            fontFamily: "var(--font-mono)",
-            fontSize: 11,
-            color: "var(--ink-tertiary)",
-            marginTop: 6,
-            whiteSpace: "pre-wrap",
-            maxHeight: 180,
-            overflow: "auto",
-          }}
-        >
-          {content.text.slice(0, 1200)}
-          {content.text.length > 1200 ? "…" : ""}
-        </div>
       </div>
 
-      <footer
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 12,
-          flexWrap: "wrap",
-        }}
-      >
-        <ExtractionModeToggle />
-        <button
-          type="button"
-          className="btn"
-          onClick={onExtract}
-          disabled={extracting}
-          data-testid="import-extract-btn"
+      {/* Mode toggle + extract CTA only show before extraction. After
+          extraction the CTA disappears; users save via the modal footer. */}
+      {candidateCount == null ? (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+            flexWrap: "wrap",
+          }}
         >
-          {extracting ? "extracting…" : "extract candidates"}{" "}
-          <span className="kbd">⌘↵</span>
-        </button>
-      </footer>
-    </section>
+          <ExtractionModeToggle />
+          <button
+            type="button"
+            className="btn"
+            onClick={onExtract}
+            disabled={extracting}
+            data-testid="import-extract-btn"
+          >
+            {extracting ? "extracting…" : "extract candidates"}{" "}
+            <span className="kbd">⌘↵</span>
+          </button>
+        </div>
+      ) : null}
+    </>
   );
 }

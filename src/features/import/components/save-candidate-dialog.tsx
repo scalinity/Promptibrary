@@ -1,72 +1,49 @@
-// Saved confirmation panel — shown after `save_extracted_prompt` succeeds.
-// Provides the slug + path the prompt was written to and a button to
-// jump straight to the prompt detail view.
+// Saved-confirmation panel — rendered inside the modal body after a
+// bulk save. Lists every saved prompt with a deep-link, and offers
+// "import another" / "done" CTAs in the modal footer (handled by the
+// route container, not here).
 
 import { Link } from "react-router-dom";
 
+import type { SavedRecord } from "@/features/import/stores/import-store";
+
 interface Props {
-  promptId: string;
-  title: string;
-  slug: string;
-  onImportAnother: () => void;
+  saved: SavedRecord[];
 }
 
-export function SaveCandidateDialog({
-  promptId,
-  title,
-  slug,
-  onImportAnother,
-}: Props): React.JSX.Element {
+export function SaveCandidateDialog({ saved }: Props): React.JSX.Element {
+  if (saved.length === 0) {
+    return (
+      <div
+        className="extract-line"
+        style={{ padding: "20px 24px", paddingLeft: "46px" }}
+      >
+        nothing was saved.
+      </div>
+    );
+  }
   return (
-    <section
-      aria-label="Saved"
-      style={{
-        display: "grid",
-        gap: 12,
-        padding: "var(--sp-4)",
-        background: "var(--bg-sunken)",
-        border: "1px solid var(--accent-deep)",
-        borderRadius: "var(--r-md)",
-      }}
+    <div
+      style={{ display: "grid", gap: 0, padding: 0 }}
+      role="list"
+      aria-label="Saved prompts"
     >
-      <header style={{ display: "grid", gap: 4 }}>
-        <span className="section-label" style={{ color: "var(--accent)", padding: 0 }}>
-          saved
-        </span>
-        <h2
-          style={{
-            margin: 0,
-            fontFamily: "var(--font-display)",
-            fontWeight: 500,
-            fontSize: 18,
-            color: "var(--ink-primary)",
-          }}
-        >
-          {title}
-        </h2>
-        <div
-          style={{
-            fontFamily: "var(--font-mono)",
-            fontSize: 11,
-            color: "var(--ink-tertiary)",
-          }}
-        >
-          slug: {slug}
-        </div>
-      </header>
-      <footer style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-        <button type="button" className="btn" onClick={onImportAnother}>
-          import another
-        </button>
+      {saved.map((p) => (
         <Link
-          to={`/prompt/${promptId}`}
-          className="btn-launch"
+          key={p.id}
+          to={`/prompt/${p.id}`}
+          className="cand on"
           style={{ textDecoration: "none" }}
           data-testid="import-saved-link"
         >
-          open prompt
+          <div className="check" aria-hidden="true" />
+          <div>
+            <div className="title">{p.title}</div>
+            <div className="preview">slug: {p.slug}</div>
+          </div>
+          <div className="meta">open ↗</div>
         </Link>
-      </footer>
-    </section>
+      ))}
+    </div>
   );
 }

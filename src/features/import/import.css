@@ -1,0 +1,192 @@
+/* Promptibrary /import — screen-local styles ported verbatim from
+   `Promptibrary Design System/screens/03-import.html`'s inline <style>
+   block. The canonical design system at `.claude/skills/promptibrary-design/`
+   keeps the universal primitives (modal, btn, btn-launch, input, kbd,
+   tag) in `app.css`; the import-specific classes were never promoted
+   because they're screen-scoped, so we keep them here next to the
+   import feature code.
+
+   Rule of thumb: every selector below mirrors the mockup 1:1. If a
+   value drifts, fix the mockup or fix this file — they're a pair, not
+   independent sources of truth. */
+
+.import-modal { width: 720px; }
+.import-modal .modal-body {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.import-stage {
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  border-bottom: var(--hairline);
+}
+
+.stage-bar {
+  display: flex;
+  gap: 18px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  color: var(--ink-dim);
+  text-transform: lowercase;
+}
+.stage-bar .step { display: inline-flex; align-items: center; gap: 6px; }
+.stage-bar .step .n {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid var(--border-subtle);
+  color: var(--ink-dim);
+}
+.stage-bar .step.done { color: var(--ink-secondary); }
+.stage-bar .step.done .n {
+  border-color: var(--accent-deep);
+  color: var(--accent);
+  background: var(--accent-tint);
+}
+.stage-bar .step.now { color: var(--accent-warm); }
+.stage-bar .step.now .n {
+  border-color: var(--accent);
+  color: var(--bg-base);
+  background: var(--accent);
+}
+.stage-bar .sep { color: var(--ink-dim); align-self: center; }
+
+.url-row { display: grid; grid-template-columns: 1fr auto; gap: 10px; }
+
+.source-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--accent-deep);
+  border-radius: var(--r-xs);
+  background: var(--accent-tint);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--accent-warm);
+  letter-spacing: 0.02em;
+  align-self: flex-start;
+}
+.source-badge.muted {
+  border-color: var(--border-subtle);
+  background: transparent;
+  color: var(--ink-tertiary);
+}
+.source-badge .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--status-running);
+  box-shadow: 0 0 6px var(--status-running);
+  animation: pb-dot-glow 1800ms ease-in-out infinite;
+}
+
+.extract-line {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-tertiary);
+  letter-spacing: 0.01em;
+  padding-left: 22px;
+  position: relative;
+}
+.extract-line::before {
+  content: "∿";
+  position: absolute;
+  left: 0;
+  color: var(--accent-dim);
+}
+
+.candidates {
+  max-height: 290px;
+  overflow: auto;
+}
+.cand {
+  display: grid;
+  grid-template-columns: 20px 1fr auto;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 24px;
+  border-bottom: var(--hairline);
+  cursor: pointer;
+  background: transparent;
+  border-left: 0;
+  border-right: 0;
+  border-top: 0;
+  text-align: left;
+  width: 100%;
+  color: inherit;
+  font: inherit;
+}
+.cand:hover, .cand:focus-visible { background: var(--bg-base); }
+.cand:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.cand .check {
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--border-mid);
+  border-radius: 3px;
+  margin-top: 3px;
+}
+.cand.on .check {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--bg-base);
+  display: grid;
+  place-items: center;
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+.cand.on .check::after {
+  content: "✓";
+  color: oklch(0.18 0.02 80);
+}
+.cand .title {
+  font-family: var(--font-ui);
+  font-weight: 500;
+  font-size: 13.5px;
+  color: var(--ink-primary);
+  margin-bottom: 4px;
+}
+.cand .preview {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ink-tertiary);
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cand .meta {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-dim);
+  letter-spacing: 0.04em;
+  align-self: center;
+  text-transform: lowercase;
+}
+
+/* Footer left-side selection-status text */
+.import-footer-status {
+  margin-right: auto;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ink-tertiary);
+  letter-spacing: 0.02em;
+}
+
+/* Compact launch button used in the import footer per the mockup
+   (`height: 30px; padding: 0 14px; font-size: 11px`). */
+.btn-launch.compact {
+  height: 30px;
+  padding: 0 14px;
+  font-size: 11px;
+}

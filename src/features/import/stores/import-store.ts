@@ -1,17 +1,12 @@
-// Zustand store for the /import state machine per spec §12.
+// Zustand store for the canonical /import flow per
+// `Promptibrary Design System/screens/03-import.html`.
 //
-// State flow:
-//   Empty  ─url→ Detected ─fetch→ PreviewReady ─extract→ Extracting
-//                                                            │
-//                                                            ▼
-//                                                     CandidatesReady
-//                                                            │
-//                                          ─pick(idx)→ EditingCandidate
-//                                                            │
-//                                          ─save────→ Saved
-//
-//   FetchFailed / ExtractionFailed are terminal-ish; user resets via the
-//   panel and starts over by entering a new URL.
+// State machine collapses to: empty → detected → preview_ready →
+// extracting → candidates_ready → saving → saved (+ fetch_failed /
+// extraction_failed branches). No per-candidate editor — the spec
+// mockup goes straight from candidates list (multi-select with
+// checkboxes) to "save N prompts". Users edit after save via the
+// canonical prompt-route editor.
 
 import { create } from "zustand";
 
@@ -29,26 +24,28 @@ export type ImportPhase =
   | "preview_ready"
   | "extracting"
   | "candidates_ready"
-  | "editing_candidate"
+  | "saving"
   | "saved"
   | "fetch_failed"
   | "extraction_failed";
+
+export interface SavedRecord {
+  id: string;
+  slug: string;
+  title: string;
+}
 
 interface ImportState {
   url: string;
   detection: SourceDetection | null;
   preview: FetchedSourceContent | null;
   candidates: CandidatePrompt[];
-  selectedCandidateIndex: number | null;
-  /** Live-edited candidate (candidate-editor patches; save commits). */
-  draft: CandidatePrompt | null;
-  savedPromptId: string | null;
-  /// Final slug as written by the backend (may differ from the client-
-  /// side guess when slug-collision suffixes apply). Set together with
-  /// `savedPromptId` so the "Saved" panel doesn't render a stale slug.
-  savedPromptSlug: string | null;
+  selectedIndices: Set<number>;
+  savedRecords: SavedRecord[];
   failure: ExtractionFailure | null;
   extractionMode: ExtractionMode;
+  /** Free-form status line under the stage bar — drives `.extract-line`. */
+  statusLine: string | null;
   phase: ImportPhase;
 
   setUrl: (url: string) => void;
@@ -56,12 +53,14 @@ interface ImportState {
   setPreview: (content: FetchedSourceContent) => void;
   setExtracting: () => void;
   setCandidates: (candidates: CandidatePrompt[]) => void;
-  selectCandidate: (index: number) => void;
-  patchDraft: (patch: Partial<CandidatePrompt>) => void;
+  toggleCandidate: (index: number) => void;
+  setAllCandidatesSelected: (selected: boolean) => void;
   setExtractionMode: (mode: ExtractionMode) => void;
+  setStatusLine: (line: string | null) => void;
+  setSaving: () => void;
+  setSaved: (saved: SavedRecord[]) => void;
   setFetchFailed: (failure: ExtractionFailure) => void;
   setExtractionFailed: (failure: ExtractionFailure) => void;
-  setSaved: (promptId: string, slug: string) => void;
   reset: () => void;
 }
 
@@ -70,12 +69,11 @@ const initial = {
   detection: null,
   preview: null,
   candidates: [] as CandidatePrompt[],
-  selectedCandidateIndex: null,
-  draft: null,
-  savedPromptId: null,
-  savedPromptSlug: null,
+  selectedIndices: new Set<number>(),
+  savedRecords: [] as SavedRecord[],
   failure: null,
   extractionMode: "standard" as ExtractionMode,
+  statusLine: null,
   phase: "empty" as ImportPhase,
 };
 
@@ -92,42 +90,54 @@ export const useImportStore = create<ImportState>((set, get) => ({
     }),
 
   setPreview: (preview) =>
-    set({ preview, phase: "preview_ready", failure: null }),
+    set({ preview, phase: "preview_ready", failure: null, statusLine: null }),
 
-  setExtracting: () => set({ phase: "extracting", failure: null }),
-
-  setCandidates: (candidates) =>
+  setExtracting: () =>
     set({
-      candidates,
-      phase: "candidates_ready",
-      selectedCandidateIndex: null,
-      draft: null,
+      phase: "extracting",
       failure: null,
+      statusLine: "calling anthropic · streaming candidates",
     }),
 
-  selectCandidate: (index) => {
-    const candidate = get().candidates[index];
-    if (!candidate) return;
+  setCandidates: (candidates) =>
+    // Default to every candidate selected — mirrors the mockup
+    // (3/5 selected). The user un-checks the ones they don't want.
     set({
-      selectedCandidateIndex: index,
-      draft: { ...candidate },
-      phase: "editing_candidate",
-    });
+      candidates,
+      selectedIndices: new Set(candidates.map((_, i) => i)),
+      phase: "candidates_ready",
+      failure: null,
+      statusLine: null,
+    }),
+
+  toggleCandidate: (index) => {
+    const next = new Set(get().selectedIndices);
+    if (next.has(index)) {
+      next.delete(index);
+    } else {
+      next.add(index);
+    }
+    set({ selectedIndices: next });
   },
 
-  patchDraft: (patch) => {
-    const draft = get().draft;
-    if (!draft) return;
-    set({ draft: { ...draft, ...patch } });
+  setAllCandidatesSelected: (selected) => {
+    if (selected) {
+      set({ selectedIndices: new Set(get().candidates.map((_, i) => i)) });
+    } else {
+      set({ selectedIndices: new Set() });
+    }
   },
 
   setExtractionMode: (mode) => set({ extractionMode: mode }),
 
+  setStatusLine: (statusLine) => set({ statusLine }),
+
+  setSaving: () => set({ phase: "saving" }),
+
+  setSaved: (savedRecords) => set({ phase: "saved", savedRecords }),
+
   setFetchFailed: (failure) => set({ phase: "fetch_failed", failure }),
   setExtractionFailed: (failure) => set({ phase: "extraction_failed", failure }),
 
-  setSaved: (promptId, slug) =>
-    set({ phase: "saved", savedPromptId: promptId, savedPromptSlug: slug }),
-
-  reset: () => set({ ...initial }),
+  reset: () => set({ ...initial, selectedIndices: new Set() }),
 }));

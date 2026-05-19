@@ -1,5 +1,5 @@
-// URL input + "detect" button. Calls `detectSourceTyped` and hands the
-// result to the store; the detected chip renders below.
+// URL input row inside the import modal. Matches the `.url-row` markup
+// from `Promptibrary Design System/screens/03-import.html`.
 
 import { useState } from "react";
 
@@ -9,12 +9,6 @@ import { useImportStore } from "@/features/import/stores/import-store";
 
 interface Props {
   onError?: (message: string) => void;
-  /**
-   * Fires after a successful detection that produced a supported source
-   * kind. The caller (ImportRoute) uses this to drive the preview fetch
-   * from an event handler instead of a `useEffect` watching the store —
-   * see CLAUDE.md's strict no-useEffect rule.
-   */
   onDetectionReady?: () => void;
 }
 
@@ -22,7 +16,17 @@ export function SourceUrlForm({ onError, onDetectionReady }: Props): React.JSX.E
   const url = useImportStore((s) => s.url);
   const setUrl = useImportStore((s) => s.setUrl);
   const setDetection = useImportStore((s) => s.setDetection);
+  const phase = useImportStore((s) => s.phase);
+  const reset = useImportStore((s) => s.reset);
   const [pending, setPending] = useState(false);
+
+  // Once a source has been fetched, the URL row shows "change" instead
+  // of "detect" (matching the mockup) — clicking resets the store back
+  // to the empty phase for a new URL.
+  const showChange =
+    phase === "preview_ready" ||
+    phase === "candidates_ready" ||
+    phase === "saving";
 
   const submit = async () => {
     setPending(true);
@@ -42,10 +46,7 @@ export function SourceUrlForm({ onError, onDetectionReady }: Props): React.JSX.E
   };
 
   return (
-    <div
-      className="url-row"
-      style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 10 }}
-    >
+    <div className="url-row">
       <input
         className="input"
         value={url}
@@ -53,22 +54,29 @@ export function SourceUrlForm({ onError, onDetectionReady }: Props): React.JSX.E
         placeholder="https://…"
         autoFocus
         onKeyDown={(e) => {
-          if (e.key === "Enter" && url.trim().length > 0) {
+          if (e.key === "Enter" && !showChange && url.trim().length > 0) {
             e.preventDefault();
             void submit();
           }
         }}
         aria-label="Source URL"
         data-testid="import-url-input"
+        readOnly={showChange}
       />
-      <button
-        type="button"
-        className="btn"
-        disabled={url.trim().length === 0 || pending}
-        onClick={() => void submit()}
-      >
-        {pending ? "detecting…" : "detect"} <span className="kbd">⌘↵</span>
-      </button>
+      {showChange ? (
+        <button type="button" className="btn" onClick={() => reset()}>
+          change
+        </button>
+      ) : (
+        <button
+          type="button"
+          className="btn"
+          disabled={url.trim().length === 0 || pending}
+          onClick={() => void submit()}
+        >
+          {pending ? "detecting…" : "detect"} <span className="kbd">⌘↵</span>
+        </button>
+      )}
     </div>
   );
 }
