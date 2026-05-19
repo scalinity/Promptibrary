@@ -275,7 +275,7 @@ export interface PromptSearchResult {
 export const searchPrompts = (args: SearchPromptsArgs) =>
   invoke<PromptSearchResult[]>("search_prompts", { input: args });
 
-export type CmdkResultKind = "prompt" | "run" | "action" | "route" | "setting";
+export type CmdkResultKind = "prompt" | "run" | "action" | "route";
 
 export interface CmdkResult {
   kind: CmdkResultKind;

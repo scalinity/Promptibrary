@@ -154,9 +154,6 @@ export function CmdKPalette(): React.JSX.Element {
         if (target) navigate(target);
         break;
       }
-      case "setting":
-        if (item.subtitle) navigate(item.subtitle);
-        break;
     }
     close();
   };

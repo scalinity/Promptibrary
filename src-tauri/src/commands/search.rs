@@ -575,7 +575,6 @@ pub enum CmdkResultKind {
     Run,
     Action,
     Route,
-    Setting,
 }
 
 #[derive(Debug, Clone, Serialize)]
