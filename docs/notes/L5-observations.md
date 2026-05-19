@@ -96,6 +96,37 @@ This is a previous-layer gap (L3 tagged complete but missing this surface), so p
 
 Recommend Option A — the persistence belongs to L3 conceptually and the runs table is what L5 reads, not what L5 owns. The reviewer makes the call.
 
+### Update 2026-05-19 19:00 — actual L3 scope is bigger than just runs-persistence
+
+While starting the SCA-785 DEF-4 fix I discovered the L3 gap is much broader than the L5-telemetry surfacing implied:
+
+- **Every file under `src-tauri/src/launch/` is a 3-line stub.** `claude_cli.rs`, `pty_session.rs`, `pty_pool.rs`, `prompt_injector.rs`, `transcript_writer.rs`, `signals.rs`, `process_probe.rs` — all `not_yet_implemented_stub` placeholders.
+- **`portable-pty = "=0.9.0"`** is commented out in `src-tauri/Cargo.toml` with the note `TODO(L3): re-enable when launch pipeline lands`.
+- **`commands::launches::{start_launch, stop_run, send_terminal_input, resize_terminal}`** are all `not_yet_implemented_stub` IPC handlers.
+
+L3 was tagged `layer-3-complete` but the launch pipeline doesn't exist. The L5 telemetry surface was built against synthetic test data; the runs table is never populated in production because nothing inserts into it.
+
+**What SCA-785 lands:** the `runs_repo::{insert_run, update_run_status, complete_run}` storage surface with 5 unit tests. This is the surface the future L3 launch pipeline will call. It's correct and tested in isolation; it just doesn't have any production caller yet.
+
+**What SCA-785 does NOT land:** the actual L3 launch pipeline. That requires:
+1. Uncommenting `portable-pty = "=0.9.0"` in Cargo.toml.
+2. Implementing `launch::pty_session` (PTY spawn with `CommandBuilder::new(claude_path)`, no shell wrapper per CLAUDE.md).
+3. Implementing `launch::prompt_injector` (event-driven bracketed paste after first PTY output).
+4. Implementing `launch::signals` (graceful SIGINT → SIGINT → SIGTERM → SIGKILL escalation, force SIGTERM → SIGKILL).
+5. Implementing `launch::transcript_writer` (ANSI normalisation, 24-bit color SGR preservation, OSC 8 hyperlinks preserved, OSC clipboard/title stripped).
+6. Implementing `launch::pty_pool` (active-run cap per LaunchDefaults).
+7. Wiring `commands::launches::{start_launch, stop_run, send_terminal_input, resize_terminal}` against the above.
+8. Hooking `runs_repo` writes at the three lifecycle moments (start, status transitions, terminal).
+9. Hooking `telemetry_repo::record_event` at the same moments.
+10. The §15 fake-claude integration test that exercises the whole pipeline.
+
+This is a genuine L3-from-scratch implementation effort, not the L5-deferral cleanup I expected. The right path for the human reviewer:
+
+- **Option A (recommended):** Amend `layer-3-complete` with a dedicated L3-reconciliation session that follows `Prompts/L3.md` from the top. Tag rotates from `layer-3-complete` → new commit ID.
+- **Option B:** Treat the gap as carry-forward, mark V1 as launch-disabled, and ship the rest of V1 with a clear "launching prompts not yet supported" UI state.
+
+The runs_repo surface from SCA-785 is safe under either option — it's correct as a standalone DB surface that the launch pipeline (whenever it lands) will use.
+
 ---
 
 ## End-of-session summary (2026-05-19)
