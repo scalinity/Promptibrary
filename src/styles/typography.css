@@ -30,7 +30,7 @@
 :root {
   --font-display: "Boska", "Iowan Old Style", "Charter", Georgia, serif;
   --font-ui:      "Switzer", "Helvetica Neue", -apple-system, system-ui, sans-serif;
-  --font-mono:    "JetBrains Mono", "JetBrains Mono Variable", ui-monospace, "SF Mono", Menlo, monospace;
+  --font-mono:    "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
 }
 
 /* ---------- Scale (utility classes) ---------- */
