@@ -783,13 +783,15 @@ fn filter_static(
     query: &str,
     limit: usize,
 ) -> Vec<CmdkResult> {
-    let q = query.to_lowercase();
+    // SCA-766: rename to `needle` so a future reader doesn't confuse
+    // this local with the outer `q` rebinding in cmdk_search_inner.
+    let needle = query.to_lowercase();
     items
         .iter()
         .filter(|(_id, title, subtitle)| {
-            q.is_empty()
-                || title.to_lowercase().contains(&q)
-                || subtitle.to_lowercase().contains(&q)
+            needle.is_empty()
+                || title.to_lowercase().contains(&needle)
+                || subtitle.to_lowercase().contains(&needle)
         })
         .take(limit)
         .map(|(id, title, subtitle)| CmdkResult {
