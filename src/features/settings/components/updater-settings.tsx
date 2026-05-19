@@ -4,10 +4,10 @@
 // renders the panel structure and the "check" button (which surfaces a
 // pending-layer toast on click).
 
-import { useState } from "react";
+import { useToast } from "@/shared/ui/use-toast";
 
 export function UpdaterSettings(): React.JSX.Element {
-  const [toast, setToast] = useState<string | null>(null);
+  const { toast, showToast } = useToast(2000);
   return (
     <section id="updater" aria-labelledby="updater-h">
       <div className="section-label" id="updater-h">
@@ -54,10 +54,7 @@ export function UpdaterSettings(): React.JSX.Element {
           <button
             type="button"
             className="btn"
-            onClick={() => {
-              setToast("auto-update check activates in L5");
-              window.setTimeout(() => setToast(null), 2000);
-            }}
+            onClick={() => showToast("auto-update check activates in L5")}
           >
             check for updates
           </button>

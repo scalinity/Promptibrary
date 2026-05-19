@@ -9,6 +9,7 @@ import { save as saveDialog } from "@tauri-apps/plugin-dialog";
 import { exportPrompt, type ExportFormat } from "@/shared/api/ipc";
 import { asAbsolutePath } from "@/shared/types/ids";
 import type { Prompt } from "@/shared/types/prompt";
+import { useToast } from "@/shared/ui/use-toast";
 
 interface Props {
   prompt: Prompt;
@@ -16,7 +17,7 @@ interface Props {
 
 export function ExportMenu({ prompt }: Props): React.JSX.Element {
   const [pending, setPending] = useState<ExportFormat | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
+  const { toast, showToast } = useToast(2400);
 
   const onExport = async (format: ExportFormat) => {
     const ext = format === "markdown" ? "md" : "json";
@@ -32,12 +33,11 @@ export function ExportMenu({ prompt }: Props): React.JSX.Element {
         format,
         destination: asAbsolutePath(result),
       });
-      setToast(`exported to ${dest}`);
+      showToast(`exported to ${dest}`);
     } catch {
-      setToast("export failed");
+      showToast("export failed");
     } finally {
       setPending(null);
-      window.setTimeout(() => setToast(null), 2400);
     }
   };
 

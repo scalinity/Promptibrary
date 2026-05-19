@@ -6,8 +6,10 @@ import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { setSecret } from "@/shared/api/ipc";
+import { isAppError } from "@/shared/api/errors";
 import { useSecretStatus } from "@/features/settings/hooks/use-settings";
 import { settingsKeys } from "@/shared/api/queryKeys";
+import { useToast } from "@/shared/ui/use-toast";
 import type { SecretKey } from "@/shared/types/settings";
 
 interface Field {
@@ -57,16 +59,24 @@ function SecretRow({
   exists: boolean;
 }): React.JSX.Element {
   const [value, setValue] = useState("");
-  const [savedLabel, setSavedLabel] = useState<string | null>(null);
+  const { toast, showToast } = useToast(1800);
   const queryClient = useQueryClient();
 
   const save = useMutation({
     mutationFn: (v: string) => setSecret({ key: field.key, value: v }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: settingsKeys.secrets() });
-      setSavedLabel("saved");
+      showToast("saved");
       setValue("");
-      window.setTimeout(() => setSavedLabel(null), 1800);
+    },
+    // SCA-641 — surface failures instead of swallowing. Keep the value so
+    // the user doesn't have to retype.
+    onError: (err: unknown) => {
+      if (isAppError(err)) {
+        showToast(`failed: ${err.message}`);
+      } else {
+        showToast("failed");
+      }
     },
   });
 
@@ -101,7 +111,7 @@ function SecretRow({
             letterSpacing: "0.04em",
           }}
         >
-          {savedLabel ?? (exists ? "•••••••• stored" : "not set")}
+          {toast ?? (exists ? "•••••••• stored" : "not set")}
         </span>
       </label>
       <p

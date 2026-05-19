@@ -10,6 +10,7 @@
 import { useState } from "react";
 
 import { useSettings } from "@/features/settings/hooks/use-settings";
+import { useToast } from "@/shared/ui/use-toast";
 
 export function TelemetrySettings(): React.JSX.Element {
   const settings = useSettings();
@@ -66,7 +67,7 @@ export function TelemetrySettings(): React.JSX.Element {
 }
 
 function ClearCacheAction(): React.JSX.Element {
-  const [toast, setToast] = useState<string | null>(null);
+  const { toast, showToast } = useToast(2400);
   return (
     <DestructiveCard
       label="clear telemetry cache"
@@ -74,17 +75,14 @@ function ClearCacheAction(): React.JSX.Element {
       confirmLabel="clear cache"
       kind="warn"
       toast={toast}
-      onConfirm={() => {
-        setToast("available in L5 — UI scaffold only");
-        window.setTimeout(() => setToast(null), 2400);
-      }}
+      onConfirm={() => showToast("available in L5 — UI scaffold only")}
     />
   );
 }
 
 function DeleteHistoryAction(): React.JSX.Element {
   const [typed, setTyped] = useState("");
-  const [toast, setToast] = useState<string | null>(null);
+  const { toast, showToast } = useToast(2400);
   const armed = typed === "delete";
   return (
     <div
@@ -132,9 +130,8 @@ function DeleteHistoryAction(): React.JSX.Element {
           className="btn-stop"
           disabled={!armed}
           onClick={() => {
-            setToast("available in L5 — UI scaffold only");
+            showToast("available in L5 — UI scaffold only");
             setTyped("");
-            window.setTimeout(() => setToast(null), 2400);
           }}
         >
           delete history
