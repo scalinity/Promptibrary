@@ -196,42 +196,16 @@ async fn hybrid(
         };
         let text_component = text_rank.get(id).copied().unwrap_or(0.0);
         let stats = usage.get(id).copied().unwrap_or(UsageStats::default());
-
-        let recency = recency_boost(stats.last_used_at, now);
-        let usage_b = usage_boost(stats.launch_count);
-
-        // semantic component is held at 0 until the embedding service
-        // lands. We still feed the weighted sum so the score formula
-        // matches §9 exactly.
-        let semantic = 0.0;
-        // SCA-737: full Unicode case-folding on BOTH sides. Pre-fix
-        // mixed `query.to_lowercase()` (Unicode) with
-        // `eq_ignore_ascii_case` (ASCII-only), so titles with
-        // accented chars (São Paulo, Übung) never pinned even on an
-        // exact-typed query. Pure-Unicode comparison handles every
-        // case-foldable script consistently.
-        let pin = meta.title.to_lowercase() == query_lower;
-
-        // Pin score: stays well clear of the natural score range
-        // (see EXACT_TITLE_PIN_BONUS docstring for the math).
-        let pin_bonus = if pin { EXACT_TITLE_PIN_BONUS } else { 0.0 };
-
-        let score =
-            pin_bonus + W_TEXT * text_component + W_SEMANTIC * semantic + recency + usage_b;
-
-        out.push(PromptSearchResult {
-            prompt_id: id.clone(),
-            title: meta.title.clone(),
-            snippet: snippets.remove(id).unwrap_or(None),
-            score,
-            score_parts: ScoreParts {
-                text: text_component,
-                semantic,
-                recency,
-                usage: usage_b,
-                exact_title_pin: pin,
-            },
-        });
+        let snippet = snippets.remove(id).unwrap_or(None);
+        out.push(compose_scored_result(
+            id,
+            meta,
+            text_component,
+            stats,
+            now,
+            &query_lower,
+            snippet,
+        ));
     }
 
     out.sort_by(|a, b| {
@@ -241,6 +215,48 @@ async fn hybrid(
     });
     out.truncate(limit);
     Ok(out)
+}
+
+/// SCA-756: pure score-assembly extracted from `hybrid()`. Takes all
+/// precomputed inputs (text component, meta, usage stats, now,
+/// lowered query) and emits the populated PromptSearchResult. No DB
+/// round-trips, no IO — directly unit-testable.
+fn compose_scored_result(
+    id: &str,
+    meta: &PromptMeta,
+    text_component: f64,
+    stats: UsageStats,
+    now: DateTime<Utc>,
+    query_lower: &str,
+    snippet: Option<String>,
+) -> PromptSearchResult {
+    let recency = recency_boost(stats.last_used_at, now);
+    let usage_b = usage_boost(stats.launch_count);
+
+    // semantic component is held at 0 until the embedding service
+    // lands. We still feed the weighted sum so the score formula
+    // matches §9 exactly.
+    let semantic = 0.0;
+    // SCA-737: full Unicode case-folding on BOTH sides.
+    let pin = meta.title.to_lowercase() == query_lower;
+    let pin_bonus = if pin { EXACT_TITLE_PIN_BONUS } else { 0.0 };
+
+    let score =
+        pin_bonus + W_TEXT * text_component + W_SEMANTIC * semantic + recency + usage_b;
+
+    PromptSearchResult {
+        prompt_id: id.into(),
+        title: meta.title.clone(),
+        snippet,
+        score,
+        score_parts: ScoreParts {
+            text: text_component,
+            semantic,
+            recency,
+            usage: usage_b,
+            exact_title_pin: pin,
+        },
+    }
 }
 
 fn recency_boost(last_used_at: Option<DateTime<Utc>>, now: DateTime<Utc>) -> f64 {
@@ -1023,6 +1039,50 @@ mod tests {
         let now = Utc::now();
         assert_eq!(recency_boost(Some(now + Duration::hours(1)), now), 0.0);
         assert_eq!(recency_boost(Some(now + Duration::days(7)), now), 0.0);
+    }
+
+    /// SCA-756: pure-function test for the score assembly. No FTS,
+    /// no DB — exercises the §9 formula directly.
+    #[test]
+    fn compose_scored_result_applies_full_formula() {
+        let now = Utc::now();
+        let meta = PromptMeta {
+            title: "Kubernetes Deployment".into(),
+        };
+
+        // Exact title match pin: score gets the +1000 bonus.
+        let pinned = compose_scored_result(
+            "01a",
+            &meta,
+            1.0 / 61.0, // top FTS hit
+            UsageStats {
+                launch_count: 1,
+                last_used_at: Some(now - Duration::hours(1)),
+            },
+            now,
+            "kubernetes deployment",
+            None,
+        );
+        assert!(pinned.score_parts.exact_title_pin);
+        assert!(pinned.score > EXACT_TITLE_PIN_BONUS);
+
+        // Non-pin baseline: score stays in the natural range.
+        let unpinned = compose_scored_result(
+            "01a",
+            &meta,
+            1.0 / 61.0,
+            UsageStats {
+                launch_count: 1,
+                last_used_at: Some(now - Duration::hours(1)),
+            },
+            now,
+            "something else entirely",
+            None,
+        );
+        assert!(!unpinned.score_parts.exact_title_pin);
+        assert!(unpinned.score < 1.0);
+        // recency_boost for ≤7d is 0.10
+        assert!((unpinned.score_parts.recency - 0.10).abs() < 1e-9);
     }
 
     #[tokio::test]
