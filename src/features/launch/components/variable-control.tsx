@@ -145,7 +145,11 @@ function Control({
         </div>
       );
     }
-    case "bool":
+    case "bool": {
+      const effective =
+        value?.type === "bool"
+          ? value.value
+          : (variable.defaultValue ?? false);
       return (
         <label
           style={{
@@ -160,7 +164,7 @@ function Control({
         >
           <input
             type="checkbox"
-            checked={value?.type === "bool" ? value.value : false}
+            checked={effective}
             onChange={(e) =>
               onChange({
                 key: variable.key,
@@ -171,15 +175,11 @@ function Control({
             style={{ accentColor: "var(--accent)" }}
           />
           <span>
-            renders as “
-            {(value?.type === "bool" && value.value) ||
-            (value?.type !== "bool" && variable.defaultValue === true)
-              ? variable.renderTrue
-              : variable.renderFalse}
-            ”
+            renders as “{effective ? variable.renderTrue : variable.renderFalse}”
           </span>
         </label>
       );
+    }
     case "number":
       return (
         <input

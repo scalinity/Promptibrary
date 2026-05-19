@@ -21,7 +21,9 @@ export interface StatusLineState {
 export const useStatusLine = create<StatusLineState>((set) => ({
   state: "READY",
   vaultPath: null,
-  model: "sonnet-4.6",
+  // Hydrated from useSettings().data?.effective.defaultModel by the
+  // AppShell on mount; empty string until that round-trip completes.
+  model: "",
   promptCount: 0,
   lastRunLabel: null,
   setState: (state) => set({ state }),

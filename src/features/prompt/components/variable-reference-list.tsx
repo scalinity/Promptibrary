@@ -135,15 +135,29 @@ export function VariableReferenceList({
   );
 }
 
+const FOCUS_TIMERS = new Map<string, number>();
+
 function focusChip(key: string): void {
+  // SCA-642 — CSS.escape protects against future relaxation of the
+  // variable key grammar (today restricted to [A-Za-z_][A-Za-z0-9_]*, but
+  // pinning the safe form here doesn't cost anything).
+  const safeKey = typeof CSS !== "undefined" && CSS.escape
+    ? CSS.escape(key)
+    : key.replace(/"/g, '\\"');
   const chip = document.querySelector<HTMLElement>(
-    `.pb-var-chip[data-var-key="${key}"]`,
+    `.pb-var-chip[data-var-key="${safeKey}"]`,
   );
-  if (chip != null) {
-    chip.scrollIntoView({ block: "center", behavior: "smooth" });
-    chip.style.boxShadow = "0 0 0 2px var(--accent)";
-    window.setTimeout(() => {
-      chip.style.boxShadow = "";
-    }, 1200);
-  }
+  if (chip == null) return;
+  chip.scrollIntoView({ block: "center", behavior: "smooth" });
+  chip.style.boxShadow = "0 0 0 2px var(--accent)";
+
+  // Clear any existing highlight timer for this key so rapid re-clicks
+  // don't race — the most recent click owns the halo's lifetime.
+  const prev = FOCUS_TIMERS.get(key);
+  if (prev != null) window.clearTimeout(prev);
+  const id = window.setTimeout(() => {
+    chip.style.boxShadow = "";
+    FOCUS_TIMERS.delete(key);
+  }, 1200);
+  FOCUS_TIMERS.set(key, id);
 }

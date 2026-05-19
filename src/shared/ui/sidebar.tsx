@@ -39,9 +39,7 @@ export function Sidebar(): React.JSX.Element {
           key={item.key}
           to={item.to}
           end={item.to === "/"}
-          className={({ isActive }) =>
-            cn("nav-item", isActive && item.key === "all" && "active")
-          }
+          className={({ isActive }) => cn("nav-item", isActive && "active")}
         >
           <span className="glyph">{item.glyph}</span>
           {item.label}

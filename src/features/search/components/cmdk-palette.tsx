@@ -5,7 +5,7 @@
 import { Command } from "cmdk";
 import { useNavigate } from "react-router-dom";
 import { useHotkeys } from "react-hotkeys-hook";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 import { useSearchStore } from "@/features/search/stores/search-store";
 import { usePrompts } from "@/features/library/hooks/use-prompts";
@@ -28,6 +28,22 @@ export function CmdKPalette(): React.JSX.Element {
   const navigate = useNavigate();
   const select = useLibraryStore((s) => s.select);
   const prompts = usePrompts();
+
+  // SCA-655 — remember the previously-focused element so we can restore
+  // focus when the palette closes. Keyboard users (most of the cmdk
+  // audience) would otherwise land on document.body.
+  const previousActive = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      const active = document.activeElement;
+      previousActive.current =
+        active instanceof HTMLElement ? active : null;
+    } else if (previousActive.current != null) {
+      previousActive.current.focus();
+      previousActive.current = null;
+    }
+  }, [isOpen]);
 
   useHotkeys(
     "escape",
@@ -63,7 +79,7 @@ export function CmdKPalette(): React.JSX.Element {
       style={{
         position: "fixed",
         inset: 0,
-        background: "oklch(0.08 0.01 220 / 0.5)",
+        background: "var(--bg-overlay)",
         backdropFilter: "blur(4px)",
         display: "grid",
         placeItems: "start center",
@@ -80,7 +96,7 @@ export function CmdKPalette(): React.JSX.Element {
           borderRadius: "var(--r-md)",
           overflow: "hidden",
           boxShadow:
-            "0 24px 64px -16px oklch(0 0 0 / 0.6), 0 0 0 1px var(--border-subtle)",
+            "0 24px 64px -16px var(--shadow-modal), 0 0 0 1px var(--border-subtle)",
         }}
       >
         <div

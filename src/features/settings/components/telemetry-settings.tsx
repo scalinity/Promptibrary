@@ -88,7 +88,7 @@ function DeleteHistoryAction(): React.JSX.Element {
     <div
       style={{
         background: "var(--bg-sunken)",
-        border: "1px solid oklch(0.4 0.1 25)",
+        border: "1px solid var(--border-danger)",
         borderRadius: "var(--r-md)",
         padding: "var(--sp-3) var(--sp-4)",
         display: "grid",
@@ -169,7 +169,7 @@ function DestructiveCard({
   onConfirm: () => void;
 }): React.JSX.Element {
   const borderColor =
-    kind === "danger" ? "oklch(0.4 0.1 25)" : "var(--border-mid)";
+    kind === "danger" ? "var(--border-danger)" : "var(--border-mid)";
   const labelColor =
     kind === "danger" ? "var(--status-error)" : "var(--ink-primary)";
   return (

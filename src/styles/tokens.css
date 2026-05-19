@@ -77,3 +77,25 @@
   --sidebar-w: 232px;
   --list-w: 340px;
 }
+
+/* === Additions beyond canonical design system ===
+   Tokens added by Promptibrary's React app where the canonical Promptibrary
+   Design System CSS doesn't cover the use case. Keeping them in tokens.css
+   (rather than inline oklch() literals in component styles) means a future
+   design-system sync just adds a `--bg-overlay` etc. to the canonical file
+   and removes the addition. */
+:root {
+  /* Modal/overlay scrim — used behind the cmdk palette. Subtle cool-cyan
+     tint matching the surface family with α 0.5. */
+  --bg-overlay: oklch(0.08 0.01 220 / 0.5);
+
+  /* Drop shadow tint used on the cmdk palette card. Per design rule the
+     launch button is the ONLY drop-shadowed element on a screen, so this
+     is reserved for the modal palette and is intentionally subtler than
+     the launch glow. */
+  --shadow-modal: oklch(0 0 0 / 0.6);
+
+  /* Danger border — same hue family as --status-error but dimmer for
+     containers (telemetry "delete all run history" card). */
+  --border-danger: oklch(0.4 0.1 25);
+}

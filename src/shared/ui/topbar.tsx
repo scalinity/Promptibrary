@@ -36,7 +36,6 @@ export function Topbar(): React.JSX.Element {
       e.preventDefault();
       navigate("/import");
     },
-    { enableOnFormTags: true },
   );
 
   useHotkeys(
@@ -45,7 +44,6 @@ export function Topbar(): React.JSX.Element {
       e.preventDefault();
       navigate("/settings");
     },
-    { enableOnFormTags: true },
   );
 
   return (

@@ -23,6 +23,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { parseVariables, type VariableRef } from "@/shared/api/ipc";
 import { isAppError } from "@/shared/api/errors";
+import { VARIABLE_REF_REGEX } from "@/features/prompt/lib/variable-ref-regex";
 import type { PromptId } from "@/shared/types/ids";
 
 interface PromptBodyEditorProps {
@@ -97,8 +98,6 @@ const PROMPTIBRARY_THEME = EditorView.theme(
   },
   { dark: true },
 );
-
-const VARIABLE_REF_REGEX = /\{\{(file|folder|text|multiline|select|bool|number):([a-zA-Z_][a-zA-Z0-9_]*)\}\}/g;
 
 class VariableChipWidget extends WidgetType {
   readonly varType: string;

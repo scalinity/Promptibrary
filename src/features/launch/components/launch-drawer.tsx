@@ -23,8 +23,7 @@ export function LaunchDrawer({ prompt }: LaunchDrawerProps): React.JSX.Element {
   return (
     <aside
       className="launch-drawer"
-      role="dialog"
-      aria-modal="false"
+      role="complementary"
       aria-label="Launch composer"
       style={{
         position: "absolute",

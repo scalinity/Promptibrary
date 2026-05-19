@@ -94,4 +94,27 @@ export async function setupVisual(
   await disableAnimations(page);
 }
 
+/**
+ * Reset the IPC mock's module-level mutable state (currently the
+ * `secretState` map). Visual specs that mutate secret status via
+ * `setSecret` should call this in `beforeEach` so tests don't leak state
+ * to siblings sharing the same Playwright worker.
+ *
+ * The mock module is loaded via the Vite alias when VITE_E2E_MODE=true;
+ * the helper grabs the export through a window-side dynamic import.
+ */
+export async function resetIpcMockState(page: Page): Promise<void> {
+  await page.evaluate(async () => {
+    // Vite serves the mock at this URL at runtime when VITE_E2E_MODE=true.
+    // The dynamic import is resolved by the browser, not by tsc — hide it
+    // from the TS module resolver via an inline-typed Function-call.
+    const dynImport = new Function(
+      "url",
+      "return import(/* @vite-ignore */ url)",
+    ) as (url: string) => Promise<{ __resetMockState?: () => void }>;
+    const mod = await dynImport("/src/shared/api/ipc.mock.ts");
+    mod.__resetMockState?.();
+  });
+}
+
 export { test };

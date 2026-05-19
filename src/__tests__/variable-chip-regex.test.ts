@@ -1,13 +1,15 @@
-// CodeMirror chip-decoration regex — ensures the parser-friendly source
-// shape `{{type:key}}` is what gets replaced. Pinning this is the cheapest
-// way to catch a future "fix" that broadens the regex and starts matching
-// `{{user}}` style mustache placeholders.
+// CodeMirror chip-decoration regex — pinned via the SHARED export. If a
+// future broadening makes the editor accept `{{user}}`-style placeholders,
+// these tests automatically catch it (no second copy of the regex to
+// drift away from). SCA-646.
 
 import { describe, expect, it } from "vitest";
 
-const VARIABLE_REF_REGEX = /\{\{(file|folder|text|multiline|select|bool|number):([a-zA-Z_][a-zA-Z0-9_]*)\}\}/g;
+import { VARIABLE_REF_REGEX } from "@/features/prompt/lib/variable-ref-regex";
 
 function matches(text: string): Array<[string, string]> {
+  // Reset lastIndex because the regex is `/g` and is shared across tests.
+  VARIABLE_REF_REGEX.lastIndex = 0;
   return [...text.matchAll(VARIABLE_REF_REGEX)].map((m) => [m[1], m[2]]);
 }
 

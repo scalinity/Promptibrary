@@ -3,7 +3,7 @@
 // Layout: frontmatter panel (left) + body editor (center) + variable
 // reference list (right). Launch drawer is overlaid when active.
 
-import { Suspense, lazy } from "react";
+import { Suspense, lazy, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { useHotkeys } from "react-hotkeys-hook";
 
@@ -34,8 +34,19 @@ export function PromptRoute(): React.JSX.Element {
   const setBody = usePromptEditorStore((s) => s.setBody);
   const showHistory = usePromptEditorStore((s) => s.showHistory);
   const toggleHistory = usePromptEditorStore((s) => s.toggleHistory);
+  const clearDraft = usePromptEditorStore((s) => s.clear);
   const openLaunch = useLaunchDraftStore((s) => s.open);
   const drawerOpen = useLaunchDraftStore((s) => s.isOpen);
+
+  // SCA-635 — drop this prompt's editor draft on unmount so the store
+  // doesn't grow unboundedly across the session. Pure cleanup; nothing
+  // declarative bridges a route-unmount → store-mutation flow.
+  useEffect(() => {
+    if (id == null) return;
+    return () => {
+      clearDraft(id);
+    };
+  }, [id, clearDraft]);
 
   useHotkeys(
     "meta+shift+h, ctrl+shift+h",
