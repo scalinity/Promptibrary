@@ -6,6 +6,7 @@
 import { Topbar } from "./topbar";
 import { Sidebar } from "./sidebar";
 import { StatusLine } from "./status-line";
+import { CmdKPalette } from "@/features/search/components/cmdk-palette";
 
 export interface AppShellProps {
   children: React.ReactNode;
@@ -25,6 +26,7 @@ export function AppShell({ children }: AppShellProps): React.JSX.Element {
         </div>
         <StatusLine />
       </div>
+      <CmdKPalette />
     </>
   );
 }

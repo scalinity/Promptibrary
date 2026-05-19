@@ -1,7 +1,26 @@
-// Route: /run/:id  Live terminal or read-only transcript.
+// Route: `/run/:runId` — L2 placeholder.
 //
-// L0 scaffold — route stub. Real implementation in a later layer.
+// The live terminal + xterm integration + PTY pipeline land in L3.
+// The L2 surface renders an empty-state explaining what's coming so the
+// route navigates cleanly from cmdk + library + launch.
 
-export function RunRoute(): null {
-  return null;
+import { useParams } from "react-router-dom";
+
+import { EmptyState } from "@/shared/ui/empty-state";
+
+export function RunRoute(): React.JSX.Element {
+  const { runId } = useParams<{ runId: string }>();
+  return (
+    <section className="detail-pane" aria-label="Run terminal">
+      <EmptyState
+        glyph="⏵"
+        title="Terminal activates in L3"
+        body={
+          runId === "latest"
+            ? "Launching a run will land here once L3 wires the PTY pipeline."
+            : `No transcript stored for run ${runId}. The launch pipeline is L3.`
+        }
+      />
+    </section>
+  );
 }

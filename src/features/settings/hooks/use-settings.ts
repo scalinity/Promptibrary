@@ -1,7 +1,20 @@
-// Hook fetching merged AppSettings.
-//
-// L0 scaffold — hook stub. Real implementation in a later layer.
+// Settings + secrets queries.
 
-export function useSettings(): never {
-  throw new Error('useSettings is not implemented yet (L0 scaffold).');
+import { useQuery } from "@tanstack/react-query";
+
+import { getSettings, getSecretStatus } from "@/shared/api/ipc";
+import { settingsKeys } from "@/shared/api/queryKeys";
+
+export function useSettings() {
+  return useQuery({
+    queryKey: settingsKeys.effective(),
+    queryFn: getSettings,
+  });
+}
+
+export function useSecretStatus() {
+  return useQuery({
+    queryKey: settingsKeys.secrets(),
+    queryFn: getSecretStatus,
+  });
 }

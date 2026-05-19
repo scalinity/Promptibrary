@@ -1,7 +1,14 @@
-// Hook calling probe_dependencies on mount.
-//
-// L0 scaffold — hook stub. Real implementation in a later layer.
+// Dependency probes — calls probe_dependencies for the diagnostics panel.
 
-export function useDependencyProbes(): never {
-  throw new Error('useDependencyProbes is not implemented yet (L0 scaffold).');
+import { useQuery } from "@tanstack/react-query";
+
+import { probeDependencies } from "@/shared/api/ipc";
+import { settingsKeys } from "@/shared/api/queryKeys";
+
+export function useDependencyProbes() {
+  return useQuery({
+    queryKey: settingsKeys.dependencies(),
+    queryFn: probeDependencies,
+    staleTime: 60_000,
+  });
 }
