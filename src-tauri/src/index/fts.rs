@@ -33,6 +33,15 @@ pub struct FtsHit {
 /// is to split into whitespace tokens, quote each one with embedded `"`
 /// doubled per the FTS5 grammar, and AND-join them. Empty input yields
 /// an empty string so the caller can take the empty-query branch.
+///
+/// SCA-761 trade-off: blanket-quoting every token also disables the
+/// FTS5 column-filter operator (`title:foo`). That's intentional for
+/// V1 — the Cmd-K palette doesn't expose column-filter syntax, and
+/// allowing untrusted input to pass through unquoted would re-open
+/// the operator-injection surface this function exists to close. If
+/// a future surface (advanced search panel?) wants column filters,
+/// it needs a smarter parser that distinguishes user-typed operators
+/// from accidentally-typed metachars — do NOT just relax this escape.
 fn escape_fts_query(query: &str) -> String {
     let mut tokens = Vec::new();
     for raw in query.split_whitespace() {
