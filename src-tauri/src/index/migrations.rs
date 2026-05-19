@@ -149,6 +149,68 @@ mod tests {
         assert_eq!(after, 0, "prompt_tags row must cascade-delete with its prompt");
     }
 
+    #[tokio::test]
+    async fn prompt_delete_cascades_to_runs_and_telemetry_events() {
+        // Regression test for SCA-565 — after migration 0005 the runs and
+        // telemetry_events rows must cascade-delete with their parent prompt.
+        let pool = temp_pool().await;
+        run_migrations(&pool).await.expect("migrations ok");
+
+        insert_minimal_prompt(&pool, "01PROMPT", "promptibrary/prompts/p.md").await;
+        insert_minimal_run(&pool, "01RUN", "01PROMPT").await;
+        insert_minimal_telemetry(&pool, "01EVT", "01RUN", "01PROMPT").await;
+
+        sqlx::query("DELETE FROM prompts WHERE id = ?")
+            .bind("01PROMPT")
+            .execute(&pool)
+            .await
+            .expect("delete prompt");
+
+        let runs: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM runs")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(runs, 0, "runs must cascade-delete with their prompt");
+
+        let events: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM telemetry_events")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(events, 0, "telemetry_events must cascade-delete with their prompt");
+    }
+
+    async fn insert_minimal_run(pool: &SqlitePool, id: &str, prompt_id: &str) {
+        sqlx::query(
+            "INSERT INTO runs (id, prompt_id, prompt_title, status, profile_json, started_at)
+             VALUES (?, ?, ?, ?, ?, ?)",
+        )
+        .bind(id)
+        .bind(prompt_id)
+        .bind("title")
+        .bind("created")
+        .bind("{}")
+        .bind("2026-05-18T14:00:00Z")
+        .execute(pool)
+        .await
+        .expect("insert run");
+    }
+
+    async fn insert_minimal_telemetry(pool: &SqlitePool, id: &str, run_id: &str, prompt_id: &str) {
+        sqlx::query(
+            "INSERT INTO telemetry_events (id, run_id, prompt_id, event_type, created_at, payload_json)
+             VALUES (?, ?, ?, ?, ?, ?)",
+        )
+        .bind(id)
+        .bind(run_id)
+        .bind(prompt_id)
+        .bind("launch_started")
+        .bind("2026-05-18T14:00:00Z")
+        .bind("{}")
+        .execute(pool)
+        .await
+        .expect("insert telemetry event");
+    }
+
     async fn insert_minimal_prompt(pool: &SqlitePool, id: &str, vault_path: &str) {
         sqlx::query(
             "INSERT INTO prompts (id, title, slug, summary, body, vault_path,
