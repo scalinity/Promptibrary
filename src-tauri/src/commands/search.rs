@@ -182,7 +182,13 @@ async fn hybrid(
         // lands. We still feed the weighted sum so the score formula
         // matches §9 exactly.
         let semantic = 0.0;
-        let pin = meta.title.eq_ignore_ascii_case(&query_lower);
+        // SCA-737: full Unicode case-folding on BOTH sides. Pre-fix
+        // mixed `query.to_lowercase()` (Unicode) with
+        // `eq_ignore_ascii_case` (ASCII-only), so titles with
+        // accented chars (São Paulo, Übung) never pinned even on an
+        // exact-typed query. Pure-Unicode comparison handles every
+        // case-foldable script consistently.
+        let pin = meta.title.to_lowercase() == query_lower;
 
         // Pin score: large enough that any pinned result outranks every
         // non-pinned one regardless of the score weights and boosts. The
@@ -907,6 +913,48 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(res[0].prompt_id, "01a", "exact title must pin");
+        assert!(res[0].score_parts.exact_title_pin);
+    }
+
+    /// SCA-737 regression: a title with an accented character must
+    /// still pin to top when the query types the same accented form.
+    /// Pre-fix used `eq_ignore_ascii_case` which only folded ASCII,
+    /// so "São Paulo Guide" never matched even with an identical
+    /// (modulo case) query.
+    #[tokio::test]
+    async fn hybrid_exact_title_pin_handles_unicode() {
+        let db = temp_pool().await;
+        upsert_prompt(
+            &db,
+            &sample_prompt("01a", "São Paulo Guide", "x", &[]),
+        )
+        .await
+        .unwrap();
+        upsert_prompt(
+            &db,
+            &sample_prompt(
+                "02b",
+                "Travel São Paulo by foot — popular",
+                "São Paulo body",
+                &[],
+            ),
+        )
+        .await
+        .unwrap();
+
+        let res = search_prompts_inner(
+            &db,
+            &SearchPromptsInput {
+                query: "são paulo guide".into(), // lowercase + accented
+                tag: None,
+                limit: None,
+                mode: Some(SearchMode::Hybrid),
+                include_archived: None,
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(res[0].prompt_id, "01a", "Unicode exact title must pin");
         assert!(res[0].score_parts.exact_title_pin);
     }
 
