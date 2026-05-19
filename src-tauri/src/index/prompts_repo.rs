@@ -168,10 +168,10 @@ pub async fn list_prompts_for_library(
         sql.push_str(&clauses.join(" AND "));
     }
     sql.push_str(" GROUP BY p.id ORDER BY p.updated_at DESC");
-    if let Some(limit) = filters.limit {
-        sql.push_str(&format!(" LIMIT {limit}"));
-        if let Some(offset) = filters.offset {
-            sql.push_str(&format!(" OFFSET {offset}"));
+    if filters.limit.is_some() {
+        sql.push_str(" LIMIT ?");
+        if filters.offset.is_some() {
+            sql.push_str(" OFFSET ?");
         }
     }
 
@@ -181,6 +181,15 @@ pub async fn list_prompts_for_library(
     >(&sql);
     if let Some(tag) = filters.tag {
         q = q.bind(tag);
+    }
+    // SCA-606: LIMIT/OFFSET via sqlx bind for parameterization consistency
+    // with the rest of the query (no SQL injection risk since the inputs
+    // are u32, but mixed inline/parameterized style was inconsistent).
+    if let Some(limit) = filters.limit {
+        q = q.bind(limit as i64);
+        if let Some(offset) = filters.offset {
+            q = q.bind(offset as i64);
+        }
     }
     let rows = q.fetch_all(db).await.map_err(AppError::from)?;
     let mut out = Vec::with_capacity(rows.len());
