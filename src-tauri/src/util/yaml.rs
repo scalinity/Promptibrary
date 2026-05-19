@@ -1,3 +1,67 @@
-//! YAML helpers shared by frontmatter.
+//! YAML helpers shared by frontmatter parsing.
 //!
-//! L0 scaffold — module stub. Real implementation lands in a later layer.
+//! Spec §3 contract for `util::yaml`: typed serde wrappers that surface
+//! friendly error messages. Anything that goes through `from_str_friendly`
+//! produces a `YamlMalformed` error with a human-readable summary.
+
+use serde::{de::DeserializeOwned, Serialize};
+
+use crate::error::{AppError, AppErrorKind, Result};
+
+pub fn from_str_friendly<T: DeserializeOwned>(s: &str) -> Result<T> {
+    serde_yaml::from_str::<T>(s).map_err(|e| {
+        AppError::new(
+            AppErrorKind::YamlMalformed,
+            format!("yaml parse failed: {}", e),
+        )
+        .with_detail("source_excerpt", excerpt(s, 200))
+    })
+}
+
+pub fn to_string<T: Serialize>(value: &T) -> Result<String> {
+    serde_yaml::to_string(value).map_err(AppError::from)
+}
+
+fn excerpt(s: &str, max: usize) -> String {
+    if s.len() <= max {
+        s.to_string()
+    } else {
+        format!("{}…", &s[..max])
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde::Deserialize;
+
+    #[derive(Debug, Deserialize, PartialEq)]
+    struct Sample {
+        name: String,
+        count: u32,
+    }
+
+    #[test]
+    fn parses_valid_yaml() {
+        let s: Sample = from_str_friendly("name: hello\ncount: 7\n").unwrap();
+        assert_eq!(
+            s,
+            Sample {
+                name: "hello".into(),
+                count: 7
+            }
+        );
+    }
+
+    #[test]
+    fn malformed_yaml_returns_yaml_malformed_kind() {
+        let err = from_str_friendly::<Sample>("not\nyaml:: @ malformed").unwrap_err();
+        assert_eq!(err.kind, AppErrorKind::YamlMalformed);
+    }
+
+    #[test]
+    fn type_mismatch_returns_yaml_malformed_kind() {
+        let err = from_str_friendly::<Sample>("name: hi\ncount: not-a-number\n").unwrap_err();
+        assert_eq!(err.kind, AppErrorKind::YamlMalformed);
+    }
+}
