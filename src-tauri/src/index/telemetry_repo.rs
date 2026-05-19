@@ -162,7 +162,10 @@ pub async fn prompt_aggregates(db: &SqlitePool) -> Result<Vec<PromptAggregateRow
                 AVG(CASE WHEN ended_at IS NOT NULL
                          THEN (julianday(ended_at) - julianday(started_at)) * 86400.0
                          ELSE NULL END) AS avg_run_seconds,
-                AVG(CAST(json_extract(token_count_json, '$.total') AS REAL)) AS avg_token_count
+                AVG(CASE WHEN token_count_json IS NOT NULL
+                              AND json_valid(token_count_json)
+                         THEN CAST(json_extract(token_count_json, '$.total') AS REAL)
+                         ELSE NULL END) AS avg_token_count
            FROM runs
        GROUP BY prompt_id",
     )
@@ -416,6 +419,43 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(count, 1);
+    }
+
+    /// SCA-746 regression: a row with a non-JSON token_count_json
+    /// value must NOT error the entire prompt_aggregates SELECT.
+    /// Pre-fix json_extract raised at runtime; the json_valid guard
+    /// treats the row as if it didn't report a token count.
+    #[tokio::test]
+    async fn prompt_aggregates_tolerates_malformed_token_count_json() {
+        let db = temp_pool().await;
+        let p1 = seed_prompt(&db, "p1").await;
+        // Good row.
+        insert_run(
+            &db, "r1", &p1, "finished", Some(0),
+            "2026-05-19T00:00:00Z", Some("2026-05-19T00:00:30Z"), Some(100),
+        )
+        .await;
+        // Malformed JSON row.
+        sqlx::query(
+            "INSERT INTO runs (id, prompt_id, prompt_title, status, profile_json,
+                started_at, ended_at, exit_code, stdout_bytes, stderr_bytes,
+                token_count_json)
+             VALUES (?, ?, 'T', 'finished', '{}',
+                '2026-05-19T01:00:00Z', '2026-05-19T01:00:10Z', 0, 0, 0,
+                'not-json')",
+        )
+        .bind("r2")
+        .bind(&p1)
+        .execute(&db)
+        .await
+        .unwrap();
+
+        let aggs = prompt_aggregates(&db).await.unwrap();
+        assert_eq!(aggs.len(), 1);
+        assert_eq!(aggs[0].launch_count, 2);
+        // Avg only counts the good row's 100 — the malformed row
+        // contributes NULL to the AVG, which SQLite drops.
+        assert_eq!(aggs[0].avg_token_count, Some(100));
     }
 
     #[test]
