@@ -21,10 +21,13 @@ pub enum Source {
     Article(ArticleSource),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Manual source — user-entered prompt with no fetch origin. Per spec §4,
+/// `originUrl` is always `null` for manual sources, which is now encoded in
+/// the type itself: the field does not exist. The TS mirror uses
+/// `Omit<SourceBase<"manual">, "originUrl">` to match.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ManualSource {
-    pub origin_url: Option<String>, // always None for manual
     pub title: Option<String>,
     pub author: Option<String>,
     pub fetched_at: Option<DateTime<Utc>>,

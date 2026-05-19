@@ -12,9 +12,10 @@ export interface SourceBase<TKind extends SourceKind> {
   contentHash: string | null;
 }
 
-export interface ManualSource extends SourceBase<"manual"> {
-  originUrl: null;
-}
+// Manual sources have no fetch origin — the `originUrl` field is dropped
+// entirely so Rust and TS agree at compile time. Rust's ManualSource also
+// omits the field (see src-tauri/src/domain/source.rs).
+export type ManualSource = Omit<SourceBase<"manual">, "originUrl">;
 
 export interface YouTubeSource extends SourceBase<"youtube"> {
   videoId: string;
