@@ -147,6 +147,10 @@ pub async fn create_prompt(
     input: CreatePromptInput,
     services: State<'_, ManagedState>,
 ) -> Result<Prompt> {
+    // Serialize create_prompt globally to close SCA-589: without this,
+    // two concurrent IPC calls observe the same slug as free, race the
+    // atomic_write rename, and produce duplicate vault_path rows.
+    let _guard = services.create_prompt_lock.lock().await;
     let (vault, db) = current_vault_db(&services).await?;
     let now = now_utc();
     let base_slug = slugify(&input.title);

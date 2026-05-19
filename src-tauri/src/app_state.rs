@@ -13,13 +13,18 @@
 use std::sync::Arc;
 
 use sqlx::SqlitePool;
-use tokio::sync::RwLock;
+use tokio::sync::{Mutex, RwLock};
 
 use crate::vault::paths::VaultPaths;
 
 #[derive(Default)]
 pub struct AppServices {
     pub state: RwLock<MutableState>,
+    /// Global serialization gate for create_prompt. Without this, two
+    /// concurrent IPC calls can both observe the same slug as free,
+    /// derive the same vault_path, and race the atomic_write rename →
+    /// duplicate-vault_path rows + content corruption. SCA-589.
+    pub create_prompt_lock: Mutex<()>,
 }
 
 #[derive(Default)]
