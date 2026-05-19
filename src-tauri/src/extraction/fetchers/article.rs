@@ -453,18 +453,37 @@ fn collapse_ws(s: &str) -> String {
 }
 
 fn collect_text(el: ElementRef<'_>) -> String {
-    let mut s = String::new();
-    for n in el.descendants() {
-        if let Some(child_el) = ElementRef::wrap(n) {
-            if is_noise_element(child_el) {
-                continue;
+    // `descendants()` returns a flat sequence; a `continue` on a noise
+    // element only skips that element, NOT its text-node children which
+    // appear later in the same flat iteration. We need a real recursive
+    // walk that prunes the entire subtree under any noise CHILD — this
+    // matters for `densest_descendant` scoring, where unaccounted-for
+    // `<script>` text would inflate the text-to-tag ratio (SCA-707).
+    //
+    // Caller is allowed to ask for text inside an explicit noise element
+    // (the JSON-LD path passes a `<script>` directly) — the root is
+    // never pruned; only noise *descendants* are. That matches the
+    // semantics the previous flat-descendants code accidentally gave us.
+    let mut out = String::new();
+    collect_text_children(el, &mut out);
+    out
+}
+
+fn collect_text_children(el: ElementRef<'_>, out: &mut String) {
+    for child in el.children() {
+        match child.value() {
+            Node::Text(t) => out.push_str(t),
+            Node::Element(_) => {
+                if let Some(child_el) = ElementRef::wrap(child) {
+                    if is_noise_element(child_el) {
+                        continue;
+                    }
+                    collect_text_children(child_el, out);
+                }
             }
-        }
-        if let Some(t) = n.value().as_text() {
-            s.push_str(t);
+            _ => {}
         }
     }
-    s
 }
 
 fn code_lang_from_child(pre: ElementRef<'_>) -> Option<String> {
@@ -747,6 +766,30 @@ mod tests {
         assert!(looks_paywalled(html));
         let p = parse(html);
         assert!(p.text.len() < PAYWALL_TEXT_THRESHOLD);
+    }
+
+    #[test]
+    fn densest_descendant_ignores_inline_script_text() {
+        // SCA-707: previously, `collect_text` used `descendants()` and
+        // `continue`d on noise elements, but the script's child text node
+        // was a separate iteration and slipped through — inflating the
+        // text-to-tag ratio for sidebar containers that wrap analytics
+        // blobs. After the fix the script contents are skipped entirely.
+        let real_paragraph = "x".repeat(800);
+        let inline_blob = "y".repeat(2_000);
+        // The sidebar div is small (one short word of visible text) but
+        // contains a long inline script. Pre-fix, the script's text
+        // would push it past the 500-char threshold and outrank the
+        // dense content div.
+        let html = format!(
+            r#"<html><body>
+              <div class='sidebar'>tiny<script>{inline_blob}</script></div>
+              <div class='content'><p>{real_paragraph}</p></div>
+            </body></html>"#
+        );
+        let p = parse(&html);
+        assert!(p.text.contains(&real_paragraph));
+        assert!(!p.text.contains("yyyy"), "inline script text must not leak into selected subtree");
     }
 
     #[test]
