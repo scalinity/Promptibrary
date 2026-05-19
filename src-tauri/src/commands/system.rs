@@ -22,15 +22,29 @@
 //! "the OS launched something at a weird location".
 
 use std::path::PathBuf;
+use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 use tauri::State;
+use tokio::time::timeout;
 
 use crate::app_state::ManagedState;
 use crate::error::{AppError, AppErrorKind, Result};
 use crate::settings::keychain::KEYCHAIN_PROBE_ACCOUNT;
 use crate::settings::secret_store::SecretStore;
+
+/// Per-binary probe wall-clock budget. A hung `claude --version` (or
+/// any other diagnostics-probed CLI) must NOT block the IPC future
+/// indefinitely; on timeout we kill the child and return
+/// `ProbeStatus::Error` with a hint that flags the timeout.
+const PROBE_BINARY_TIMEOUT: Duration = Duration::from_secs(5);
+
+/// Wall-clock budget for the `open(1)` / `xdg-open` / Terminal.app
+/// launch step. Real-world `open` returns nearly instantly (Launch
+/// Services dispatch); 10 s is the slow-Mac upper bound that still
+/// keeps the user from staring at a hung dialog.
+const SPAWN_LAUNCH_TIMEOUT: Duration = Duration::from_secs(10);
 
 // ─── probe_dependencies ──────────────────────────────────────────────
 
@@ -117,13 +131,40 @@ async fn probe_binary(
     args: &[&str],
     install_hint: Option<&'static str>,
 ) -> DependencyProbe {
-    let output = tokio::process::Command::new(name)
-        .args(args)
-        .output()
-        .await;
+    probe_binary_with_timeout(name, args, install_hint, PROBE_BINARY_TIMEOUT).await
+}
 
-    match output {
-        Ok(out) if out.status.success() => {
+/// Inner helper for `probe_binary` parameterized on the wall-clock
+/// budget so tests can exercise the timeout path without waiting
+/// for the production 5 s.
+async fn probe_binary_with_timeout(
+    name: &'static str,
+    args: &[&str],
+    install_hint: Option<&'static str>,
+    budget: Duration,
+) -> DependencyProbe {
+    let spawn = tokio::process::Command::new(name)
+        .args(args)
+        .kill_on_drop(true)
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn();
+
+    let child = match spawn {
+        Ok(c) => c,
+        Err(_) => {
+            return DependencyProbe {
+                name,
+                status: ProbeStatus::Missing,
+                version: None,
+                install_hint,
+            }
+        }
+    };
+
+    let wait = child.wait_with_output();
+    match timeout(budget, wait).await {
+        Ok(Ok(out)) if out.status.success() => {
             let stdout = String::from_utf8_lossy(&out.stdout);
             let stderr = String::from_utf8_lossy(&out.stderr);
             let raw = if !stdout.trim().is_empty() {
@@ -139,17 +180,25 @@ async fn probe_binary(
                 install_hint: None,
             }
         }
-        Ok(_) => DependencyProbe {
+        Ok(Ok(_)) => DependencyProbe {
             name,
             status: ProbeStatus::Error,
             version: None,
             install_hint,
         },
-        Err(_) => DependencyProbe {
+        Ok(Err(_)) => DependencyProbe {
             name,
             status: ProbeStatus::Missing,
             version: None,
             install_hint,
+        },
+        Err(_elapsed) => DependencyProbe {
+            name,
+            status: ProbeStatus::Error,
+            version: None,
+            install_hint: Some(
+                "binary did not respond within 5 s — check that it isn't blocked on stdin or a network call",
+            ),
         },
     }
 }
@@ -249,30 +298,32 @@ pub async fn open_path(input: PathInput) -> Result<()> {
 
 #[cfg(target_os = "macos")]
 async fn spawn_terminal(path: &std::path::Path) -> Result<()> {
-    let status = tokio::process::Command::new("open")
+    let fut = tokio::process::Command::new("open")
         .args(["-a", "Terminal"])
         .arg(path)
-        .status()
-        .await
-        .map_err(AppError::from)?;
-    if !status.success() {
-        return Err(AppError::new(
+        .status();
+    match timeout(SPAWN_LAUNCH_TIMEOUT, fut).await {
+        Ok(Ok(status)) if status.success() => Ok(()),
+        Ok(Ok(_)) => Err(AppError::new(
             AppErrorKind::Internal,
             "Terminal.app failed to launch",
-        ));
+        )),
+        Ok(Err(e)) => Err(AppError::from(e)),
+        Err(_) => Err(AppError::new(
+            AppErrorKind::Internal,
+            "Terminal.app launch timed out after 10 s",
+        )),
     }
-    Ok(())
 }
 
 #[cfg(target_os = "linux")]
 async fn spawn_terminal(path: &std::path::Path) -> Result<()> {
     for bin in ["x-terminal-emulator", "gnome-terminal", "konsole"] {
-        let status = tokio::process::Command::new(bin)
+        let fut = tokio::process::Command::new(bin)
             .args(["--working-directory"])
             .arg(path)
-            .status()
-            .await;
-        if let Ok(s) = status {
+            .status();
+        if let Ok(Ok(s)) = timeout(SPAWN_LAUNCH_TIMEOUT, fut).await {
             if s.success() {
                 return Ok(());
             }
@@ -294,34 +345,30 @@ async fn spawn_terminal(_path: &std::path::Path) -> Result<()> {
 
 #[cfg(target_os = "macos")]
 async fn spawn_opener(path: &std::path::Path) -> Result<()> {
-    let status = tokio::process::Command::new("open")
-        .arg(path)
-        .status()
-        .await
-        .map_err(AppError::from)?;
-    if !status.success() {
-        return Err(AppError::new(
+    let fut = tokio::process::Command::new("open").arg(path).status();
+    match timeout(SPAWN_LAUNCH_TIMEOUT, fut).await {
+        Ok(Ok(status)) if status.success() => Ok(()),
+        Ok(Ok(_)) => Err(AppError::new(AppErrorKind::Internal, "open(1) failed")),
+        Ok(Err(e)) => Err(AppError::from(e)),
+        Err(_) => Err(AppError::new(
             AppErrorKind::Internal,
-            "open(1) failed",
-        ));
+            "open(1) timed out after 10 s",
+        )),
     }
-    Ok(())
 }
 
 #[cfg(target_os = "linux")]
 async fn spawn_opener(path: &std::path::Path) -> Result<()> {
-    let status = tokio::process::Command::new("xdg-open")
-        .arg(path)
-        .status()
-        .await
-        .map_err(AppError::from)?;
-    if !status.success() {
-        return Err(AppError::new(
+    let fut = tokio::process::Command::new("xdg-open").arg(path).status();
+    match timeout(SPAWN_LAUNCH_TIMEOUT, fut).await {
+        Ok(Ok(status)) if status.success() => Ok(()),
+        Ok(Ok(_)) => Err(AppError::new(AppErrorKind::Internal, "xdg-open failed")),
+        Ok(Err(e)) => Err(AppError::from(e)),
+        Err(_) => Err(AppError::new(
             AppErrorKind::Internal,
-            "xdg-open failed",
-        ));
+            "xdg-open timed out after 10 s",
+        )),
     }
-    Ok(())
 }
 
 #[cfg(not(any(target_os = "macos", target_os = "linux")))]
@@ -347,6 +394,33 @@ mod tests {
         .await;
         assert!(matches!(p.status, ProbeStatus::Missing));
         assert!(p.version.is_none());
+    }
+
+    /// SCA-733 invariant: a hung binary must not block diagnostics
+    /// indefinitely. We probe `sleep 10` with a 200 ms budget; the
+    /// timeout fires, the child is killed via `kill_on_drop`, and
+    /// the probe returns `Error` with a timeout-flavored install
+    /// hint.
+    #[tokio::test]
+    async fn probe_binary_with_timeout_returns_error_on_hung_binary() {
+        let p = probe_binary_with_timeout(
+            "sleep",
+            &["10"],
+            None,
+            Duration::from_millis(200),
+        )
+        .await;
+        assert!(
+            matches!(p.status, ProbeStatus::Error),
+            "expected Error status on timeout, got {p:?}"
+        );
+        assert!(
+            p.install_hint
+                .map(|h| h.contains("did not respond"))
+                .unwrap_or(false),
+            "expected timeout install_hint, got {:?}",
+            p.install_hint
+        );
     }
 
     #[tokio::test]
