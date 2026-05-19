@@ -22,6 +22,22 @@
 //! implementations land progressively in L1–L5. The dispatcher registration
 //! makes every command callable (with a typed error response) from day one,
 //! so the frontend never hits "command not found".
+//!
+//! ## Command name renames
+//!
+//! Two Tauri commands picked up a `_cmd` suffix during L1 to avoid colliding
+//! with same-named repo functions in their feature modules. Spec §11 calls
+//! these out by their bare names; the frontend must use the suffixed name
+//! when calling `invoke()`:
+//!
+//! | Spec §11 name     | Frontend `invoke()` name | Reason                                              |
+//! |-------------------|--------------------------|-----------------------------------------------------|
+//! | `scan_vault`      | `scan_vault_cmd`         | collides with `vault::scanner::scan_vault`          |
+//! | `archive_prompt`  | `archive_prompt_cmd`     | collides with `vault::writer::archive_prompt`       |
+//!
+//! All other commands match their spec §11 names exactly. If new collisions
+//! appear, follow the same convention: keep the spec name on the repo
+//! function and apply `_cmd` only on the Tauri-command wrapper.
 
 pub mod prompts;
 pub mod variables;
