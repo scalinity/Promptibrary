@@ -26,6 +26,14 @@ on:
 permissions:
   contents: write
 
+# SCA-745: a force-re-tag of v* would otherwise race two release runs
+# against the same GitHub Release. cancel-in-progress: false so the
+# in-flight build completes — cancellation mid-build could leave a
+# partial release with some artifacts uploaded and others missing.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 env:
   RELEASE_TAG: ${{ github.ref_name }}
   RELEASE_REPO: ${{ github.repository }}
