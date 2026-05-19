@@ -239,7 +239,17 @@ async fn hybrid(
 fn recency_boost(last_used_at: Option<DateTime<Utc>>, now: DateTime<Utc>) -> f64 {
     match last_used_at {
         Some(t) => {
-            let days = (now - t).num_seconds() as f64 / 86_400.0;
+            // SCA-741: explicit guard against negative days. A row
+            // with t > now (clock skew, manual SQL insert, future-tz
+            // value) is a misconfigured signal, not a recent launch.
+            // Pre-fix it would have passed `days <= 7.0` and silently
+            // returned 0.10. We return 0.0 to treat it as "no signal"
+            // rather than "most-recent ever".
+            let secs = (now - t).num_seconds();
+            if secs < 0 {
+                return 0.0;
+            }
+            let days = secs as f64 / 86_400.0;
             if days <= 7.0 {
                 0.10
             } else if days <= 30.0 {
@@ -1008,6 +1018,16 @@ mod tests {
         assert_eq!(recency_boost(Some(now - Duration::days(1)), now), 0.10);
         assert_eq!(recency_boost(Some(now - Duration::days(8)), now), 0.05);
         assert_eq!(recency_boost(Some(now - Duration::days(60)), now), 0.0);
+    }
+
+    /// SCA-741: a future timestamp (clock skew, misconfigured row)
+    /// must NOT silently earn the maximum boost. Pre-fix the
+    /// negative-day diff passed `days <= 7.0` and returned 0.10.
+    #[test]
+    fn recency_boost_clamps_future_timestamps_to_zero() {
+        let now = Utc::now();
+        assert_eq!(recency_boost(Some(now + Duration::hours(1)), now), 0.0);
+        assert_eq!(recency_boost(Some(now + Duration::days(7)), now), 0.0);
     }
 
     #[tokio::test]
