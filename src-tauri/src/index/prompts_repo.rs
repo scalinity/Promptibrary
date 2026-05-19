@@ -135,25 +135,39 @@ pub struct LibraryFilters {
     pub offset: Option<u32>,
 }
 
+/// Delimiter for the GROUP_CONCAT(tag_name) trick in
+/// `list_prompts_for_library`. Tag names can't contain this byte by
+/// construction — see migration 0006_fts_tags_sync.sql which uses a
+/// space as its own delimiter, but here we need an unambiguous splitter
+/// for the Rust side. U+001F (Unit Separator) is the canonical choice.
+const TAG_LIST_DELIM: &str = "\u{001f}";
+
 pub async fn list_prompts_for_library(
     db: &SqlitePool,
     filters: LibraryFilters,
 ) -> Result<Vec<PromptIndexRow>> {
+    // Single query (was N+1 prior to SCA-590). LEFT JOIN keeps prompts
+    // with zero tags in the result set; GROUP_CONCAT aggregates the
+    // tags per row using the Unit Separator so we can split them back
+    // in Rust without ambiguity.
     let mut sql = String::from(
-        "SELECT id, title, slug, summary, vault_path, archived_at FROM prompts",
+        "SELECT p.id, p.title, p.slug, p.summary, p.vault_path, p.archived_at, \
+                COALESCE(GROUP_CONCAT(pt.tag_name, '\u{001f}'), '') AS tags \
+         FROM prompts p \
+         LEFT JOIN prompt_tags pt ON pt.prompt_id = p.id",
     );
     let mut clauses: Vec<&'static str> = Vec::new();
     if !filters.include_archived {
-        clauses.push("archived_at IS NULL");
+        clauses.push("p.archived_at IS NULL");
     }
     if filters.tag.is_some() {
-        clauses.push("id IN (SELECT prompt_id FROM prompt_tags WHERE tag_name = ?)");
+        clauses.push("p.id IN (SELECT prompt_id FROM prompt_tags WHERE tag_name = ?)");
     }
     if !clauses.is_empty() {
         sql.push_str(" WHERE ");
         sql.push_str(&clauses.join(" AND "));
     }
-    sql.push_str(" ORDER BY updated_at DESC");
+    sql.push_str(" GROUP BY p.id ORDER BY p.updated_at DESC");
     if let Some(limit) = filters.limit {
         sql.push_str(&format!(" LIMIT {limit}"));
         if let Some(offset) = filters.offset {
@@ -161,19 +175,24 @@ pub async fn list_prompts_for_library(
         }
     }
 
-    let mut q = sqlx::query_as::<_, (String, String, String, String, String, Option<String>)>(&sql);
+    let mut q = sqlx::query_as::<
+        _,
+        (String, String, String, String, String, Option<String>, String),
+    >(&sql);
     if let Some(tag) = filters.tag {
         q = q.bind(tag);
     }
     let rows = q.fetch_all(db).await.map_err(AppError::from)?;
     let mut out = Vec::with_capacity(rows.len());
-    for (id, title, slug, summary, vault_path, archived_at) in rows {
-        let tags: Vec<String> =
-            sqlx::query_scalar("SELECT tag_name FROM prompt_tags WHERE prompt_id = ?")
-                .bind(&id)
-                .fetch_all(db)
-                .await
-                .map_err(AppError::from)?;
+    for (id, title, slug, summary, vault_path, archived_at, tags_concat) in rows {
+        let tags: Vec<String> = if tags_concat.is_empty() {
+            Vec::new()
+        } else {
+            tags_concat
+                .split(TAG_LIST_DELIM)
+                .map(|s| s.to_string())
+                .collect()
+        };
         out.push(PromptIndexRow {
             id,
             title,
