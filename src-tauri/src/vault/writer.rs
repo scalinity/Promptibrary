@@ -18,15 +18,11 @@ use crate::util::atomic_write::atomic_write_string;
 use crate::vault::markdown::{serialize_markdown_document, MarkdownDocument};
 use crate::vault::paths::VaultPaths;
 
-/// Serialize a `Prompt` into the canonical Markdown+frontmatter shape and
-/// atomically write it to the vault at `prompt.vault_path`.
-///
-/// The on-disk frontmatter is derived from the `Prompt`. `checksum_sha256`
-/// is recomputed from the rendered document so callers don't have to.
-pub fn write_prompt(vault: &VaultPaths, prompt: &mut Prompt) -> Result<()> {
-    // Build the YAML frontmatter from a typed struct so we control field
-    // ordering and avoid `serde_yaml`'s map-iteration nondeterminism on
-    // round-trips of arbitrary `Variable` shapes.
+/// Serialize a `Prompt` into the canonical Markdown + frontmatter shape that
+/// `write_prompt` would write to disk. Pure function — exposed so callers
+/// like `export_prompt` can produce the same bytes without touching the
+/// vault filesystem.
+pub fn render_prompt_markdown(prompt: &Prompt) -> Result<String> {
     let frontmatter_yaml = serde_yaml::to_string(&PromptFile {
         promptibrary_schema: 1,
         id: prompt.id.0.clone(),
@@ -48,7 +44,16 @@ pub fn write_prompt(vault: &VaultPaths, prompt: &mut Prompt) -> Result<()> {
         frontmatter_yaml,
         body: prompt.body.clone(),
     };
-    let serialized = serialize_markdown_document(&doc);
+    Ok(serialize_markdown_document(&doc))
+}
+
+/// Serialize a `Prompt` into the canonical Markdown+frontmatter shape and
+/// atomically write it to the vault at `prompt.vault_path`.
+///
+/// The on-disk frontmatter is derived from the `Prompt`. `checksum_sha256`
+/// is recomputed from the rendered document so callers don't have to.
+pub fn write_prompt(vault: &VaultPaths, prompt: &mut Prompt) -> Result<()> {
+    let serialized = render_prompt_markdown(prompt)?;
 
     // Stamp the checksum into the in-memory record AFTER serialization, so
     // the on-disk content is the canonical input to the hash.

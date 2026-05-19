@@ -19,7 +19,9 @@ use crate::util::slug::slugify;
 use crate::vault::frontmatter::parse_prompt_frontmatter;
 use crate::vault::markdown::parse_markdown_document;
 use crate::vault::paths::prompt_path_for_slug;
-use crate::vault::writer::{archive_prompt, write_prompt};
+use crate::vault::writer::{archive_prompt, render_prompt_markdown, write_prompt};
+use crate::util::atomic_write::atomic_write_bytes;
+use std::path::PathBuf;
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -94,6 +96,21 @@ pub struct UpdatePromptInput {
     pub tags: Option<Vec<String>>,
     #[serde(default)]
     pub variables: Option<Vec<Variable>>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ExportFormat {
+    Markdown,
+    Json,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportPromptInput {
+    pub id: String,
+    pub format: ExportFormat,
+    pub destination: PathBuf,
 }
 
 #[tauri::command]
@@ -286,11 +303,29 @@ pub async fn delete_prompt(
 
 #[tauri::command]
 pub async fn export_prompt(
-    input: GetPromptInput,
+    input: ExportPromptInput,
     services: State<'_, ManagedState>,
-) -> Result<String> {
-    let prompt = get_prompt(input, services).await?;
-    serde_json::to_string_pretty(&prompt).map_err(AppError::from)
+) -> Result<PathBuf> {
+    // Reuse get_prompt for the canonical fetch — keeps the on-disk shape
+    // and the exported shape identical for markdown exports.
+    let prompt = get_prompt(GetPromptInput { id: input.id.clone() }, services).await?;
+
+    let bytes = match input.format {
+        ExportFormat::Markdown => render_prompt_markdown(&prompt)?.into_bytes(),
+        ExportFormat::Json => serde_json::to_vec_pretty(&prompt).map_err(AppError::from)?,
+    };
+
+    // Caller picks the destination via the OS save dialog; require it to be
+    // absolute so we don't silently create files under the cwd.
+    if !input.destination.is_absolute() {
+        return Err(AppError::new(
+            AppErrorKind::Internal,
+            "export destination must be an absolute path",
+        ));
+    }
+
+    atomic_write_bytes(&input.destination, &bytes)?;
+    Ok(input.destination)
 }
 
 // ---------- Helpers --------------------------------------------------------
