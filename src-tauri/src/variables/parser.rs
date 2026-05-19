@@ -424,6 +424,25 @@ fn humanize_label(value: &str) -> String {
     out
 }
 
+/// Parse the constraint section of a variable ref.
+///
+/// Splits on `,` for pairs and `=` for key/value, with no escape mechanism.
+/// **Known limitation (SCA-610):** a `pattern` constraint that contains a
+/// literal `,` or `=` will be truncated, since those chars are the
+/// delimiters. Example: `?pattern=^[a,b]+$` parses as `pattern=^[a` plus
+/// a junk-key segment `b]+$` (which is then dropped because `is_valid_key`
+/// rejects keys starting with `[`).
+///
+/// Workarounds today:
+///   1. Author the pattern without `,` or `=` (most regexes don't need
+///      them outside character classes).
+///   2. Move the pattern into the `pattern` field of frontmatter
+///      `variables[].pattern`, which bypasses constraint-string parsing
+///      entirely.
+///
+/// V2-candidate: introduce a quoting mechanism (e.g. backslash-escape or
+/// single-quoted values). Not in scope for L1 — the spec §5 grammar
+/// hard-codes the unescaped split.
 fn parse_constraints(s: &str) -> HashMap<String, String> {
     let mut out = HashMap::new();
     for part in s.split(',') {
