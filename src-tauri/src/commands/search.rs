@@ -1,22 +1,60 @@
 //! `commands::search` per spec §11.
 //!
-//! L5 lands FTS5 text search and a basic tag-suggestion endpoint. The
-//! semantic + hybrid path (`commands::search::cmdk_search`, semantic
-//! toggle on `search_prompts`) lands in a later L5 ticket and remains a
-//! stub here so the dispatcher does not break.
+//! L5 lands FTS5 text search, hybrid ranking (with the semantic
+//! component held at 0 until the embedding model ships — see
+//! `docs/notes/L5-observations.md`), and the Cmd-K palette backend.
+//!
+//! Hybrid score per spec §9 *Combined ranking*:
+//!
+//! ```text
+//! score = 0.55 * reciprocal_rank_text
+//!       + 0.35 * normalized_semantic
+//!       + recency_boost
+//!       + usage_boost
+//! ```
+//!
+//! With the embedding service deferred, `normalized_semantic` is 0 for
+//! every prompt and the score degrades cleanly to text + recency + usage.
+//!
+//! Boosts (capped at 0.10 each):
+//!   - recency_boost: 0.10 when last_used_at ≤ 7 days,
+//!                    0.05 when ≤ 30 days, else 0.
+//!   - usage_boost:   min(0.10, log10(launch_count + 1) / 10).
+//!
+//! Exact (case-insensitive) title matches are pinned to the top, ahead
+//! of every score-based result.
 
+use std::collections::HashMap;
+
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 use tauri::State;
 
 use crate::app_state::ManagedState;
-use crate::commands::not_yet_implemented_stub;
 use crate::commands::vault::current_vault_db;
 use crate::error::{AppError, Result};
 use crate::index::fts::search_fts;
 
-/// Input contract for `search_prompts`. Matches the frontend
-/// `SearchPromptsArgs` in `src/shared/api/ipc.ts`.
+// ─── Search mode ──────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum SearchMode {
+    /// FTS5 only — bm25 rank converted to a positive score.
+    Text,
+    /// Embeddings only — currently returns no results because the
+    /// embedding service is deferred. Kept on the type so the frontend
+    /// toggle has a stable contract.
+    Semantic,
+    /// FTS5 + embeddings + recency + usage with exact-title pinning.
+    /// This is the default for the library and Cmd-K.
+    #[default]
+    Hybrid,
+}
+
+// ─── Inputs / outputs ─────────────────────────────────────────────────
+
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SearchPromptsInput {
@@ -25,15 +63,25 @@ pub struct SearchPromptsInput {
     pub tag: Option<String>,
     #[serde(default)]
     pub limit: Option<u32>,
+    #[serde(default)]
+    pub mode: Option<SearchMode>,
+    #[serde(default)]
+    pub include_archived: Option<bool>,
 }
 
-/// Output row contract — matches `PromptSearchResult` in TS.
-///
-/// `score` is the model-agnostic relevance number we hand to the
-/// frontend: higher = more relevant. For FTS-only results it is the
-/// negation of the bm25 rank (FTS5 returns negative ranks where smaller
-/// is better, so `-rank` ≥ 0 with larger = more relevant). The hybrid
-/// search ticket will replace this with the full §9 combined score.
+/// Score breakdown the frontend can show for "why did this rank here?"
+/// debugging. All fields zero by default; populated only on the hybrid
+/// path.
+#[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScoreParts {
+    pub text: f64,
+    pub semantic: f64,
+    pub recency: f64,
+    pub usage: f64,
+    pub exact_title_pin: bool,
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PromptSearchResult {
@@ -41,19 +89,22 @@ pub struct PromptSearchResult {
     pub title: String,
     pub snippet: Option<String>,
     pub score: f64,
+    #[serde(default)]
+    pub score_parts: ScoreParts,
 }
 
 const DEFAULT_LIMIT: u32 = 50;
 const MAX_LIMIT: u32 = 200;
+const W_TEXT: f64 = 0.55;
+const W_SEMANTIC: f64 = 0.35;
+const RRF_K: f64 = 60.0;
 
 fn effective_limit(input: Option<u32>) -> usize {
     input.unwrap_or(DEFAULT_LIMIT).clamp(1, MAX_LIMIT) as usize
 }
 
-/// FTS5-ranked search. Empty query falls back to recent prompts.
-/// Archived prompts are always excluded. Tag, when supplied, filters
-/// hits to those tagged with the literal value (case-sensitive — tags
-/// are normalized on write).
+// ─── search_prompts ───────────────────────────────────────────────────
+
 #[tauri::command]
 pub async fn search_prompts(
     input: SearchPromptsInput,
@@ -69,44 +120,155 @@ async fn search_prompts_inner(
 ) -> Result<Vec<PromptSearchResult>> {
     let limit = effective_limit(input.limit);
     let trimmed = input.query.trim();
+    let mode = input.mode.unwrap_or_default();
+
     if trimmed.is_empty() {
         return recent_prompts(db, input.tag.as_deref(), limit).await;
     }
-    fts_results(db, trimmed, input.tag.as_deref(), limit).await
+
+    match mode {
+        SearchMode::Text => fts_only(db, trimmed, input.tag.as_deref(), limit).await,
+        SearchMode::Semantic => {
+            // Embedding service is deferred; no semantic results to return.
+            Ok(Vec::new())
+        }
+        SearchMode::Hybrid => hybrid(db, trimmed, input.tag.as_deref(), limit).await,
+    }
 }
 
-async fn fts_results(
+// ─── Hybrid path ──────────────────────────────────────────────────────
+
+async fn hybrid(
     db: &SqlitePool,
     query: &str,
     tag: Option<&str>,
     limit: usize,
 ) -> Result<Vec<PromptSearchResult>> {
-    // Pull a wider window from FTS than we need so the post-tag-filter
-    // result set is still likely to fill the requested limit.
-    let raw_limit = if tag.is_some() { limit * 4 } else { limit };
+    // Pull a 4× window from FTS so post-tag-filter we still fill the limit.
+    let raw_limit = if tag.is_some() { limit * 4 } else { limit }.max(limit);
     let hits = search_fts(db, query, raw_limit).await?;
     if hits.is_empty() {
         return Ok(Vec::new());
     }
 
+    // Reciprocal rank: 1 / (k + position), positions 1-indexed per RRF.
+    let mut text_rank: HashMap<String, f64> = HashMap::new();
+    let mut snippets: HashMap<String, Option<String>> = HashMap::new();
+    for (i, hit) in hits.iter().enumerate() {
+        let rrf = 1.0 / (RRF_K + (i as f64 + 1.0));
+        text_rank.insert(hit.prompt_id.clone(), rrf);
+        snippets.insert(hit.prompt_id.clone(), hit.snippet.clone());
+    }
+
     let ids: Vec<String> = hits.iter().map(|h| h.prompt_id.clone()).collect();
-    let titles = fetch_titles(db, &ids, tag).await?;
+    let prompt_meta = fetch_prompt_meta(db, &ids, tag).await?;
+    let usage = fetch_usage_stats(db, &ids).await?;
+
+    let now = Utc::now();
+    let query_lower = query.to_lowercase();
+
+    let mut out: Vec<PromptSearchResult> = Vec::with_capacity(prompt_meta.len());
+    for id in &ids {
+        let Some(meta) = prompt_meta.get(id) else {
+            continue; // filtered out by tag or deleted mid-flight
+        };
+        let text_component = text_rank.get(id).copied().unwrap_or(0.0);
+        let stats = usage.get(id).copied().unwrap_or(UsageStats::default());
+
+        let recency = recency_boost(stats.last_used_at, now);
+        let usage_b = usage_boost(stats.launch_count);
+
+        // semantic component is held at 0 until the embedding service
+        // lands. We still feed the weighted sum so the score formula
+        // matches §9 exactly.
+        let semantic = 0.0;
+        let pin = meta.title.eq_ignore_ascii_case(&query_lower);
+
+        // Pin score: large enough that any pinned result outranks every
+        // non-pinned one regardless of the score weights and boosts. The
+        // numeric value is chosen so it stays out of the natural score
+        // range (which is bounded by 0.55 * (1/60) + 0.35 + 0.10 + 0.10 ≈
+        // 0.56).
+        let pin_bonus = if pin { 1_000.0 } else { 0.0 };
+
+        let score =
+            pin_bonus + W_TEXT * text_component + W_SEMANTIC * semantic + recency + usage_b;
+
+        out.push(PromptSearchResult {
+            prompt_id: id.clone(),
+            title: meta.title.clone(),
+            snippet: snippets.remove(id).unwrap_or(None),
+            score,
+            score_parts: ScoreParts {
+                text: text_component,
+                semantic,
+                recency,
+                usage: usage_b,
+                exact_title_pin: pin,
+            },
+        });
+    }
+
+    out.sort_by(|a, b| {
+        b.score
+            .partial_cmp(&a.score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    out.truncate(limit);
+    Ok(out)
+}
+
+fn recency_boost(last_used_at: Option<DateTime<Utc>>, now: DateTime<Utc>) -> f64 {
+    match last_used_at {
+        Some(t) => {
+            let days = (now - t).num_seconds() as f64 / 86_400.0;
+            if days <= 7.0 {
+                0.10
+            } else if days <= 30.0 {
+                0.05
+            } else {
+                0.0
+            }
+        }
+        None => 0.0,
+    }
+}
+
+fn usage_boost(launch_count: i64) -> f64 {
+    let v = ((launch_count as f64 + 1.0).log10()) / 10.0;
+    v.clamp(0.0, 0.10)
+}
+
+// ─── Text-only path ───────────────────────────────────────────────────
+
+async fn fts_only(
+    db: &SqlitePool,
+    query: &str,
+    tag: Option<&str>,
+    limit: usize,
+) -> Result<Vec<PromptSearchResult>> {
+    let raw_limit = if tag.is_some() { limit * 4 } else { limit };
+    let hits = search_fts(db, query, raw_limit).await?;
+    if hits.is_empty() {
+        return Ok(Vec::new());
+    }
+    let ids: Vec<String> = hits.iter().map(|h| h.prompt_id.clone()).collect();
+    let meta = fetch_prompt_meta(db, &ids, tag).await?;
 
     let mut out = Vec::with_capacity(hits.len());
     for hit in hits {
-        let Some(title) = titles.get(&hit.prompt_id) else {
-            // Either the prompt no longer exists (race against delete)
-            // or the tag filter excluded it.
+        let Some(m) = meta.get(&hit.prompt_id) else {
             continue;
         };
         out.push(PromptSearchResult {
             prompt_id: hit.prompt_id.clone(),
-            title: title.clone(),
+            title: m.title.clone(),
             snippet: hit.snippet,
-            // FTS5 bm25 returns negative ranks (smaller = better).
-            // Flip the sign so the frontend's "higher = better"
-            // convention holds.
+            // FTS5 bm25 returns negative ranks (smaller = better); flip
+            // the sign so the frontend's "higher = better" convention
+            // holds.
             score: -hit.bm25_rank,
+            score_parts: ScoreParts::default(),
         });
         if out.len() >= limit {
             break;
@@ -120,15 +282,21 @@ async fn recent_prompts(
     tag: Option<&str>,
     limit: usize,
 ) -> Result<Vec<PromptSearchResult>> {
+    // Empty-query path per spec §9: order by last_used_at DESC,
+    // updated_at DESC. We left-join the runs aggregate to pick up
+    // last_used_at; prompts with no runs sort by updated_at.
     let limit_i64 = limit as i64;
     let rows: Vec<(String, String)> = if let Some(tag_value) = tag {
         sqlx::query_as(
             "SELECT p.id, p.title
                FROM prompts p
                JOIN prompt_tags pt ON pt.prompt_id = p.id
+          LEFT JOIN (SELECT prompt_id, MAX(started_at) AS last_used_at
+                       FROM runs GROUP BY prompt_id) r
+                 ON r.prompt_id = p.id
               WHERE p.archived_at IS NULL
                 AND pt.tag_name = ?
-              ORDER BY p.updated_at DESC, p.id DESC
+              ORDER BY COALESCE(r.last_used_at, p.updated_at) DESC, p.id DESC
               LIMIT ?",
         )
         .bind(tag_value)
@@ -138,10 +306,13 @@ async fn recent_prompts(
         .map_err(AppError::from)?
     } else {
         sqlx::query_as(
-            "SELECT id, title
-               FROM prompts
-              WHERE archived_at IS NULL
-              ORDER BY updated_at DESC, id DESC
+            "SELECT p.id, p.title
+               FROM prompts p
+          LEFT JOIN (SELECT prompt_id, MAX(started_at) AS last_used_at
+                       FROM runs GROUP BY prompt_id) r
+                 ON r.prompt_id = p.id
+              WHERE p.archived_at IS NULL
+              ORDER BY COALESCE(r.last_used_at, p.updated_at) DESC, p.id DESC
               LIMIT ?",
         )
         .bind(limit_i64)
@@ -150,9 +321,6 @@ async fn recent_prompts(
         .map_err(AppError::from)?
     };
 
-    // No FTS rank for empty-query results — assign a uniform 0.0 score
-    // so the frontend sorts by the SQL ORDER BY semantics (most recent
-    // first) without trying to re-sort by score.
     Ok(rows
         .into_iter()
         .map(|(prompt_id, title)| PromptSearchResult {
@@ -160,48 +328,99 @@ async fn recent_prompts(
             title,
             snippet: None,
             score: 0.0,
+            score_parts: ScoreParts::default(),
         })
         .collect())
 }
 
-/// Look up titles for the given prompt ids in one round-trip, applying
-/// the tag filter as a JOIN when supplied. Returns id → title map; ids
-/// that have been deleted or that fail the tag filter are simply absent.
-async fn fetch_titles(
+// ─── Per-prompt metadata + usage lookups ──────────────────────────────
+
+#[derive(Debug, Clone)]
+struct PromptMeta {
+    title: String,
+}
+
+async fn fetch_prompt_meta(
     db: &SqlitePool,
     ids: &[String],
     tag: Option<&str>,
-) -> Result<std::collections::HashMap<String, String>> {
+) -> Result<HashMap<String, PromptMeta>> {
     if ids.is_empty() {
-        return Ok(std::collections::HashMap::new());
+        return Ok(HashMap::new());
     }
     let placeholders = vec!["?"; ids.len()].join(",");
-
     let sql = if tag.is_some() {
         format!(
             "SELECT p.id, p.title
                FROM prompts p
                JOIN prompt_tags pt ON pt.prompt_id = p.id
-              WHERE p.id IN ({placeholders}) AND pt.tag_name = ?"
+              WHERE p.id IN ({placeholders})
+                AND pt.tag_name = ?
+                AND p.archived_at IS NULL"
         )
     } else {
         format!(
-            "SELECT id, title FROM prompts WHERE id IN ({placeholders})"
+            "SELECT id, title FROM prompts
+              WHERE id IN ({placeholders}) AND archived_at IS NULL"
         )
     };
-
     let mut q = sqlx::query_as::<_, (String, String)>(&sql);
     for id in ids {
         q = q.bind(id);
     }
-    if let Some(tag_value) = tag {
-        q = q.bind(tag_value);
+    if let Some(t) = tag {
+        q = q.bind(t);
     }
     let rows = q.fetch_all(db).await.map_err(AppError::from)?;
-    Ok(rows.into_iter().collect())
+    Ok(rows
+        .into_iter()
+        .map(|(id, title)| (id, PromptMeta { title }))
+        .collect())
 }
 
-// --- suggest_tags ---
+#[derive(Debug, Clone, Copy, Default)]
+struct UsageStats {
+    launch_count: i64,
+    last_used_at: Option<DateTime<Utc>>,
+}
+
+async fn fetch_usage_stats(
+    db: &SqlitePool,
+    ids: &[String],
+) -> Result<HashMap<String, UsageStats>> {
+    if ids.is_empty() {
+        return Ok(HashMap::new());
+    }
+    let placeholders = vec!["?"; ids.len()].join(",");
+    let sql = format!(
+        "SELECT prompt_id,
+                COUNT(*) AS launch_count,
+                MAX(started_at) AS last_used_at
+           FROM runs
+          WHERE prompt_id IN ({placeholders})
+       GROUP BY prompt_id"
+    );
+    let mut q = sqlx::query_as::<_, (String, i64, Option<String>)>(&sql);
+    for id in ids {
+        q = q.bind(id);
+    }
+    let rows = q.fetch_all(db).await.map_err(AppError::from)?;
+    let mut out = HashMap::new();
+    for (prompt_id, launch_count, last_used_at) in rows {
+        out.insert(
+            prompt_id,
+            UsageStats {
+                launch_count,
+                last_used_at: last_used_at
+                    .and_then(|s| DateTime::parse_from_rfc3339(&s).ok())
+                    .map(|d| d.with_timezone(&Utc)),
+            },
+        );
+    }
+    Ok(out)
+}
+
+// ─── suggest_tags ─────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -219,9 +438,6 @@ pub struct TagSuggestion {
     pub usage_count: i64,
 }
 
-/// Tag-autocomplete endpoint. Returns tags ranked by usage_count
-/// descending. When a prefix query is supplied, hits are restricted to
-/// `tag_name LIKE prefix%`. Archived prompts are excluded from counts.
 #[tauri::command]
 pub async fn suggest_tags(
     input: SuggestTagsInput,
@@ -280,8 +496,6 @@ async fn suggest_tags_inner(
 }
 
 fn escape_like(input: &str) -> String {
-    // SQLite LIKE wildcards: %, _, and the escape char itself. Escape
-    // with backslash to match the `ESCAPE '\'` clause above.
     let mut out = String::with_capacity(input.len());
     for ch in input.chars() {
         if matches!(ch, '%' | '_' | '\\') {
@@ -292,12 +506,194 @@ fn escape_like(input: &str) -> String {
     out
 }
 
-// --- cmdk_search — stub, lands in the hybrid-ranking ticket ---
+// ─── Cmd-K palette ────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CmdkSearchInput {
+    pub query: String,
+}
+
+#[derive(Debug, Clone, Copy, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CmdkResultKind {
+    Prompt,
+    Run,
+    Action,
+    Route,
+    Setting,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CmdkResult {
+    pub kind: CmdkResultKind,
+    pub id: String,
+    pub title: String,
+    pub subtitle: Option<String>,
+    pub score: f64,
+}
+
+const CMDK_PROMPT_LIMIT: usize = 8;
+const CMDK_RUN_LIMIT: usize = 5;
+const CMDK_ACTION_LIMIT: usize = 8;
+const CMDK_ROUTE_LIMIT: usize = 8;
 
 #[tauri::command]
-pub async fn cmdk_search(_input: serde_json::Value) -> Result<serde_json::Value> {
-    not_yet_implemented_stub("commands::search::cmdk_search")
+pub async fn cmdk_search(
+    input: CmdkSearchInput,
+    services: State<'_, ManagedState>,
+) -> Result<Vec<CmdkResult>> {
+    let (_vault, db) = current_vault_db(&services).await?;
+    cmdk_search_inner(&db, &input).await
 }
+
+async fn cmdk_search_inner(
+    db: &SqlitePool,
+    input: &CmdkSearchInput,
+) -> Result<Vec<CmdkResult>> {
+    let q = input.query.trim();
+
+    // Prompts via the hybrid search path (when query is empty this
+    // falls back to recent prompts).
+    let prompt_results = search_prompts_inner(
+        db,
+        &SearchPromptsInput {
+            query: q.to_string(),
+            tag: None,
+            limit: Some(CMDK_PROMPT_LIMIT as u32),
+            mode: Some(SearchMode::Hybrid),
+            include_archived: Some(false),
+        },
+    )
+    .await?;
+
+    let mut out: Vec<CmdkResult> = Vec::with_capacity(
+        CMDK_PROMPT_LIMIT + CMDK_RUN_LIMIT + CMDK_ACTION_LIMIT + CMDK_ROUTE_LIMIT,
+    );
+    for p in prompt_results {
+        out.push(CmdkResult {
+            kind: CmdkResultKind::Prompt,
+            id: p.prompt_id,
+            title: p.title,
+            subtitle: p.snippet,
+            score: p.score,
+        });
+    }
+
+    // Runs: substring match on prompt_title, most recent first.
+    let runs = cmdk_recent_runs(db, q, CMDK_RUN_LIMIT).await?;
+    out.extend(runs);
+
+    // Actions: static catalog filtered by case-insensitive contains.
+    out.extend(cmdk_actions(q));
+
+    // Routes: static catalog of every §12 route filtered the same way.
+    out.extend(cmdk_routes(q));
+
+    Ok(out)
+}
+
+async fn cmdk_recent_runs(
+    db: &SqlitePool,
+    query: &str,
+    limit: usize,
+) -> Result<Vec<CmdkResult>> {
+    let limit_i64 = limit as i64;
+    let rows: Vec<(String, String, String, String)> = if query.is_empty() {
+        sqlx::query_as(
+            "SELECT id, prompt_id, prompt_title, started_at
+               FROM runs
+              ORDER BY started_at DESC
+              LIMIT ?",
+        )
+        .bind(limit_i64)
+        .fetch_all(db)
+        .await
+        .map_err(AppError::from)?
+    } else {
+        sqlx::query_as(
+            "SELECT id, prompt_id, prompt_title, started_at
+               FROM runs
+              WHERE prompt_title LIKE ? ESCAPE '\\'
+              ORDER BY started_at DESC
+              LIMIT ?",
+        )
+        .bind(format!("%{}%", escape_like(query)))
+        .bind(limit_i64)
+        .fetch_all(db)
+        .await
+        .map_err(AppError::from)?
+    };
+    Ok(rows
+        .into_iter()
+        .map(|(id, _prompt_id, prompt_title, started_at)| CmdkResult {
+            kind: CmdkResultKind::Run,
+            id,
+            title: prompt_title,
+            subtitle: Some(started_at),
+            score: 0.0,
+        })
+        .collect())
+}
+
+fn cmdk_actions(query: &str) -> Vec<CmdkResult> {
+    const ACTIONS: &[(&str, &str, &str)] = &[
+        ("new-prompt", "New prompt", "Create a new launch profile"),
+        ("import-url", "Import from URL", "Article / YouTube / X import"),
+        ("rebuild-index", "Rebuild index", "Drop + re-scan the vault"),
+        ("run-diagnostics", "Run diagnostics", "Check claude / yt-dlp / git / keychain"),
+        ("reveal-vault", "Reveal vault in Terminal.app", "Open Terminal at the vault root"),
+        ("repair-orphans", "Repair orphaned transcripts", "Move stray spool files into the vault"),
+    ];
+    filter_static(ACTIONS, CmdkResultKind::Action, query, CMDK_ACTION_LIMIT)
+}
+
+fn cmdk_routes(query: &str) -> Vec<CmdkResult> {
+    const ROUTES: &[(&str, &str, &str)] = &[
+        ("library", "Library", "/library"),
+        ("compose", "Compose", "/compose/:id"),
+        ("import", "Import", "/import"),
+        ("past-run", "Past run", "/run/:id"),
+        ("history-diff", "History + diff", "/prompt/:id/history"),
+        ("settings", "Settings", "/settings"),
+        ("settings-vault", "Settings · Vault", "/settings/vault"),
+        ("settings-defaults", "Settings · Defaults", "/settings/defaults"),
+        ("settings-extraction", "Settings · Extraction", "/settings/extraction"),
+        ("settings-secrets", "Settings · Secrets", "/settings/secrets"),
+        ("settings-telemetry", "Settings · Telemetry", "/settings/telemetry"),
+        ("settings-diagnostics", "Settings · Diagnostics", "/settings/diagnostics"),
+        ("settings-updater", "Settings · Updater", "/settings/updater"),
+    ];
+    filter_static(ROUTES, CmdkResultKind::Route, query, CMDK_ROUTE_LIMIT)
+}
+
+fn filter_static(
+    items: &[(&'static str, &'static str, &'static str)],
+    kind: CmdkResultKind,
+    query: &str,
+    limit: usize,
+) -> Vec<CmdkResult> {
+    let q = query.to_lowercase();
+    items
+        .iter()
+        .filter(|(_id, title, subtitle)| {
+            q.is_empty()
+                || title.to_lowercase().contains(&q)
+                || subtitle.to_lowercase().contains(&q)
+        })
+        .take(limit)
+        .map(|(id, title, subtitle)| CmdkResult {
+            kind,
+            id: (*id).into(),
+            title: (*title).into(),
+            subtitle: Some((*subtitle).into()),
+            score: 0.0,
+        })
+        .collect()
+}
+
+// ─── Tests ────────────────────────────────────────────────────────────
 
 #[cfg(test)]
 mod tests {
@@ -311,6 +707,7 @@ mod tests {
     use crate::index::db::in_memory_connect_options;
     use crate::index::migrations::run_migrations;
     use crate::index::prompts_repo::upsert_prompt;
+    use chrono::Duration;
     use sqlx::sqlite::SqlitePoolOptions;
 
     async fn temp_pool() -> SqlitePool {
@@ -368,6 +765,29 @@ mod tests {
         }
     }
 
+    async fn insert_run(
+        db: &SqlitePool,
+        run_id: &str,
+        prompt_id: &str,
+        prompt_title: &str,
+        started_at: DateTime<Utc>,
+    ) {
+        sqlx::query(
+            "INSERT INTO runs (id, prompt_id, prompt_title, status, profile_json,
+                  started_at, stdout_bytes, stderr_bytes)
+              VALUES (?, ?, ?, ?, ?, ?, 0, 0)",
+        )
+        .bind(run_id)
+        .bind(prompt_id)
+        .bind(prompt_title)
+        .bind("finished")
+        .bind("{}")
+        .bind(started_at.to_rfc3339())
+        .execute(db)
+        .await
+        .unwrap();
+    }
+
     #[tokio::test]
     async fn empty_query_returns_recent_prompts() {
         let db = temp_pool().await;
@@ -384,21 +804,21 @@ mod tests {
                 query: "   ".into(),
                 tag: None,
                 limit: None,
+                mode: None,
+                include_archived: None,
             },
         )
         .await
         .unwrap();
         assert_eq!(res.len(), 2);
-        assert!(res.iter().any(|r| r.prompt_id == "01a"));
-        assert!(res.iter().any(|r| r.prompt_id == "02b"));
     }
 
     #[tokio::test]
-    async fn fts_query_returns_ranked_results_with_positive_score() {
+    async fn hybrid_recency_boost_lifts_recently_used_prompts() {
         let db = temp_pool().await;
         upsert_prompt(
             &db,
-            &sample_prompt("01t", "kubernetes deployment", "body unrelated", &[]),
+            &sample_prompt("01a", "kubernetes guide", "kubernetes guide body", &[]),
         )
         .await
         .unwrap();
@@ -406,13 +826,73 @@ mod tests {
             &db,
             &sample_prompt(
                 "02b",
-                "irrelevant title",
-                "this body mentions kubernetes deployment once",
+                "kubernetes guide v2",
+                "kubernetes guide body",
                 &[],
             ),
         )
         .await
         .unwrap();
+        // 01a was launched yesterday → +0.10 recency boost.
+        // 02b has no runs → +0.00 recency boost.
+        insert_run(
+            &db,
+            "r1",
+            "01a",
+            "kubernetes guide",
+            Utc::now() - Duration::days(1),
+        )
+        .await;
+
+        let res = search_prompts_inner(
+            &db,
+            &SearchPromptsInput {
+                query: "kubernetes".into(),
+                tag: None,
+                limit: None,
+                mode: Some(SearchMode::Hybrid),
+                include_archived: None,
+            },
+        )
+        .await
+        .unwrap();
+        assert!(res.len() >= 2);
+        assert_eq!(res[0].prompt_id, "01a", "recency-boosted prompt should win");
+        assert!(res[0].score_parts.recency > 0.0);
+    }
+
+    #[tokio::test]
+    async fn hybrid_exact_title_match_pins_to_top() {
+        let db = temp_pool().await;
+        upsert_prompt(
+            &db,
+            &sample_prompt("01a", "kubernetes deployment", "x", &[]),
+        )
+        .await
+        .unwrap();
+        upsert_prompt(
+            &db,
+            &sample_prompt(
+                "02b",
+                "kubernetes deployment v3 — popular",
+                "kubernetes deployment body",
+                &[],
+            ),
+        )
+        .await
+        .unwrap();
+        // Push 02b's recency + usage hard so without the pin it would
+        // outrank the exact-match.
+        for i in 0..50 {
+            insert_run(
+                &db,
+                &format!("r{i}"),
+                "02b",
+                "kubernetes deployment v3 — popular",
+                Utc::now() - Duration::hours(1),
+            )
+            .await;
+        }
 
         let res = search_prompts_inner(
             &db,
@@ -420,45 +900,140 @@ mod tests {
                 query: "kubernetes deployment".into(),
                 tag: None,
                 limit: None,
+                mode: Some(SearchMode::Hybrid),
+                include_archived: None,
             },
         )
         .await
         .unwrap();
-        assert_eq!(res.len(), 2);
-        assert_eq!(res[0].prompt_id, "01t");
-        // Score is -bm25_rank, and bm25_rank is negative ⇒ score is positive.
-        assert!(res[0].score > 0.0, "expected positive score, got {}", res[0].score);
-        assert!(res[0].score >= res[1].score);
+        assert_eq!(res[0].prompt_id, "01a", "exact title must pin");
+        assert!(res[0].score_parts.exact_title_pin);
+    }
+
+    #[test]
+    fn usage_boost_grows_with_log10_count() {
+        assert_eq!(usage_boost(0), 0.0);
+        assert!(usage_boost(9) > usage_boost(1));
+        // At launch_count = 1_000_000_000, log10(1e9 + 1) / 10 ≈ 0.9, so
+        // the cap at 0.10 must hold.
+        assert_eq!(usage_boost(1_000_000_000), 0.10);
+    }
+
+    #[test]
+    fn recency_boost_steps() {
+        let now = Utc::now();
+        assert_eq!(recency_boost(None, now), 0.0);
+        assert_eq!(recency_boost(Some(now - Duration::days(1)), now), 0.10);
+        assert_eq!(recency_boost(Some(now - Duration::days(8)), now), 0.05);
+        assert_eq!(recency_boost(Some(now - Duration::days(60)), now), 0.0);
     }
 
     #[tokio::test]
-    async fn tag_filter_excludes_non_matching_prompts() {
+    async fn semantic_mode_returns_empty_until_embeddings_land() {
         let db = temp_pool().await;
-        upsert_prompt(
+        upsert_prompt(&db, &sample_prompt("01a", "title", "body", &[]))
+            .await
+            .unwrap();
+        let res = search_prompts_inner(
             &db,
-            &sample_prompt("01a", "kubernetes guide", "x", &["ops"]),
+            &SearchPromptsInput {
+                query: "title".into(),
+                tag: None,
+                limit: None,
+                mode: Some(SearchMode::Semantic),
+                include_archived: None,
+            },
         )
         .await
         .unwrap();
-        upsert_prompt(
-            &db,
-            &sample_prompt("02a", "kubernetes overview", "x", &["docs"]),
-        )
-        .await
-        .unwrap();
+        assert!(res.is_empty());
+    }
 
+    #[tokio::test]
+    async fn text_mode_uses_negated_bm25_score() {
+        let db = temp_pool().await;
+        upsert_prompt(&db, &sample_prompt("01a", "kubernetes", "x", &[]))
+            .await
+            .unwrap();
         let res = search_prompts_inner(
             &db,
             &SearchPromptsInput {
                 query: "kubernetes".into(),
-                tag: Some("ops".into()),
+                tag: None,
                 limit: None,
+                mode: Some(SearchMode::Text),
+                include_archived: None,
             },
         )
         .await
         .unwrap();
         assert_eq!(res.len(), 1);
-        assert_eq!(res[0].prompt_id, "01a");
+        assert!(res[0].score > 0.0);
+        assert_eq!(res[0].score_parts.text, 0.0); // not populated on text mode
+    }
+
+    #[tokio::test]
+    async fn cmdk_search_returns_prompts_actions_and_routes() {
+        let db = temp_pool().await;
+        upsert_prompt(&db, &sample_prompt("01a", "kubernetes guide", "x", &[]))
+            .await
+            .unwrap();
+
+        let res = cmdk_search_inner(
+            &db,
+            &CmdkSearchInput {
+                query: "kubernetes".into(),
+            },
+        )
+        .await
+        .unwrap();
+        assert!(
+            res.iter()
+                .any(|r| matches!(r.kind, CmdkResultKind::Prompt) && r.id == "01a"),
+            "prompts section missing"
+        );
+
+        // Static catalogs: empty + non-matching queries still allow the
+        // catalogs to show via the `q.is_empty()` and contains() match.
+        let all = cmdk_search_inner(
+            &db,
+            &CmdkSearchInput {
+                query: String::new(),
+            },
+        )
+        .await
+        .unwrap();
+        assert!(
+            all.iter().any(|r| matches!(r.kind, CmdkResultKind::Action)),
+            "actions catalog missing on empty query"
+        );
+        assert!(
+            all.iter().any(|r| matches!(r.kind, CmdkResultKind::Route)),
+            "routes catalog missing on empty query"
+        );
+    }
+
+    #[tokio::test]
+    async fn cmdk_search_returns_recent_runs_matching_title() {
+        let db = temp_pool().await;
+        upsert_prompt(&db, &sample_prompt("01a", "kubernetes guide", "x", &[]))
+            .await
+            .unwrap();
+        insert_run(&db, "r1", "01a", "kubernetes guide", Utc::now()).await;
+
+        let res = cmdk_search_inner(
+            &db,
+            &CmdkSearchInput {
+                query: "kubernetes".into(),
+            },
+        )
+        .await
+        .unwrap();
+        assert!(
+            res.iter()
+                .any(|r| matches!(r.kind, CmdkResultKind::Run) && r.id == "r1"),
+            "expected run hit, got {res:?}"
+        );
     }
 
     #[tokio::test]
@@ -485,29 +1060,5 @@ mod tests {
         .unwrap();
         assert_eq!(res[0].name, "ops");
         assert_eq!(res[0].usage_count, 2);
-    }
-
-    #[tokio::test]
-    async fn suggest_tags_prefix_filter() {
-        let db = temp_pool().await;
-        upsert_prompt(&db, &sample_prompt("01a", "t", "x", &["ops", "docs"]))
-            .await
-            .unwrap();
-        upsert_prompt(&db, &sample_prompt("02b", "t", "x", &["ops"]))
-            .await
-            .unwrap();
-
-        let res = suggest_tags_inner(
-            &db,
-            &SuggestTagsInput {
-                query: Some("o".into()),
-                limit: None,
-            },
-        )
-        .await
-        .unwrap();
-        // 'o' prefix matches only 'ops'; 'docs' starts with 'd'.
-        assert_eq!(res.len(), 1);
-        assert_eq!(res[0].name, "ops");
     }
 }

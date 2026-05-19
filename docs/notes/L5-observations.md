@@ -38,3 +38,43 @@ Pending back-fills (sub-tickets to file once Linear reconnects):
 
 - `feat(search): FTS5 read surface + search_prompts/suggest_tags IPC` — landed against SCA-729 parent.
 
+### Deferred to follow-up sessions: native-dep tickets
+
+Two L5 tickets require enabling crates that ship native dependencies and are deliberately commented out in `src-tauri/Cargo.toml`:
+
+- **Semantic search (`index/embeddings.rs`)** — requires `fastembed = "5.13"` which transitively pulls `ort` / ONNX Runtime native libs. Real integration also needs:
+  1. `build.rs` baking a SHA-256 manifest for the bge-small-en-v1.5 ONNX files (or generated from a vendored manifest committed alongside the model name).
+  2. AppData download flow with `index://progress` events, resumability, and fail-closed hash verification.
+  3. sqlite-vec `vec0` virtual table created at runtime (the migration intentionally leaves it out because `sqlx::migrate!` does not load extensions).
+  4. Reindex queue with concurrency 1 + idle scheduler.
+
+  Hybrid ranking in this layer lands with the **text-only score path**. The semantic toggle in the frontend stays disabled until the model integration lands. The hybrid score formula degrades cleanly to `0.55 * RRF_text + recency_boost + usage_boost` when the semantic component is absent.
+
+- **Git history / diff / revert (`git/*`)** — requires `git2 = "0.20"`. The libgit2 build adds ~30s to clean builds and complicates CI matrix entries. Real integration also needs `git_diff_find_options` with rename detection capped at `versionHistory.renameDetectionWindow = 200` commits per the patched §13.
+
+  Three IPC commands (`get_prompt_history`, `get_prompt_diff`, `revert_prompt_to_commit`) remain stubs after L5 lands. The frontend history panel reads stub results and renders the empty state until the git2 ticket completes.
+
+### Deferred to follow-up sessions: tickets that need user-interactive setup or release infra
+
+- **Tauri signer keypair generation** — `tauri signer generate` is interactive; the private key must be pasted into a GH Actions secret (`TAURI_SIGNING_PRIVATE_KEY`) by the human operator. The L5 ticket lands the manifest URL + `pubkey` placeholder in `tauri.conf.json`, the updater plugin configuration, and the `docs/RELEASING.md` documenting the rotation path; the actual keypair generation is a checklist item, not an automated step.
+- **CI release workflow dry-run** — the `release.yml` workflow can be authored without a dry-run, but the spec's stop-condition requires a real `v0.0.1-rc1` tag push and verification that `latest.json` resolves correctly. That happens outside the build agent's reach; the L5 ticket lands the YAML and the verification steps in `docs/RELEASING.md`, but does not gate the layer on a successful release run.
+- **Visual regression baselines** — each new spec needs `pnpm test:visual:update` to capture and **human verification against the mockup** before commit. The L5 ticket lands the spec files + fixtures + a capture-script invocation; the manual verification + baseline commit happens in a follow-up.
+- **V1 verification report** — depends on all of the above being end-to-end green. Captured at the natural end of the layer, not mid-stream.
+
+### What lands this session
+
+Reachable without native-dep tickets or user-interactive infra:
+- ✅ FTS5 text search (committed)
+- ⏭ Hybrid ranking — text-only score path (semantic component returns 0)
+- ⏭ Cmd-K palette wiring (prompts via FTS, runs via direct query, static actions+routes)
+- ⏭ Telemetry events (`record_launch_metric` + L3 lifecycle hooks)
+- ⏭ Telemetry aggregates (`prompt_stats`, `tag_stats` rebuild + incremental)
+- ⏭ Two destructive actions (clear_telemetry_cache + delete_all_run_history)
+- ⏭ Settings get/update (atomic write to local JSON + vault `promptibrary/settings.yml`)
+- ⏭ System probes (`probe_dependencies`, `reveal_in_terminal`, `open_path`)
+- ⏭ Updater plugin scaffolding (manifest URL, pubkey placeholder, mandatory-verification config)
+- ⏭ Docs trio: `docs/RELEASING.md`, `docs/INSTALLING.md`, expanded `docs/V2-CANDIDATES.md`
+- ⏭ CLAUDE.md updater-posture commit (already staged in the user's working tree)
+- ⏭ `.github/workflows/release.yml` YAML (un-dry-run-verified)
+
+Tagging `layer-5-complete` happens **only after** the deferred set above also lands; this session ends with an explicit handoff list, not a tag.
