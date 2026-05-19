@@ -66,12 +66,22 @@ pub async fn scan_vault<F: FnMut(ScanProgress)>(
     }
 
     let mut summary = ScanSummary::default();
-    let mut seen_paths: Vec<String> = Vec::new();
+    // `on_disk_paths` — every vault_path the walk *touched*, regardless of
+    // parse outcome. SCA-592: a transiently-malformed file must NOT cause
+    // its index row to be deleted; the file is still on disk and the row
+    // is still authoritative until the file is fixed.
+    let mut on_disk_paths: Vec<String> = Vec::with_capacity(paths.len());
     let mut last_emit = Instant::now();
     let mut last_emit_count = 0usize;
 
     for path in paths {
         summary.scanned_files += 1;
+        // Record the path as on-disk *before* any parse attempt, so the
+        // stale-delete pass below doesn't drop the row on a transient
+        // YAML error mid-edit.
+        if let Some(rel) = vault.to_relative(&path) {
+            on_disk_paths.push(rel);
+        }
         let content = match std::fs::read_to_string(&path) {
             Ok(s) => s,
             Err(_) => {
@@ -97,11 +107,11 @@ pub async fn scan_vault<F: FnMut(ScanProgress)>(
         let vault_path = match vault.to_relative(&path) {
             Some(rel) => rel,
             None => {
-                // Path somehow isn't inside the vault — bail on this file.
                 summary.malformed_files += 1;
                 continue;
             }
         };
+        // Already recorded above for the on-disk set; nothing more to do here.
 
         let body = parsed.body.clone();
         let prompt = Prompt {
@@ -137,7 +147,7 @@ pub async fn scan_vault<F: FnMut(ScanProgress)>(
             continue;
         }
         summary.indexed_prompts += 1;
-        seen_paths.push(vault_path);
+        let _ = vault_path;
 
         // Throttled progress emission.
         let elapsed_since = last_emit.elapsed();
@@ -153,7 +163,11 @@ pub async fn scan_vault<F: FnMut(ScanProgress)>(
         }
     }
 
-    // Delete index rows whose vault_path is no longer present on disk.
+    // Delete index rows whose vault_path is absent from disk. We compare
+    // against `on_disk_paths` (every file the walk touched) — NOT only the
+    // successfully-parsed files (SCA-592). A single DELETE by vault_path
+    // suffices; FK CASCADE handles prompt_tags (SCA-593, removes the prior
+    // SELECT id → DELETE id round-trip and its inter-statement race).
     let existing_paths: Vec<String> =
         sqlx::query_scalar("SELECT vault_path FROM prompts WHERE vault_path LIKE ?")
             .bind("promptibrary/prompts/%")
@@ -161,15 +175,13 @@ pub async fn scan_vault<F: FnMut(ScanProgress)>(
             .await
             .map_err(AppError::from)?;
     for path in existing_paths {
-        if !seen_paths.iter().any(|p| p == &path) {
-            // Resolve to id to use the delete API.
-            let id: Option<String> = sqlx::query_scalar("SELECT id FROM prompts WHERE vault_path = ?")
+        if !on_disk_paths.iter().any(|p| p == &path) {
+            let result = sqlx::query("DELETE FROM prompts WHERE vault_path = ?")
                 .bind(&path)
-                .fetch_optional(db)
+                .execute(db)
                 .await
                 .map_err(AppError::from)?;
-            if let Some(id) = id {
-                prompts_repo::delete_prompt(db, &id).await?;
+            if result.rows_affected() > 0 {
                 summary.deleted_rows += 1;
             }
         }
