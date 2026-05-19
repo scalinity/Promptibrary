@@ -164,6 +164,7 @@ fn collect_paragraphs(text: &str) -> Vec<Paragraph<'_>> {
     let mut start = 0usize;
     let bytes = text.as_bytes();
     let mut in_fence = false;
+    let mut fence_start_segment: Option<usize> = None;
     let mut line_start = 0usize;
 
     let mut i = 0usize;
@@ -171,6 +172,14 @@ fn collect_paragraphs(text: &str) -> Vec<Paragraph<'_>> {
         if bytes[i] == b'\n' {
             let line = &text[line_start..i];
             if line.trim_start().starts_with("```") {
+                if !in_fence {
+                    // Remember where the fence opened so we can recover
+                    // gracefully if EOF arrives without a closing fence
+                    // (SCA-717).
+                    fence_start_segment = Some(start);
+                } else {
+                    fence_start_segment = None;
+                }
                 in_fence = !in_fence;
             } else if !in_fence && line.trim().is_empty() {
                 let para = text[start..i].trim();
@@ -183,10 +192,25 @@ fn collect_paragraphs(text: &str) -> Vec<Paragraph<'_>> {
         }
         i += 1;
     }
-    // Trailing paragraph.
-    let tail = text[start..].trim();
-    if !tail.is_empty() {
-        out.push(Paragraph { text: tail });
+
+    if in_fence {
+        // EOF inside an unclosed fence (SCA-717). Re-split the tail
+        // from the open fence onward as normal blank-line-separated
+        // paragraphs so the priority scorer doesn't see one giant
+        // low-priority prose blob.
+        let unclosed_start = fence_start_segment.unwrap_or(start);
+        for para in text[unclosed_start..].split("\n\n") {
+            let trimmed = para.trim();
+            if !trimmed.is_empty() {
+                out.push(Paragraph { text: trimmed });
+            }
+        }
+    } else {
+        // Trailing paragraph.
+        let tail = text[start..].trim();
+        if !tail.is_empty() {
+            out.push(Paragraph { text: tail });
+        }
     }
     out
 }
@@ -333,6 +357,28 @@ mod tests {
         // not in standard cap (60k).
         assert!(out.text.len() <= 160_000);
         assert!(out.text.len() >= 100_000);
+    }
+
+    #[test]
+    fn unterminated_fence_at_eof_recovers_into_paragraphs() {
+        // SCA-717: a code fence at EOF with no closing fence used to
+        // leave the entire tail as one giant low-priority paragraph.
+        // After the fix, the post-fence content is split on blank lines
+        // and surfaces as individual paragraphs.
+        let mut s = String::new();
+        s.push_str("# Heading\n\n");
+        s.push_str("```rust\nfn a() {}\n\n");
+        // No closing ``` — simulates a truncated/malformed source.
+        s.push_str("Second paragraph after the broken fence.\n\n");
+        s.push_str("Third paragraph.");
+        let paras = collect_paragraphs(&s);
+        // Heading + at least one of the recovered tail paragraphs.
+        assert!(paras.iter().any(|p| p.text.contains("Heading")));
+        assert!(
+            paras.iter().any(|p| p.text.contains("Second paragraph after the broken fence.")),
+            "tail after unclosed fence must split on blank lines"
+        );
+        assert!(paras.iter().any(|p| p.text.contains("Third paragraph")));
     }
 
     #[test]
