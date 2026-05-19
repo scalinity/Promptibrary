@@ -48,7 +48,18 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 notify = "=8.2.0"
 
 # HTTP (spec §2). `rustls-tls` was renamed to `rustls` in reqwest 0.13.
-reqwest = { version = "0.13", default-features = false, features = ["json", "stream", "rustls"] }
+reqwest = { version = "0.13", default-features = false, features = ["json", "stream", "rustls", "gzip", "brotli"] }
+
+# URL parsing for source detection + canonicalization (spec §6).
+url = "2"
+percent-encoding = "2"
+
+# HTML scraping for the generic article fetcher (spec §6). `html5ever` /
+# `scraper` give us a DOM + CSS-selector API without reimplementing a parser.
+scraper = "0.20"
+
+# Async trait sugar for the Anthropic client + fetcher abstraction.
+async-trait = "0.1"
 
 # Keychain (spec §13). `keyring-core` defines the trait; platform backends
 # are pulled in target-conditionally below so headless CI doesn't need D-Bus

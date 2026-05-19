@@ -36,6 +36,7 @@ Thumbs.db
 .idea/
 
 # AI session artifacts
+.claude/
 .cursor/
 .aider*
 docs/superpowers/
