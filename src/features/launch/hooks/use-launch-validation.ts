@@ -34,10 +34,12 @@ function validateField(
   variable: Variable,
   value: ResolvedVariableValue | undefined,
 ): string | null {
+  // When no value is set, fall back to the variable's defaultValue if any.
+  // F12's open(prompt) seeding makes this branch seldom-hit in practice,
+  // but the validator stays correct independent of that seeding.
   if (value == null) {
-    return variable.required && variable.defaultValue == null
-      ? "required"
-      : null;
+    if (variable.defaultValue != null) return null;
+    return variable.required ? "required" : null;
   }
   if (value.type !== variable.type) return "wrong type";
 
@@ -49,8 +51,14 @@ function validateField(
       if (variable.maxLength != null && value.value.length > variable.maxLength)
         return `at most ${variable.maxLength} characters`;
       if (variable.pattern != null) {
+        // F3 (SCA-630, CWE-1333): cap the input fed to `new RegExp().test()`
+        // so a pathological pattern (e.g. catastrophic-backtracking
+        // `(a+)+$`) sourced from user-editable vault YAML can't pin the
+        // main thread indefinitely. The Rust validator is the contract and
+        // re-checks the full value; this is a UX shortcut only.
+        const capped = value.value.slice(0, 1000);
         try {
-          if (!new RegExp(variable.pattern).test(value.value)) {
+          if (!new RegExp(variable.pattern).test(capped)) {
             return "doesn't match required pattern";
           }
         } catch {
@@ -81,10 +89,16 @@ function validateField(
       return null;
     case "file":
     case "folder":
-      // Existence + extension checks defer to the Rust validator; the L2
-      // surface only checks for a non-empty path.
-      if (value.type === variable.type && value.value.length === 0)
-        return "required";
+      // F11 (SCA-638): file/folder `value.value` is typed `AbsolutePath | null`.
+      // Guard against null before calling `.length`. Empty string is also
+      // an unfilled path. Existence + extension checks defer to the Rust
+      // validator (validate_launch_inputs).
+      if (
+        value.type === variable.type &&
+        (value.value == null || (value.value as string).length === 0)
+      ) {
+        return variable.required ? "required" : null;
+      }
       return null;
     case "bool":
       return null;
