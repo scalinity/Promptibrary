@@ -18,11 +18,11 @@ This file augments the global `~/.claude/CLAUDE.md` with project-specific rules 
 
 Source of truth: latest Git tag matching `layer-*-complete`. Check the box and tag when you finish a layer.
 
-- [ ] L0 — Foundations
-- [ ] L1 — Vault and Variables
-- [ ] L2 — IPC and Frontend Shell
-- [ ] L3 — Launch Pipeline
-- [ ] L4 — Extraction
+- [x] L0 — Foundations
+- [x] L1 — Vault and Variables
+- [x] L2 — IPC and Frontend Shell
+- [x] L3 — Launch Pipeline
+- [x] L4 — Extraction
 - [ ] L5 — Polish and Ship
 
 ---
