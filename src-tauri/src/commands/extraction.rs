@@ -310,3 +310,97 @@ fn ensure_imported_tag(mut tags: Vec<String>) -> Vec<String> {
 mod _silence_unused {
     use super::LaunchDefaultsPatch;
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use std::sync::Arc;
+
+    use sqlx::sqlite::SqlitePoolOptions;
+
+    use crate::app_state::AppServices;
+    use crate::domain::source::{ManualSource, Source};
+    use crate::extraction::types::{
+        CandidateConfidence, CandidatePrompt, LaunchDefaultsPatch,
+    };
+    use crate::index::db::in_memory_connect_options;
+    use crate::index::migrations::run_migrations;
+    use crate::settings::secret_store::InMemorySecretStore;
+    use crate::vault::paths::VaultPaths;
+
+    /// SCA-711 regression: two concurrent `create_prompt_from_candidate`
+    /// calls with the same title must each get a distinct slug, mirroring
+    /// the SCA-589 invariant for `create_prompt`. Without
+    /// `create_prompt_lock` (held inside the helper), both calls would
+    /// observe the same slug as free and race to write the same vault
+    /// path, producing duplicate-vault_path rows + corrupted YAML.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn concurrent_save_with_same_title_yields_distinct_slugs() {
+        let vault_dir = tempfile::tempdir().unwrap();
+        let vault = VaultPaths::new(vault_dir.path().to_path_buf());
+        crate::vault::repair::repair_missing_dirs(&vault).unwrap();
+
+        // SQLite in-memory DBs are per-connection unless you opt into a
+        // shared cache; keep the pool single-connection so every
+        // operation sees the migrated schema. The test still exercises
+        // the SCA-589 lock — concurrency is at the tokio task level, not
+        // the DB connection level.
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect_with(in_memory_connect_options())
+            .await
+            .unwrap();
+        run_migrations(&pool).await.unwrap();
+
+        let services: Arc<AppServices> = Arc::new(AppServices::with_secret_store(Arc::new(
+            InMemorySecretStore::new(),
+        )));
+        {
+            let mut state = services.state.write().await;
+            state.vault = Some(vault);
+            state.db = Some(pool);
+        }
+
+        let candidate = CandidatePrompt {
+            title: "Refactor streaming response handler".into(),
+            summary: "Concurrent regression test".into(),
+            body: "x".repeat(300),
+            tags: vec!["refactor".into()],
+            variables: vec![],
+            launch_defaults_patch: LaunchDefaultsPatch::default(),
+            confidence: CandidateConfidence::Medium,
+            rationale: "concurrency regression".into(),
+            source_anchors: vec![],
+        };
+        let source = Source::Manual(ManualSource {
+            title: None,
+            author: None,
+            fetched_at: None,
+            content_hash: None,
+        });
+
+        let s1 = services.clone();
+        let c1 = candidate.clone();
+        let src1 = source.clone();
+        let s2 = services.clone();
+        let c2 = candidate.clone();
+        let src2 = source.clone();
+
+        let (p1, p2) = tokio::join!(
+            tokio::spawn(async move { create_prompt_from_candidate(c1, src1, &s1).await }),
+            tokio::spawn(async move { create_prompt_from_candidate(c2, src2, &s2).await }),
+        );
+        let p1 = p1.unwrap().expect("first save succeeds");
+        let p2 = p2.unwrap().expect("second save succeeds");
+
+        assert_ne!(
+            p1.slug, p2.slug,
+            "concurrent saves with identical titles must yield distinct slugs"
+        );
+        assert_ne!(
+            p1.vault_path, p2.vault_path,
+            "concurrent saves must write to distinct vault paths"
+        );
+    }
+}
