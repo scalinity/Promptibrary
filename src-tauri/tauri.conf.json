@@ -26,7 +26,7 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": "default-src 'self' tauri: asset: ipc: http://ipc.localhost; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline' https://api.fontshare.com; font-src 'self' https://api.fontshare.com data: asset:; img-src 'self' data: asset: blob:; connect-src 'self' ipc: http://ipc.localhost ws://localhost:1420 http://localhost:1420 https://api.fontshare.com"
     }
   },
   "bundle": {
