@@ -1,0 +1,126 @@
+/* Cmd-K palette styles (SCA-759).
+ *
+ * Extracted from inline JSX styles in cmdk-palette.tsx — the modal
+ * overlay/dialog/input/list/footer/item primitives match the visual
+ * grammar in `src/styles/app.css` for `.modal-overlay` / `.modal` /
+ * `.input`, but the cmdk palette is its own surface in the design
+ * system (Promptibrary Design System/screens/06-command-palette.html)
+ * so we keep the styles feature-local rather than promoting to the
+ * universal primitives.
+ */
+
+.cmdk-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--bg-overlay);
+  backdrop-filter: blur(4px);
+  display: grid;
+  place-items: start center;
+  padding-top: 12vh;
+  z-index: 100;
+}
+
+.cmdk-dialog {
+  width: min(640px, calc(100vw - 48px));
+  background: var(--bg-raised);
+  border: 1px solid var(--border-mid);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  box-shadow:
+    0 24px 64px -16px var(--shadow-modal),
+    0 0 0 1px var(--border-subtle);
+}
+
+.cmdk-input-row {
+  display: flex;
+  align-items: center;
+  padding: var(--sp-3) var(--sp-4);
+  border-bottom: var(--hairline);
+  gap: 12px;
+}
+
+.cmdk-input-glyph {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  color: var(--accent-dim);
+}
+
+.cmdk-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--ink-primary);
+}
+
+.cmdk-sem-toggle {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  background: transparent;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-xs);
+  padding: 2px 8px;
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.cmdk-sem-toggle[aria-pressed="true"] {
+  color: var(--accent);
+}
+
+.cmdk-list {
+  max-height: 360px;
+  overflow: auto;
+  padding: var(--sp-2) 0;
+}
+
+.cmdk-empty {
+  padding: var(--sp-4);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--ink-tertiary);
+  text-align: center;
+}
+
+.cmdk-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: var(--sp-3) var(--sp-4);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  cursor: pointer;
+  color: var(--ink-secondary);
+}
+
+.cmdk-item-title {
+  color: var(--ink-primary);
+}
+
+.cmdk-item-sub {
+  color: var(--ink-tertiary);
+  font-size: 11.5px;
+  margin-left: auto;
+  font-family: var(--font-mono);
+  letter-spacing: 0.01em;
+  max-width: 55%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cmdk-footer {
+  border-top: var(--hairline);
+  padding: var(--sp-2) var(--sp-4);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ink-tertiary);
+  letter-spacing: 0.04em;
+  display: flex;
+  justify-content: space-between;
+}

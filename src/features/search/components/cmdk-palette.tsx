@@ -24,6 +24,8 @@ import { searchKeys } from "@/shared/api/queryKeys";
 import { useSearchStore } from "@/features/search/stores/search-store";
 import { useLibraryStore } from "@/features/library/stores/library-store";
 
+import "@/features/search/cmdk-palette.css";
+
 /// SCA-742: render FTS5 snippet `<mark>…</mark>` markers as real
 /// `<mark>` elements. Pre-fix the JSX rendered the snippet as a text
 /// node (correct XSS posture), so users saw literal `<mark>` and
@@ -164,46 +166,14 @@ export function CmdKPalette(): React.JSX.Element {
       aria-modal="true"
       aria-label="Command palette"
       onClick={close}
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "var(--bg-overlay)",
-        backdropFilter: "blur(4px)",
-        display: "grid",
-        placeItems: "start center",
-        paddingTop: "12vh",
-        zIndex: 100,
-      }}
+      className="cmdk-overlay"
     >
       <Command
         onClick={(e) => e.stopPropagation()}
-        style={{
-          width: "min(640px, calc(100vw - 48px))",
-          background: "var(--bg-raised)",
-          border: "1px solid var(--border-mid)",
-          borderRadius: "var(--r-md)",
-          overflow: "hidden",
-          boxShadow:
-            "0 24px 64px -16px var(--shadow-modal), 0 0 0 1px var(--border-subtle)",
-        }}
+        className="cmdk-dialog"
       >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            padding: "var(--sp-3) var(--sp-4)",
-            borderBottom: "var(--hairline)",
-            gap: 12,
-          }}
-        >
-          <span
-            aria-hidden="true"
-            style={{
-              fontFamily: "var(--font-mono)",
-              fontSize: 14,
-              color: "var(--accent-dim)",
-            }}
-          >
+        <div className="cmdk-input-row">
+          <span aria-hidden="true" className="cmdk-input-glyph">
             ⌕
           </span>
           <Command.Input
@@ -211,15 +181,7 @@ export function CmdKPalette(): React.JSX.Element {
             onValueChange={setQuery}
             placeholder="search prompts, runs, actions…"
             autoFocus
-            style={{
-              flex: 1,
-              background: "transparent",
-              border: "none",
-              outline: "none",
-              fontFamily: "var(--font-mono)",
-              fontSize: 13,
-              color: "var(--ink-primary)",
-            }}
+            className="cmdk-input"
           />
           <button
             type="button"
@@ -227,39 +189,13 @@ export function CmdKPalette(): React.JSX.Element {
             disabled
             title="Semantic search lands with the embedding model (V2-deferred per docs/notes/L5-observations.md) — Cmd-K is text-only for V1"
             aria-pressed={semantic}
-            style={{
-              fontFamily: "var(--font-mono)",
-              fontSize: 10.5,
-              letterSpacing: "0.04em",
-              textTransform: "uppercase",
-              color: semantic ? "var(--accent)" : "var(--ink-dim)",
-              background: "transparent",
-              border: "1px solid var(--border-subtle)",
-              borderRadius: "var(--r-xs)",
-              padding: "2px 8px",
-              cursor: "not-allowed",
-              opacity: 0.55,
-            }}
+            className="cmdk-sem-toggle"
           >
             sem
           </button>
         </div>
-        <Command.List
-          style={{
-            maxHeight: 360,
-            overflow: "auto",
-            padding: "var(--sp-2) 0",
-          }}
-        >
-          <Command.Empty
-            style={{
-              padding: "var(--sp-4)",
-              fontFamily: "var(--font-mono)",
-              fontSize: 11.5,
-              color: "var(--ink-tertiary)",
-              textAlign: "center",
-            }}
-          >
+        <Command.List className="cmdk-list">
+          <Command.Empty className="cmdk-empty">
             nothing matches
           </Command.Empty>
 
@@ -270,11 +206,11 @@ export function CmdKPalette(): React.JSX.Element {
                   key={`prompt:${p.id}`}
                   value={`prompt:${p.id}:${p.title}`}
                   onSelect={() => handleSelect(p)}
-                  style={cmdkItemStyle}
+                  className="cmdk-item"
                 >
-                  <span style={{ color: "var(--ink-primary)" }}>{p.title}</span>
+                  <span className="cmdk-item-title">{p.title}</span>
                   {p.subtitle != null && p.subtitle !== "" && (
-                    <span style={cmdkSubStyle}>{renderSnippet(p.subtitle)}</span>
+                    <span className="cmdk-item-sub">{renderSnippet(p.subtitle)}</span>
                   )}
                 </Command.Item>
               ))}
@@ -288,11 +224,11 @@ export function CmdKPalette(): React.JSX.Element {
                   key={`run:${r.id}`}
                   value={`run:${r.id}:${r.title}`}
                   onSelect={() => handleSelect(r)}
-                  style={cmdkItemStyle}
+                  className="cmdk-item"
                 >
-                  <span style={{ color: "var(--ink-primary)" }}>{r.title}</span>
+                  <span className="cmdk-item-title">{r.title}</span>
                   {r.subtitle != null && r.subtitle !== "" && (
-                    <span style={cmdkSubStyle}>{r.subtitle}</span>
+                    <span className="cmdk-item-sub">{r.subtitle}</span>
                   )}
                 </Command.Item>
               ))}
@@ -306,11 +242,11 @@ export function CmdKPalette(): React.JSX.Element {
                   key={`action:${a.id}`}
                   value={`action:${a.id}:${a.title}`}
                   onSelect={() => handleSelect(a)}
-                  style={cmdkItemStyle}
+                  className="cmdk-item"
                 >
-                  <span style={{ color: "var(--ink-primary)" }}>{a.title}</span>
+                  <span className="cmdk-item-title">{a.title}</span>
                   {a.subtitle != null && a.subtitle !== "" && (
-                    <span style={cmdkSubStyle}>{a.subtitle}</span>
+                    <span className="cmdk-item-sub">{a.subtitle}</span>
                   )}
                 </Command.Item>
               ))}
@@ -324,29 +260,18 @@ export function CmdKPalette(): React.JSX.Element {
                   key={`route:${r.id}`}
                   value={`route:${r.id}:${r.title}`}
                   onSelect={() => handleSelect(r)}
-                  style={cmdkItemStyle}
+                  className="cmdk-item"
                 >
-                  <span style={{ color: "var(--ink-primary)" }}>{r.title}</span>
+                  <span className="cmdk-item-title">{r.title}</span>
                   {r.subtitle != null && r.subtitle !== "" && (
-                    <span style={cmdkSubStyle}>{r.subtitle}</span>
+                    <span className="cmdk-item-sub">{r.subtitle}</span>
                   )}
                 </Command.Item>
               ))}
             </Command.Group>
           )}
         </Command.List>
-        <footer
-          style={{
-            borderTop: "var(--hairline)",
-            padding: "var(--sp-2) var(--sp-4)",
-            fontFamily: "var(--font-mono)",
-            fontSize: 10.5,
-            color: "var(--ink-tertiary)",
-            letterSpacing: "0.04em",
-            display: "flex",
-            justifyContent: "space-between",
-          }}
-        >
+        <footer className="cmdk-footer">
           <span>↑ ↓ navigate · ↵ open · esc close</span>
           <span>
             {search.isFetching
@@ -358,26 +283,3 @@ export function CmdKPalette(): React.JSX.Element {
     </div>
   );
 }
-
-const cmdkItemStyle: React.CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: 12,
-  padding: "var(--sp-3) var(--sp-4)",
-  fontFamily: "var(--font-ui)",
-  fontSize: 13,
-  cursor: "pointer",
-  color: "var(--ink-secondary)",
-};
-
-const cmdkSubStyle: React.CSSProperties = {
-  color: "var(--ink-tertiary)",
-  fontSize: 11.5,
-  marginLeft: "auto",
-  fontFamily: "var(--font-mono)",
-  letterSpacing: "0.01em",
-  maxWidth: "55%",
-  overflow: "hidden",
-  textOverflow: "ellipsis",
-  whiteSpace: "nowrap",
-};
