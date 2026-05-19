@@ -5,6 +5,7 @@
 // `src/shared/ui/*` may import this directly — everything else must go through
 // the wrapper at `@/shared/ui/button`.
 
+// eslint-disable-next-line no-restricted-imports -- vendored shadcn primitive uses `import * as React` for JSX namespace types; no useEffect call site here
 import * as React from "react";
 import { Slot } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";

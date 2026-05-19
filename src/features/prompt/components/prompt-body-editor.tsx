@@ -19,6 +19,7 @@ import { EditorView, Decoration, WidgetType } from "@codemirror/view";
 import type { DecorationSet } from "@codemirror/view";
 import { StateField, EditorState, Range } from "@codemirror/state";
 import { autocompletion, type CompletionContext } from "@codemirror/autocomplete";
+// eslint-disable-next-line no-restricted-imports -- SCA-723: pre-CLAUDE.md useEffect, refactor in follow-up cleanup pass
 import { useEffect, useMemo, useState } from "react";
 
 import { parseVariables, type VariableRef } from "@/shared/api/ipc";

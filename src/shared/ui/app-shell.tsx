@@ -3,6 +3,7 @@
 // Mirrors the `.app-frame` layout from `Promptibrary Design System/app.css`.
 // Renders the persistent chrome and slots route content into the workspace.
 
+// eslint-disable-next-line no-restricted-imports -- SCA-723: pre-CLAUDE.md useEffect, refactor in follow-up cleanup pass
 import { useEffect } from "react";
 
 import { Topbar } from "./topbar";

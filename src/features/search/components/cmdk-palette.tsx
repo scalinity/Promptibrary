@@ -5,6 +5,7 @@
 import { Command } from "cmdk";
 import { useNavigate } from "react-router-dom";
 import { useHotkeys } from "react-hotkeys-hook";
+// eslint-disable-next-line no-restricted-imports -- SCA-723: pre-CLAUDE.md useEffect, refactor in follow-up cleanup pass
 import { useEffect, useRef } from "react";
 
 import { useSearchStore } from "@/features/search/stores/search-store";

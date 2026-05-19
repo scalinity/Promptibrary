@@ -4,6 +4,7 @@
 // a row scrolls/focuses the corresponding `.pb-var-chip` in the CodeMirror
 // editor (DOM-level lookup since chips are widgets, not React).
 
+// eslint-disable-next-line no-restricted-imports -- SCA-723: pre-CLAUDE.md useEffect, refactor in follow-up cleanup pass
 import { useEffect, useState } from "react";
 
 import { parseVariables, type ParseVariablesResult } from "@/shared/api/ipc";

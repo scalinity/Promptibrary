@@ -3,6 +3,7 @@
 // Layout: frontmatter panel (left) + body editor (center) + variable
 // reference list (right). Launch drawer is overlaid when active.
 
+// eslint-disable-next-line no-restricted-imports -- SCA-723: pre-CLAUDE.md useEffect, refactor in follow-up cleanup pass
 import { Suspense, lazy, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { useHotkeys } from "react-hotkeys-hook";

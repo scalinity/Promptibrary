@@ -7,6 +7,7 @@
 // component unmounts, so a navigation mid-toast doesn't fire setState on
 // an unmounted component.
 
+// eslint-disable-next-line no-restricted-imports -- SCA-723: pre-CLAUDE.md useEffect, refactor in follow-up cleanup pass
 import { useCallback, useEffect, useRef, useState } from "react";
 
 export interface UseToastResult {

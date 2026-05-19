@@ -16,6 +16,21 @@ const SHADCN_IMPORT_BOUNDARY = {
         "Import shadcn primitives only via the @/shared/ui/* wrapper layer, not directly.",
     },
   ],
+  // CLAUDE.md "React Architecture & Side-Effects Policy" strict rule:
+  // never use `useEffect` directly. Mechanically enforce by forbidding
+  // the named import from React. If a genuine escape hatch is unavoidable
+  // after exhausting the five replacement patterns (derived state, data-
+  // fetching hooks, event handlers, `key` remount, useMountEffect),
+  // opt out with `// eslint-disable-next-line no-restricted-imports`
+  // plus a rationale comment — that's the SCA-722 escape valve.
+  paths: [
+    {
+      name: "react",
+      importNames: ["useEffect"],
+      message:
+        "Direct useEffect is banned by CLAUDE.md. Prefer derived state, a data-fetching hook (TanStack Query/SWR), an event handler, the `key` remount, or useMountEffect. Opt out with `// eslint-disable-next-line no-restricted-imports` + a rationale.",
+    },
+  ],
 };
 
 export default tseslint.config(
@@ -59,10 +74,25 @@ export default tseslint.config(
     },
   },
   {
-    // Wrapper layer is allowed to import shadcn primitives directly.
+    // Wrapper layer is allowed to import shadcn primitives directly, but
+    // it STILL gets the useEffect ban — we only re-enable the shadcn path
+    // here, keeping the `paths` restriction (no direct useEffect) intact.
     files: ["src/shared/ui/**/*.{ts,tsx}"],
     rules: {
-      "no-restricted-imports": "off",
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "react",
+              importNames: ["useEffect"],
+              message:
+                "Direct useEffect is banned by CLAUDE.md. Prefer derived state, a data-fetching hook, an event handler, the `key` remount, or useMountEffect. Opt out with `// eslint-disable-next-line no-restricted-imports` + a rationale.",
+            },
+          ],
+          // No shadcn `patterns` entry here — wrappers may import shadcn.
+        },
+      ],
     },
   },
   {

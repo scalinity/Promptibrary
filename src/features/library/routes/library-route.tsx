@@ -5,6 +5,7 @@
 // carry it for V1 (matches the design system mockup which has no per-prompt
 // URL on the home route).
 
+// eslint-disable-next-line no-restricted-imports -- SCA-723: pre-CLAUDE.md useEffect, refactor in follow-up cleanup pass
 import { useEffect } from "react";
 
 import { LibraryDetailPane } from "@/features/library/components/library-detail-pane";
