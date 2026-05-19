@@ -387,14 +387,25 @@ export const getSecretStatus: typeof Real.getSecretStatus = () =>
 
 // ─── Git history ──────────────────────────────────────────────────────────
 
-export const getPromptHistory: typeof Real.getPromptHistory = () => ok([]);
+export const getPromptHistory: typeof Real.getPromptHistory = () =>
+  ok({ history: [] });
 
-export const revertPromptToCommit: typeof Real.revertPromptToCommit = () =>
-  Promise.reject({
-    kind: "Internal",
-    message: "not_yet_implemented",
-    details: { layer: "L5" },
+export const getPromptDiff: typeof Real.getPromptDiff = ({
+  promptId,
+  fromSha,
+  toSha,
+}) =>
+  ok({
+    promptId,
+    fromSha: fromSha ?? null,
+    toSha,
+    unified: "",
   });
+
+export const revertPromptToCommit: typeof Real.revertPromptToCommit = ({
+  promptId,
+  commitSha,
+}) => ok({ promptId, commitSha, bytesWritten: 0 });
 
 // ─── System ───────────────────────────────────────────────────────────────
 
@@ -476,7 +487,8 @@ export type {
   ExtractCandidatesResult,
   SaveExtractedPromptArgs,
   SetSecretArgs,
-  GitCommitInfo,
+  PromptHistoryEntry,
+  PromptDiff,
   RevertPromptArgs,
   DependencyProbe,
   IpcCommand,

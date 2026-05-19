@@ -70,7 +70,12 @@ keyring-core = "1"
 # Local vector search + embeddings
 sqlite-vec = "=0.1.9"
 # fastembed = "5.13"   # TODO(L5): re-enable when ONNX runtime is wired up; pulls in ort/onnxruntime native deps
-# git2 = "0.20"        # TODO(L5): re-enable for Git history; libgit2 build adds ~30s
+
+# Git history / diff / revert per spec §10. Vendored libgit2 so CI on
+# clean runners doesn't need a system libgit2-dev. ~30s clean build
+# cost; cached by Swatinem/rust-cache in the workflow.
+git2 = { version = "0.20", default-features = false, features = ["vendored-libgit2"] }
+
 # portable-pty = "=0.9.0"  # TODO(L3): re-enable when launch pipeline lands
 
 # Hashing for prompt checksums

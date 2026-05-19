@@ -425,24 +425,64 @@ export const getSecretStatus = () =>
 
 // ─── Git history ──────────────────────────────────────────────────────────
 
-export interface GitCommitInfo {
-  commit: string;
-  author: string;
-  authoredAt: string;
-  subject: string;
-  body: string | null;
+export interface ShortStat {
+  filesChanged: number;
+  insertions: number;
+  deletions: number;
 }
 
-export const getPromptHistory = (vaultPath: RelativeVaultPath) =>
-  invoke<GitCommitInfo[]>("get_prompt_history", { input: { vaultPath } });
+export interface PromptHistoryEntry {
+  commitSha: string;
+  authorName: string;
+  authorEmail: string;
+  authoredAt: string;
+  message: string;
+  shortStat: ShortStat;
+}
+
+export interface GetPromptHistoryArgs {
+  vaultRelativePath: RelativeVaultPath;
+  windowSize?: number;
+}
+
+export interface GetPromptHistoryOutput {
+  history: PromptHistoryEntry[];
+}
+
+export const getPromptHistory = (args: GetPromptHistoryArgs) =>
+  invoke<GetPromptHistoryOutput>("get_prompt_history", { input: args });
+
+export interface GetPromptDiffArgs {
+  promptId: PromptId;
+  vaultRelativePath: RelativeVaultPath;
+  fromSha?: string | null;
+  toSha: string;
+}
+
+export interface PromptDiff {
+  promptId: PromptId;
+  fromSha: string | null;
+  toSha: string;
+  unified: string;
+}
+
+export const getPromptDiff = (args: GetPromptDiffArgs) =>
+  invoke<PromptDiff>("get_prompt_diff", { input: args });
 
 export interface RevertPromptArgs {
   promptId: PromptId;
-  commit: string;
+  vaultRelativePath: RelativeVaultPath;
+  commitSha: string;
+}
+
+export interface RevertPromptToCommitOutput {
+  promptId: PromptId;
+  commitSha: string;
+  bytesWritten: number;
 }
 
 export const revertPromptToCommit = (args: RevertPromptArgs) =>
-  invoke<Prompt>("revert_prompt_to_commit", { input: args });
+  invoke<RevertPromptToCommitOutput>("revert_prompt_to_commit", { input: args });
 
 // ─── System ───────────────────────────────────────────────────────────────
 
