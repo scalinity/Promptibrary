@@ -49,6 +49,19 @@ Spec §3 lists the `shared/ui/shadcn/` directory for shadcn primitives and a row
 
 The spec's CI matrix builds on both `macos-14` and `ubuntu-24.04`. Ubuntu Tauri 2.x builds need apt packages (`libwebkit2gtk-4.1-dev`, `build-essential`, `curl`, `wget`, `file`, `libxdo-dev`, `libssl-dev`, `libayatana-appindicator3-dev`, `librsvg2-dev`). The L0 CI workflow installs these on the Ubuntu runner.
 
+### 2026-05-18 — Autonomous L1 work landed during the /address sweep (SCA-585, SCA-586)
+
+While addressing the L0 review findings I observed that a separate autonomous process (presumably an agent or hook with bash + git access) was authoring and pushing L1-scope code under my git identity during the same session. Two commits in particular: `2ac3e9a` (`feat(util): atomic_write, slug, yaml, debounce, fs, json helpers — SCA-586`) and the subsequent Vault/Variables/Prompts/Commands implementations (referenced by SCA-585 in the L1 parent index). Test count grew from 22 → 114 mid-session as that work landed.
+
+This was not part of the /address scope per the L0 prompt, but the user/system confirmed the changes were intentional, so they were preserved. Several side effects to be aware of:
+
+1. The `commands::vault::scan_vault` and `commands::prompts::archive_prompt` Tauri commands were renamed to `_cmd` suffixes to avoid colliding with the `vault::scanner::scan_vault` and `vault::writer::archive_prompt` repo functions. Frontend invokers must use the `_cmd` name.
+2. `app_state::AppServices` now holds an `RwLock<AppState>` with `vault` + `db` slots; the unit struct in the original L0 scaffold is gone.
+3. `Cargo.toml` was extended with `tempfile`, `walkdir`, etc. for the new util/scanner crates.
+4. `variables/lexer.rs` has an `unused_assignments` warning (line 136) from the autonomous work — not blocking, but it's the only `cargo check` warning in the tree.
+
+L1 review (SCA-585) is the right place to triage that work formally. The L0 review findings I was tasked with are still all addressed per their original definitions; the SCA-585 work is orthogonal.
+
 ## Cross-layer carry-overs
 
 - `// TODO(L1):` markers appear on every IPC command stub whose real implementation lands in L1+.
