@@ -1,8 +1,8 @@
 //! Migration runner.
 //!
 //! Migrations live under `src-tauri/migrations/` and apply in numeric order:
-//! `0001_init` → `0002_fts` → `0003_embeddings` → `0004_telemetry` → `0005_fk_cascade`
-//! → `0006_fts_tags_sync`.
+//! `0001_init` → `0002_fts` → `0003_embeddings` → `0004_telemetry`
+//! → `0005_fk_cascade` → `0006_fts_tags_sync`.
 //!
 //! Callers MUST use [`crate::index::db::connect`] (or `connect_options`) to
 //! build the pool. That factory applies the three CLAUDE.md PRAGMAs
@@ -177,6 +177,85 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(events, 0, "telemetry_events must cascade-delete with their prompt");
+    }
+
+    #[tokio::test]
+    async fn fts_tags_column_stays_in_sync_with_prompt_tags() {
+        // Regression test for SCA-566 — after migration 0006, FTS `tags`
+        // must reflect prompt_tags on insert, update, and delete.
+        let pool = temp_pool().await;
+        run_migrations(&pool).await.expect("migrations ok");
+
+        insert_minimal_prompt(&pool, "01TAG", "promptibrary/prompts/tag.md").await;
+        for tag in ["agentic", "refactor"] {
+            sqlx::query("INSERT INTO prompt_tags (prompt_id, tag_name) VALUES (?, ?)")
+                .bind("01TAG")
+                .bind(tag)
+                .execute(&pool)
+                .await
+                .expect("insert tag");
+        }
+
+        // After tag inserts, both tags must be searchable via FTS.
+        let hits_agentic: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM prompts_fts WHERE prompts_fts MATCH 'agentic'",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(hits_agentic, 1, "tag 'agentic' should be indexed");
+
+        let hits_refactor: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM prompts_fts WHERE prompts_fts MATCH 'refactor'",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(hits_refactor, 1, "tag 'refactor' should be indexed");
+
+        // After tag delete, the removed tag must no longer match.
+        sqlx::query("DELETE FROM prompt_tags WHERE prompt_id = ? AND tag_name = ?")
+            .bind("01TAG")
+            .bind("agentic")
+            .execute(&pool)
+            .await
+            .expect("delete tag");
+
+        let after_delete: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM prompts_fts WHERE prompts_fts MATCH 'agentic'",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(after_delete, 0, "deleted tag 'agentic' should not match FTS");
+
+        // 'refactor' must still match.
+        let still_refactor: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM prompts_fts WHERE prompts_fts MATCH 'refactor'",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(still_refactor, 1, "remaining tag 'refactor' should still match");
+
+        // After prompt update, FTS body changes and tags survive the rewrite.
+        sqlx::query("UPDATE prompts SET body = ? WHERE id = ?")
+            .bind("brand-new body content")
+            .bind("01TAG")
+            .execute(&pool)
+            .await
+            .expect("update prompt");
+
+        let still_refactor_after_update: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM prompts_fts WHERE prompts_fts MATCH 'refactor'",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            still_refactor_after_update, 1,
+            "prompt body update must not blank the FTS tags column"
+        );
     }
 
     async fn insert_minimal_run(pool: &SqlitePool, id: &str, prompt_id: &str) {
