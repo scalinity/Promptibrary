@@ -109,29 +109,51 @@ pub fn start_watcher(vault: &VaultPaths) -> Result<VaultWatcher> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::util::debounce::Debouncer;
+
+    /// SCA-607: the previous test for notify integration was vacuous —
+    /// it tolerated a 2s timeout with no assertion, so it always passed
+    /// regardless of watcher correctness. Replaced with a deterministic
+    /// test that exercises the Debouncer → events channel directly
+    /// (which is what the notify callback feeds), bypassing the OS
+    /// watcher. A second test is kept around for local notify validation
+    /// but marked #[ignore] so CI doesn't hit notify's well-known
+    /// non-determinism in sandboxed environments.
+    #[tokio::test]
+    async fn debouncer_pushes_emit_through_events_channel() {
+        let (tx, mut rx) = mpsc::channel::<WatcherEventKey>(16);
+        let d = Debouncer::new(Duration::from_millis(50), tx);
+        let key = WatcherEventKey {
+            path: PathBuf::from("/vault/promptibrary/prompts/hi.md"),
+            kind: WatcherEventKind::PromptUpdated,
+        };
+        d.push(key.clone()).await;
+        let evt = tokio::time::timeout(Duration::from_millis(500), rx.recv())
+            .await
+            .expect("debounced event arrived")
+            .expect("channel open");
+        assert_eq!(evt, key);
+    }
 
     #[tokio::test]
+    #[ignore = "notify is non-deterministic in CI sandboxes; run locally to validate the OS watcher path"]
     async fn watcher_emits_event_on_file_write() {
         let dir = tempfile::tempdir().unwrap();
         let v = VaultPaths::new(dir.path());
         std::fs::create_dir_all(v.prompts_dir()).unwrap();
         let mut watcher = start_watcher(&v).expect("start watcher");
 
-        // Small delay to let notify settle.
         tokio::time::sleep(Duration::from_millis(100)).await;
         std::fs::write(v.absolute("promptibrary/prompts/hi.md").unwrap(), b"hello").unwrap();
 
-        // Wait up to 2s for a debounced emit.
-        let received = tokio::time::timeout(Duration::from_secs(2), watcher.events.recv()).await;
-        // On CI sandboxes notify can be flaky; tolerate timeout without
-        // failing the test outright but assert if we got something it was
-        // for our path.
-        if let Ok(Some(evt)) = received {
-            assert!(
-                evt.path.ends_with("hi.md") || matches!(evt.kind, WatcherEventKind::RescanRequired),
-                "unexpected watcher event: {:?}",
-                evt
-            );
-        }
+        let evt = tokio::time::timeout(Duration::from_secs(2), watcher.events.recv())
+            .await
+            .expect("watcher emitted within 2s")
+            .expect("channel open");
+        assert!(
+            evt.path.ends_with("hi.md") || matches!(evt.kind, WatcherEventKind::RescanRequired),
+            "unexpected watcher event: {:?}",
+            evt
+        );
     }
 }
