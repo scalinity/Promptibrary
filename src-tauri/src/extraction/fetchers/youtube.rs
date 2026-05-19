@@ -325,10 +325,39 @@ fn collapse_adjacent(entries: Vec<(f64, String)>) -> Vec<SourceChunk> {
     out
 }
 
-fn parse_metadata(stdout: &[u8]) -> std::result::Result<YtDlpMetadata, serde_json::Error> {
+#[derive(Debug)]
+pub enum MetadataParseError {
+    Json(serde_json::Error),
+    MissingId,
+}
+
+impl std::fmt::Display for MetadataParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Json(e) => write!(f, "{e}"),
+            Self::MissingId => write!(f, "yt-dlp metadata is missing video id"),
+        }
+    }
+}
+
+impl From<serde_json::Error> for MetadataParseError {
+    fn from(e: serde_json::Error) -> Self {
+        Self::Json(e)
+    }
+}
+
+fn parse_metadata(stdout: &[u8]) -> std::result::Result<YtDlpMetadata, MetadataParseError> {
     let v: serde_json::Value = serde_json::from_slice(stdout)?;
+    // SCA-712: reject empty / missing id explicitly. An empty `video_id`
+    // would later cause `find_transcript_files` to do `starts_with("")`,
+    // matching every file in the temp dir — including transcripts from a
+    // concurrent fetch (in V1, rate-limited away; but fragile contract).
+    let id = v["id"].as_str().unwrap_or("").trim().to_string();
+    if id.is_empty() {
+        return Err(MetadataParseError::MissingId);
+    }
     Ok(YtDlpMetadata {
-        id: v["id"].as_str().unwrap_or("").to_string(),
+        id,
         title: v["title"].as_str().map(str::to_string),
         uploader: v["uploader"].as_str().map(str::to_string),
         channel: v["channel"].as_str().map(str::to_string),
@@ -421,6 +450,28 @@ pub async fn fetch_youtube(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn metadata_empty_id_rejected() {
+        let raw = br#"{"id": "", "title": "x"}"#;
+        let err = parse_metadata(raw).unwrap_err();
+        assert!(matches!(err, MetadataParseError::MissingId));
+    }
+
+    #[test]
+    fn metadata_missing_id_rejected() {
+        let raw = br#"{"title": "no id key"}"#;
+        let err = parse_metadata(raw).unwrap_err();
+        assert!(matches!(err, MetadataParseError::MissingId));
+    }
+
+    #[test]
+    fn metadata_valid_id_parses() {
+        let raw = br#"{"id": "abc123", "title": "x", "duration": 42.0}"#;
+        let m = parse_metadata(raw).unwrap();
+        assert_eq!(m.id, "abc123");
+        assert_eq!(m.duration_seconds, Some(42));
+    }
 
     #[test]
     fn json3_parses_events_in_timestamp_order() {
