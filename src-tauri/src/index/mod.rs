@@ -11,3 +11,4 @@ pub mod telemetry_repo;
 pub mod fts;
 pub mod embeddings;
 pub mod reindex;
+pub mod sql_util;

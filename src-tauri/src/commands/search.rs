@@ -35,6 +35,7 @@ use crate::app_state::ManagedState;
 use crate::commands::vault::current_vault_db;
 use crate::error::{AppError, Result};
 use crate::index::fts::search_fts;
+use crate::index::sql_util::escape_like;
 
 // ─── Search mode ──────────────────────────────────────────────────────
 
@@ -553,17 +554,6 @@ async fn suggest_tags_inner(
         .into_iter()
         .map(|(name, usage_count)| TagSuggestion { name, usage_count })
         .collect())
-}
-
-fn escape_like(input: &str) -> String {
-    let mut out = String::with_capacity(input.len());
-    for ch in input.chars() {
-        if matches!(ch, '%' | '_' | '\\') {
-            out.push('\\');
-        }
-        out.push(ch);
-    }
-    out
 }
 
 // ─── Cmd-K palette ────────────────────────────────────────────────────
