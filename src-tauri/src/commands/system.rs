@@ -296,10 +296,17 @@ pub async fn open_path(input: PathInput) -> Result<()> {
     spawn_opener(&input.path).await
 }
 
+/// SCA-743 trust posture: the V1 threat model is "user owns the
+/// frontend"; the IPC accepts any path the process has read access to.
+/// Vault-ancestry restriction is a V2 candidate. We do however add
+/// the `--` argument terminator below so a path starting with `-`
+/// (e.g. `-h`) is not parsed as a flag by `open` / `xdg-open` —
+/// without it, `open -- "-h"` would print help instead of opening a
+/// file literally named `-h`. Same precaution for `spawn_terminal`.
 #[cfg(target_os = "macos")]
 async fn spawn_terminal(path: &std::path::Path) -> Result<()> {
     let fut = tokio::process::Command::new("open")
-        .args(["-a", "Terminal"])
+        .args(["-a", "Terminal", "--"])
         .arg(path)
         .status();
     match timeout(SPAWN_LAUNCH_TIMEOUT, fut).await {
@@ -320,7 +327,7 @@ async fn spawn_terminal(path: &std::path::Path) -> Result<()> {
 async fn spawn_terminal(path: &std::path::Path) -> Result<()> {
     for bin in ["x-terminal-emulator", "gnome-terminal", "konsole"] {
         let fut = tokio::process::Command::new(bin)
-            .args(["--working-directory"])
+            .args(["--working-directory", "--"])
             .arg(path)
             .status();
         if let Ok(Ok(s)) = timeout(SPAWN_LAUNCH_TIMEOUT, fut).await {
@@ -345,7 +352,10 @@ async fn spawn_terminal(_path: &std::path::Path) -> Result<()> {
 
 #[cfg(target_os = "macos")]
 async fn spawn_opener(path: &std::path::Path) -> Result<()> {
-    let fut = tokio::process::Command::new("open").arg(path).status();
+    let fut = tokio::process::Command::new("open")
+        .arg("--")
+        .arg(path)
+        .status();
     match timeout(SPAWN_LAUNCH_TIMEOUT, fut).await {
         Ok(Ok(status)) if status.success() => Ok(()),
         Ok(Ok(_)) => Err(AppError::new(AppErrorKind::Internal, "open(1) failed")),
@@ -359,7 +369,10 @@ async fn spawn_opener(path: &std::path::Path) -> Result<()> {
 
 #[cfg(target_os = "linux")]
 async fn spawn_opener(path: &std::path::Path) -> Result<()> {
-    let fut = tokio::process::Command::new("xdg-open").arg(path).status();
+    let fut = tokio::process::Command::new("xdg-open")
+        .arg("--")
+        .arg(path)
+        .status();
     match timeout(SPAWN_LAUNCH_TIMEOUT, fut).await {
         Ok(Ok(status)) if status.success() => Ok(()),
         Ok(Ok(_)) => Err(AppError::new(AppErrorKind::Internal, "xdg-open failed")),
