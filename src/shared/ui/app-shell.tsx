@@ -33,7 +33,6 @@ export function AppShell({ children }: AppShellProps): React.JSX.Element {
 
   return (
     <>
-      <div className="grain" aria-hidden="true" />
       <div className="app-frame">
         <Topbar />
         <div className="workspace">
