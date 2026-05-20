@@ -50,7 +50,7 @@
   background: var(--accent);
   border: 1px solid var(--accent);
   border-radius: var(--r-sm);
-  color: #0c0c0c;
+  color: var(--bg-deep);
   font-family: var(--font-mono);
   font-size: 11.5px;
   font-weight: 500;
@@ -74,7 +74,7 @@
   padding: 1px 5px;
   border: 1px solid rgba(12, 12, 12, 0.4);
   border-radius: 3px;
-  color: #0c0c0c;
+  color: var(--bg-deep);
   letter-spacing: 0.02em;
 }
 

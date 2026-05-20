@@ -139,7 +139,7 @@
 .cand.on .check {
   background: var(--accent);
   border-color: var(--accent);
-  color: var(--bg-base);
+  color: var(--bg-deep);
   display: grid;
   place-items: center;
   font-family: var(--font-mono);
@@ -147,7 +147,6 @@
 }
 .cand.on .check::after {
   content: "✓";
-  color: #0c0c0c;
 }
 .cand .title {
   font-family: var(--font-ui);
