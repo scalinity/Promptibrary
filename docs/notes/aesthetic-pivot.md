@@ -53,3 +53,11 @@ Filing as an L-numbered child would have falsely scoped it. Instead it's a coord
 - **`spec-gen` tag swatch** — currently `var(--paper-warm)` which maps to `#fbbf24` (amber-on-panel). Visually identical to amber-hover states. A future ticket should re-shuffle the tag swatch palette to give `spec-gen` a distinct hue.
 - **Local Outfit bundle** — V2 polish, tracked in `docs/V2-CANDIDATES.md`.
 - **xterm `getTerminalTheme()`** — spec §8 documents the bridge; the implementation in `src/features/terminal/` is still a stub (the same stub as before the retheme — not a regression, just unfinished L3/L5 work).
+
+---
+
+## Commit range
+
+- **Parent (retheme):** [SCA-866](https://linear.app/scalinity/issue/SCA-866) — commits `4ae8f9f..597d117` on `main` (13 commits, 12 sub-issues + 1 cleanup pass).
+- **Parent (review follow-ups):** [SCA-879](https://linear.app/scalinity/issue/SCA-879) — addresses every finding from `/review-2` against SCA-866. 10 sub-issues (SCA-880..SCA-889).
+- To replay: `git log --oneline 4ae8f9f^..main -- Promptibrary\ Design\ System .claude/skills/promptibrary-design src/styles src/index.css src/features/import/import.css src/shared/ui/app-shell.tsx docs/SPEC.md docs/notes/aesthetic-pivot.md docs/V2-CANDIDATES.md CLAUDE.md`
