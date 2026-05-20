@@ -26,6 +26,9 @@
   /* ---------- Accent — amber, the signature ---------- */
   --accent:      #f59e0b;
   --accent-warm: #fbbf24;                    /* hover / on-panel */
+  /* --accent-dim and --accent-deep intentionally share #b45309 — slots
+     kept separate for semantic clarity (fill vs outline) even though
+     the hue collides in the carbon palette. Do not consolidate. */
   --accent-dim:  #b45309;                    /* secondary use    */
   --accent-deep: #b45309;                    /* outlines         */
   --accent-glow: rgba(245, 158, 11, 0.30);   /* halo             */
