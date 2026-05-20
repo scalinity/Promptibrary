@@ -1,7 +1,7 @@
 // Single prompt row — matches `.row` in the canonical app.css.
 //
 // The 3px left spine encodes state via the row's state class
-// (`.selected` / `.running` / `.recent`). Title is Switzer 500, tag chips
+// (`.selected` / `.running` / `.recent`). Title is Outfit 500, tag chips
 // inherit the canonical `.row-tags > span` style, meta line is mono dim.
 //
 // Data shape is the slim `PromptListItem` returned by `listPrompts` — the
