@@ -96,7 +96,31 @@ impl AppServices {
 
         let extraction_temp_dir = std::env::temp_dir().join("promptibrary").join("extraction");
         let app_data_dir = default_app_data_dir();
-        let embedding_service: Arc<dyn EmbeddingService> = MockEmbeddingService::new();
+
+        // SCA-808: real semantic search when `fastembed` cargo feature
+        // is enabled. The model download is lazy and ~130 MB on first
+        // run; if it fails we fall back to MockEmbeddingService so the
+        // app still starts (the hybrid score's semantic component
+        // degrades gracefully to 0 rather than crashing the index).
+        let embedding_service: Arc<dyn EmbeddingService> = {
+            #[cfg(feature = "fastembed")]
+            {
+                match crate::index::fastembed_service::FastembedService::try_new(&app_data_dir) {
+                    Ok(svc) => Arc::new(svc) as Arc<dyn EmbeddingService>,
+                    Err(e) => {
+                        tracing::warn!(
+                            error = %e,
+                            "fastembed initialization failed; falling back to MockEmbeddingService"
+                        );
+                        MockEmbeddingService::new()
+                    }
+                }
+            }
+            #[cfg(not(feature = "fastembed"))]
+            {
+                MockEmbeddingService::new()
+            }
+        };
 
         Self {
             state: RwLock::default(),

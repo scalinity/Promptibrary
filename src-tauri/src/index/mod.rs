@@ -12,3 +12,6 @@ pub mod fts;
 pub mod embeddings;
 pub mod reindex;
 pub mod sql_util;
+
+#[cfg(feature = "fastembed")]
+pub mod fastembed_service;

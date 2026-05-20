@@ -69,7 +69,15 @@ keyring-core = "1"
 
 # Local vector search + embeddings
 sqlite-vec = "=0.1.9"
-# fastembed = "5.13"   # TODO(L5): re-enable when ONNX runtime is wired up; pulls in ort/onnxruntime native deps
+
+# SCA-808: fastembed is optional. Default builds use the in-tree
+# MockEmbeddingService (deterministic hash-based vectors — useful for
+# tests + cosine-storage development without ORT). Production builds
+# that want real bge-small-en-v1.5 semantic search opt in via
+# `cargo build --features fastembed` (or `cargo tauri build --features
+# fastembed`). The fastembed crate pulls the ONNX Runtime native deps,
+# adding ~3 min to a cold compile.
+fastembed = { version = "5.13", optional = true }
 
 # Git history / diff / revert per spec §10. Vendored libgit2 so CI on
 # clean runners doesn't need a system libgit2-dev. ~30s clean build
@@ -105,3 +113,8 @@ windows-native-keyring-store = "1"
 # By default, Tauri 2 uses the custom protocol on Windows/Linux/macOS.
 default = ["custom-protocol"]
 custom-protocol = ["tauri/custom-protocol"]
+# SCA-808 — opt-in semantic search via fastembed + bge-small-en-v1.5.
+# See `src/index/embeddings.rs` and `src/index/fastembed_service.rs`
+# for the wire-up; the runtime swaps MockEmbeddingService for
+# FastembedService when this feature is set.
+fastembed = ["dep:fastembed"]
