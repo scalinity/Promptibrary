@@ -85,14 +85,13 @@
     margin-top: 3px;
   }
   .cand.on .check { background: var(--accent); border-color: var(--accent); color: var(--bg-base); display: grid; place-items: center; font-family: var(--font-mono); font-size: 10px; }
-  .cand.on .check::after { content: "✓"; color: oklch(0.18 0.02 80); }
+  .cand.on .check::after { content: "✓"; color: #0c0c0c; }
   .cand .title { font-family: var(--font-ui); font-weight: 500; font-size: 13.5px; color: var(--ink-primary); margin-bottom: 4px; }
   .cand .preview { font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-tertiary); letter-spacing: 0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .cand .meta { font-family: var(--font-mono); font-size: 10px; color: var(--ink-dim); letter-spacing: 0.04em; text-transform: lowercase; align-self: center; }
 </style>
 </head>
 <body>
-<div class="grain"></div>
 
 <!-- BACKGROUND APP (dimmed, behind modal) -->
 <div class="app-frame" data-screen-label="03 Import" style="filter: brightness(0.5) saturate(0.7);">

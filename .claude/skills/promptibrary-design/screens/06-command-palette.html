@@ -15,7 +15,7 @@
     background: var(--bg-raised);
     border: var(--hairline);
     border-radius: var(--r-lg);
-    box-shadow: 0 24px 60px -20px oklch(0 0 0 / 0.6);
+    box-shadow: 0 24px 60px -20px rgba(0, 0, 0, 0.7);
     overflow: hidden;
     display: flex;
     flex-direction: column;
@@ -131,7 +131,6 @@
 </style>
 </head>
 <body>
-<div class="grain"></div>
 
 <div class="app-frame" data-screen-label="06 Command palette" style="filter: brightness(0.45) saturate(0.6);">
   <div class="topbar"><div class="brand"><span class="brand-name">Promptibrary<span class="dot">.</span></span><span class="brand-tag">// agentic operator console</span></div><div class="center"><div class="search"><span class="glyph">⌕</span><input><span class="kbd">⌘K</span></div></div><div class="actions"><button class="btn">import</button></div></div>
@@ -139,7 +138,7 @@
   <div class="statusbar"><span class="dot"></span><span class="state">READY</span></div>
 </div>
 
-<div class="modal-overlay" style="background: oklch(0 0 0 / 0.6); align-items:flex-start; padding-top: 14vh">
+<div class="modal-overlay" style="background: rgba(0, 0, 0, 0.7); align-items:flex-start; padding-top: 14vh">
   <div class="palette">
     <div class="pal-input">
       <span class="glyph">⌕</span>

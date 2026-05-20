@@ -121,17 +121,16 @@
   .ln { display: block; padding: 1px 8px; border-radius: 2px; white-space: pre-wrap; }
   .ln .gut { display: inline-block; width: 22px; color: var(--ink-dim); margin-right: 8px; text-align: right; }
   .ln.ctx { color: var(--ink-secondary); }
-  .ln.add { background: oklch(0.78 0.18 145 / 0.06); color: var(--accent-warm); }
+  .ln.add { background: rgba(52, 211, 153, 0.06); color: var(--accent-warm); }
   .ln.add .gut { color: var(--accent); }
   .ln.add::before { content: "+ "; color: var(--accent); }
-  .ln.del { background: oklch(0.68 0.22 25 / 0.06); color: oklch(0.78 0.16 25); text-decoration: line-through; text-decoration-color: oklch(0.48 0.14 25); text-decoration-thickness: 1px; }
-  .ln.del .gut { color: oklch(0.58 0.16 25); }
-  .ln.del::before { content: "− "; color: oklch(0.78 0.16 25); text-decoration: none; }
+  .ln.del { background: rgba(239, 68, 68, 0.06); color: #fca5a5; text-decoration: line-through; text-decoration-color: rgba(239, 68, 68, 0.5); text-decoration-thickness: 1px; }
+  .ln.del .gut { color: #f87171; }
+  .ln.del::before { content: "− "; color: #fca5a5; text-decoration: none; }
   .ln.ctx::before { content: "  "; }
 </style>
 </head>
 <body>
-<div class="grain"></div>
 
 <div class="app-frame" data-screen-label="05 History" style="filter: brightness(0.5) saturate(0.7);">
   <div class="topbar"><div class="brand"><span class="brand-name">Promptibrary<span class="dot">.</span></span><span class="brand-tag">// agentic operator console</span></div><div class="center"><div class="search"><span class="glyph">⌕</span><input><span class="kbd">⌘K</span></div></div><div class="actions"><button class="btn">import</button></div></div>
