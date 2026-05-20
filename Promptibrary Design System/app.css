@@ -1,6 +1,18 @@
 /* ============================================================
    Promptibrary — Component styles (shared by component refs + screens)
    Load AFTER tokens.css, typography.css, base.css.
+
+   Italic retention rule (do not churn this in refactors):
+   - KEEP `font-style: italic` on JBM-using classes (`.brand-tag`,
+     `.var-inline`, `.term-line.think`, `.prompt-body .comment`,
+     `.picker.empty .path`, `.input::placeholder`,
+     `.search input::placeholder`) — JetBrains Mono ships a true
+     italic face so the slant is real type, not browser-synthesized.
+   - DROP `font-style: italic` from Outfit-using section labels
+     (`.menu-label`, `.side-section`, `.section-label`) — Outfit
+     has no native italic; browser-synthesized italic on Outfit
+     looks faux. The § glyph + lowercase + 0.02em tracking
+     carries the editorial signature without the italic.
    ============================================================ */
 
 /* ============================================================
