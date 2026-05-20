@@ -4,6 +4,21 @@
    No others. Ever.
    ============================================================ */
 
+/* === Differences from src/styles/typography.css ===
+   This canonical file serves static HTML mocks (the screens/ + preview/ +
+   components/ pages render directly from this directory). For that audience,
+   loading JetBrains Mono from the Google Fonts CDN is the simplest path.
+
+   The runtime React app (src/styles/typography.css) replaces the JBM CDN
+   @import below with local @font-face rules pointing at the bundled
+   JetBrainsMono Variable .ttf assets in src/assets/fonts/ — see lines 14-28
+   of src/styles/typography.css. The Outfit CDN @import stays in both files
+   (Outfit local-bundling is a V2 polish item per docs/V2-CANDIDATES.md).
+
+   If you copy this file verbatim into a new surface and want the same
+   metrics as the running app, swap the JBM @import for local @font-face
+   rules + bundle the .ttf assets next to the file.
+   =================================================== */
 @import url("https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap");
 @import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap");
 
