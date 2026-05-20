@@ -44,11 +44,18 @@
   --color-accent-warm: var(--accent-warm);
   --color-accent-dim: var(--accent-dim);
   --color-accent-deep: var(--accent-deep);
+  --color-accent-glow: var(--accent-glow);
+  --color-accent-tint: var(--accent-tint);
 
   /* Status */
   --color-status-running: var(--status-running);
   --color-status-error: var(--status-error);
   --color-status-warn: var(--status-warn);
+  --color-status-error-dim: var(--status-error-dim);
+
+  /* Repurposed accent slots */
+  --color-paper-warm: var(--paper-warm);
+  --color-term-path: var(--term-path);
 
   /* Typography */
   --font-display: var(--font-display);
