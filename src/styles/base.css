@@ -79,11 +79,6 @@ hr {
 
 /* ---------- Motion primitives (used by components) ---------- */
 
-@keyframes pb-pulse {
-  0%, 100% { opacity: 1; }
-  50%      { opacity: 0.55; }
-}
-
 /* pb-glow — flat pulse-border style (ClaudeRoom carbon). Subtler than
    the original radial halo: just a 2px outline of --accent-glow that
    fades in and out, used for buttons that need to draw the eye. */
@@ -105,18 +100,6 @@ hr {
 @keyframes pb-dot-glow {
   0%, 100% { box-shadow: 0 0 4px 0 var(--status-running); }
   50%      { box-shadow: 0 0 4px 1px var(--status-running); }
-}
-
-/* ---------- General-purpose keyframes (ClaudeRoom carbon set) ---------- */
-
-@keyframes fade-in {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
-
-@keyframes slide-up {
-  from { opacity: 0; transform: translateY(12px); }
-  to   { opacity: 1; transform: translateY(0); }
 }
 
 /* ---------- Reduced motion ---------- */
