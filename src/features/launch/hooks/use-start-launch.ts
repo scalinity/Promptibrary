@@ -1,7 +1,7 @@
-// Mutation hook calling start_launch — on success, navigates to /run/:id.
+// Mutation hook calling start_launch — on success, navigates to /run/:runId.
 //
-// In L2 the IPC always rejects with `not_yet_implemented`; the launch button
-// surfaces that gracefully. L3 wires the actual PTY pipeline.
+// Spec §7: the Tauri command returns `runId` so the frontend can route to
+// the run pane and subscribe to `term:stdout` / `term:finished` events.
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
@@ -17,13 +17,10 @@ export function useStartLaunch() {
 
   return useMutation({
     mutationFn: (args: StartLaunchArgs) => startLaunch(args),
-    onSuccess: (profile) => {
+    onSuccess: ({ runId }) => {
       reset();
       queryClient.invalidateQueries({ queryKey: runKeys.all() });
-      // The launch profile carries the runId only after L3; the L2 mock
-      // path never reaches here, so this is a no-op in the visual specs.
-      const launchedAt = profile.launchedAt;
-      if (launchedAt != null) navigate("/run/latest");
+      navigate(`/run/${runId}`);
     },
   });
 }

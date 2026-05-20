@@ -199,16 +199,17 @@ export const cmdkSearch: typeof Real.cmdkSearch = (query) => {
 export const startLaunch: typeof Real.startLaunch = () =>
   Promise.reject({
     kind: "Internal",
-    message: "not_yet_implemented",
+    message: "start_launch is backend-only — the mock IPC layer cannot spawn a real PTY",
     details: { layer: "L3" },
   });
 
+export const stopRun: typeof Real.stopRun = () => ok(undefined as never);
+
 export const sendTerminalInput: typeof Real.sendTerminalInput = () =>
-  Promise.reject({
-    kind: "Internal",
-    message: "not_yet_implemented",
-    details: { layer: "L3" },
-  });
+  ok(undefined as never);
+
+export const resizeTerminal: typeof Real.resizeTerminal = () =>
+  ok(undefined as never);
 
 // ─── Runs ─────────────────────────────────────────────────────────────────
 
@@ -478,7 +479,12 @@ export type {
   CmdkResultKind,
   CmdkResult,
   StartLaunchArgs,
+  StartLaunchOutput,
+  StopRunArgs,
   SendTerminalInputArgs,
+  ResizeTerminalArgs,
+  TermStdoutEvent,
+  TermFinishedEvent,
   DetectedSourceKind,
   DetectSourceResult,
   ExtractPromptCandidatesArgs,

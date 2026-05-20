@@ -16,6 +16,7 @@ use crate::extraction::anthropic::{AnthropicTransport, HttpAnthropicTransport};
 use crate::extraction::fetchers::youtube::{RealYtDlpRunner, YtDlpRunner};
 use crate::extraction::rate_limit::RateLimiter;
 use crate::index::embeddings::{EmbeddingService, MockEmbeddingService};
+use crate::launch::pty_pool::PtyPool;
 use crate::settings::secret_store::SecretStore;
 #[cfg(any(
     test,
@@ -62,6 +63,10 @@ pub struct AppServices {
     /// Cargo.toml — see `src/index/embeddings.rs` module docstring for
     /// the enable procedure.
     pub embedding_service: Arc<dyn EmbeddingService>,
+    /// SCA-809: live PTY sessions keyed by RunId. commands::launches::
+    /// start_launch inserts; stop_run / natural exit removes;
+    /// send_terminal_input + resize_terminal look up by id.
+    pub pty_pool: Arc<PtyPool>,
 }
 
 #[derive(Default)]
@@ -133,6 +138,7 @@ impl AppServices {
             extraction_temp_dir,
             app_data_dir,
             embedding_service,
+            pty_pool: Arc::new(PtyPool::new()),
         }
     }
 
@@ -157,6 +163,7 @@ impl AppServices {
             extraction_temp_dir: std::env::temp_dir().join("promptibrary").join("extraction"),
             app_data_dir: default_app_data_dir(),
             embedding_service: MockEmbeddingService::new(),
+            pty_pool: Arc::new(PtyPool::new()),
         }
     }
 

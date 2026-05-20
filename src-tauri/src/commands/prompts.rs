@@ -357,7 +357,7 @@ async fn unique_slug(db: &sqlx::SqlitePool, base: &str) -> Result<String> {
     }
 }
 
-fn prompt_from_file(vault_path: &str, content: &str) -> Result<Prompt> {
+pub(crate) fn prompt_from_file(vault_path: &str, content: &str) -> Result<Prompt> {
     let doc = parse_markdown_document(content)?;
     let fm = parse_prompt_frontmatter(&doc.frontmatter_yaml)?;
     let body = doc.body;

@@ -38,13 +38,27 @@ export function LaunchButton({ prompt, validation }: Props): React.JSX.Element {
       return;
     }
     setError(null);
+    // Map the in-drawer overrides bag onto the per-field StartLaunchArgs
+    // shape Rust expects. `workingDirectory` is its own required field
+    // and `destination` / `maxTurns` are not part of the IPC contract
+    // (destination is a constant ClaudeCodeCli; max_turns is intentionally
+    // forward-compat-only per spec §7), so we don't forward them.
+    const {
+      destination: _destination,
+      workingDirectory: _wd,
+      maxTurns: _maxTurns,
+      ...overrideFields
+    } = overrides;
+    void _destination;
+    void _wd;
+    void _maxTurns;
     startLaunch
       .mutateAsync({
         promptId: prompt.id,
         values: Object.values(values),
         workingDirectory,
         inlineTweakBody: inlineTweak,
-        overrides,
+        ...overrideFields,
       })
       .catch((err: unknown) => {
         if (isAppError(err) && err.message === "not_yet_implemented") {

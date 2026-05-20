@@ -295,11 +295,44 @@ export interface StartLaunchArgs {
   values: ResolvedVariableValue[];
   workingDirectory: AbsolutePath;
   inlineTweakBody?: string | null;
-  overrides?: Partial<LaunchDefaults>;
+  additionalDirectories?: AbsolutePath[];
+  model?: LaunchDefaults["model"];
+  verifierMode?: LaunchDefaults["verifierMode"];
+  permissionMode?: LaunchDefaults["permissionMode"];
+  allowedTools?: LaunchDefaults["allowedTools"];
+  disallowedTools?: LaunchDefaults["disallowedTools"];
+  mcpConfigPaths?: LaunchDefaults["mcpConfigPaths"];
+  strictMcpConfig?: LaunchDefaults["strictMcpConfig"];
+  appendSystemPrompt?: LaunchDefaults["appendSystemPrompt"];
+  /** xterm.js viewport at launch — sets the initial PTY winsize. */
+  cols?: number;
+  rows?: number;
+}
+
+/**
+ * Per spec §7 the Tauri command returns `runId` so the frontend can
+ * route to the run pane and subscribe to `term:stdout` / `term:finished`
+ * events. The full `LaunchProfile` is returned so the run pane can show
+ * the resolved prompt + variable values without a second roundtrip.
+ */
+export interface StartLaunchOutput {
+  runId: RunId;
+  launchProfile: LaunchProfile;
+  transcriptPath: string;
 }
 
 export const startLaunch = (args: StartLaunchArgs) =>
-  invoke<LaunchProfile>("start_launch", { input: args });
+  invoke<StartLaunchOutput>("start_launch", { input: args });
+
+export interface StopRunArgs {
+  runId: RunId;
+  /** Force-kill (SIGTERM → SIGKILL). Defaults to graceful SIGINT
+   *  escalation per spec §7. */
+  force?: boolean;
+}
+
+export const stopRun = (args: StopRunArgs) =>
+  invoke<void>("stop_run", { input: args });
 
 export interface SendTerminalInputArgs {
   runId: RunId;
@@ -308,6 +341,31 @@ export interface SendTerminalInputArgs {
 
 export const sendTerminalInput = (args: SendTerminalInputArgs) =>
   invoke<void>("send_terminal_input", { input: args });
+
+export interface ResizeTerminalArgs {
+  runId: RunId;
+  cols: number;
+  rows: number;
+}
+
+export const resizeTerminal = (args: ResizeTerminalArgs) =>
+  invoke<void>("resize_terminal", { input: args });
+
+// ─── Terminal events (emitted by the Rust backend) ────────────────────────
+
+/** Raw PTY stdout chunk. `bytesB64` is base64 of the raw bytes — JSON
+ *  can't carry arbitrary bytes safely, and xterm.js's `write()` accepts
+ *  a Uint8Array, so the frontend decodes b64 once and writes through. */
+export interface TermStdoutEvent {
+  runId: RunId;
+  bytesB64: string;
+}
+
+export interface TermFinishedEvent {
+  runId: RunId;
+  exitCode: number | null;
+  signal: string | null;
+}
 
 // ─── Runs ─────────────────────────────────────────────────────────────────
 

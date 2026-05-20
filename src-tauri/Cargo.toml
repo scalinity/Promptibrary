@@ -79,12 +79,12 @@ sqlite-vec = "=0.1.9"
 # adding ~3 min to a cold compile.
 fastembed = { version = "5.13", optional = true }
 
-# Git history / diff / revert per spec §10. Vendored libgit2 so CI on
-# clean runners doesn't need a system libgit2-dev. ~30s clean build
-# cost; cached by Swatinem/rust-cache in the workflow.
+# Git history / diff / revert per spec §10.
 git2 = { version = "0.20", default-features = false, features = ["vendored-libgit2"] }
 
-# portable-pty = "=0.9.0"  # TODO(L3): re-enable when launch pipeline lands
+# L3 launch pipeline — direct PTY spawn for claude per spec §7.
+# Pinned to =0.9.0 per spec §2.
+portable-pty = "=0.9.0"
 
 # Hashing for prompt checksums
 sha2 = "0.10"
@@ -95,6 +95,17 @@ regex = { version = "1", default-features = false, features = ["std", "unicode-p
 # Utility
 once_cell = "1"
 parking_lot = "0.12"
+
+# Base64 for forwarding raw PTY stdout bytes through Tauri events.
+# JSON can't carry arbitrary bytes safely; xterm.js decodes b64 on the
+# frontend before write().
+base64 = "0.22"
+
+[target.'cfg(unix)'.dependencies]
+# SIGINT/SIGTERM/SIGKILL delivery to the claude child PID.
+# portable-pty doesn't expose POSIX signal sends directly; nix's
+# `signal::kill` does it cleanly.
+nix = { version = "0.29", features = ["signal"] }
 
 [dev-dependencies]
 tempfile = "3"
