@@ -2,15 +2,16 @@
    Promptibrary — Application stylesheet entry.
    Tailwind v4 CSS-first config via @theme.
    Imports the canonical Promptibrary design system CSS, then maps
-   the OKLCH tokens into Tailwind's theme so utilities can use them.
+   the dark-carbon tokens into Tailwind's theme so utilities can
+   use them.
 
    PostCSS requires every @import to precede other statements, so
-   we hoist the Fontshare CDN import for Boska/Switzer here, ahead
-   of every other CSS rule. Bundling those families locally is
-   tracked as a V2 polish item (see docs/V2-CANDIDATES.md).
+   we hoist the Google Fonts CDN import for Outfit here, ahead
+   of every other CSS rule. Bundling Outfit locally is tracked
+   as a V2 polish item (see docs/V2-CANDIDATES.md).
    ============================================================ */
 
-@import url("https://api.fontshare.com/v2/css?f[]=boska@400,500,700,400i&f[]=switzer@400,500,600&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap");
 
 @import "tailwindcss";
 

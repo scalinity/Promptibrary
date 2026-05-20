@@ -1,16 +1,16 @@
 /* ============================================================
    Promptibrary — Typography
-   Three faces: Boska (display), Switzer (UI), JetBrains Mono.
+   Two faces: Outfit (display + UI), JetBrains Mono (runtime/identifier/numeric).
    No others. Ever.
    ============================================================ */
 
-/* The Fontshare CDN @import for Boska + Switzer lives at the top of
+/* The Google Fonts CDN @import for Outfit lives at the top of
    `src/index.css` so it precedes every CSS rule (PostCSS requirement). */
 
 /* === Additions beyond canonical design system ===
    JetBrains Mono Variable is bundled locally per L0 prompt and spec §8.
-   Boska + Switzer continue from Fontshare CDN for V1; bundling them is a V2 polish item
-   (see docs/V2-CANDIDATES.md). */
+   Outfit is loaded from Google Fonts CDN for V1; bundling it is a V2 polish
+   item (see docs/V2-CANDIDATES.md). */
 @font-face {
   font-family: "JetBrains Mono Variable";
   font-style: normal;
@@ -28,8 +28,8 @@
 }
 
 :root {
-  --font-display: "Boska", "Iowan Old Style", "Charter", Georgia, serif;
-  --font-ui:      "Switzer", "Helvetica Neue", -apple-system, system-ui, sans-serif;
+  --font-display: "Outfit", system-ui, sans-serif;
+  --font-ui:      "Outfit", system-ui, sans-serif;
   --font-mono:    "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
 }
 
@@ -37,7 +37,7 @@
 
 .t-display-xl {
   font-family: var(--font-display);
-  font-weight: 500;
+  font-weight: 600;
   font-size: 32px;
   line-height: 1.1;
   letter-spacing: -0.02em;
@@ -45,7 +45,7 @@
 
 .t-display-l {
   font-family: var(--font-display);
-  font-weight: 500;
+  font-weight: 600;
   font-size: 26px;
   line-height: 1.15;
   letter-spacing: -0.015em;
@@ -53,7 +53,7 @@
 
 .t-display-m {
   font-family: var(--font-display);
-  font-weight: 500;
+  font-weight: 600;
   font-size: 22px;
   line-height: 1.2;
   letter-spacing: -0.02em;
@@ -61,7 +61,7 @@
 
 .t-display-s {
   font-family: var(--font-display);
-  font-weight: 500;
+  font-weight: 600;
   font-size: 18px;
   line-height: 1.25;
   letter-spacing: -0.01em;
@@ -69,7 +69,6 @@
 
 .t-section {
   font-family: var(--font-display);
-  font-style: italic;
   font-weight: 500;
   font-size: 12px;
   line-height: 1.2;
@@ -138,11 +137,10 @@
   letter-spacing: 0.04em;
 }
 
-/* ---------- Section label glyph ---------- */
+/* ---------- Section label glyph (Promptibrary signature) ---------- */
 
 .section-label::before {
   content: "§";
   color: var(--ink-dim);
   margin-right: 0.45em;
-  font-style: normal;
 }
