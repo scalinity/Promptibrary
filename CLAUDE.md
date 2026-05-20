@@ -6,7 +6,7 @@ This file augments the global `~/.claude/CLAUDE.md` with project-specific rules 
 
 ## Project at a glance
 
-**Promptibrary** is a Tauri 2.x desktop app — an agentic-coding operator console for Claude Code. The unit is a *launch profile*: a saved prompt with typed variables that resolves into a fresh Claude Code session running in an embedded terminal. Library + cockpit. Editorial × instrumented.
+**Promptibrary** is a Tauri 2.x desktop app — an agentic-coding operator console for Claude Code. The unit is a *launch profile*: a saved prompt with typed variables that resolves into a fresh Claude Code session running in an embedded terminal. Library + cockpit. Dark carbon × Promptibrary.
 
 - **Spec (source of truth):** `docs/SPEC.md`. Treat as authoritative. If your priors conflict with the spec, follow the spec.
 - **Build plan:** `~/Documents/Obsidian Vault/Promptibrary/Build Plan.md` and the six `Prompts/L*.md` files. Sectioned build: each layer is one `/goal` run with a hard human review checkpoint between layers.
@@ -188,8 +188,8 @@ Pulled from the spec and from the verified `claude --help` reconciliation. Viola
 
 - React 19, TypeScript, Vite 8, Tailwind v4 (CSS-first via `@theme`, no `tailwind.config.js`).
 - shadcn/ui generated to `src/shared/ui/shadcn/`. Wrappers at `src/shared/ui/`. **ESLint enforces:** only `@/shared/ui/*` may import from `@/shared/ui/shadcn/*`. Other code imports the wrappers.
-- All colors via CSS custom properties from `src/styles/tokens.css` (OKLCH). **No hex anywhere.** If you find yourself writing `#ff5c5c`, stop and use the right token.
-- JetBrains Mono Variable bundled locally (no CDN). Boska + Switzer from Fontshare CDN OK in V1.
+- All colors via CSS custom properties from `src/styles/tokens.css` (hex). Direct hex/rgba literals in component code prohibited — colors must flow through tokens. If you find yourself writing a color literal in a `.tsx` file, stop and use the right token.
+- JetBrains Mono Variable bundled locally (no CDN). Outfit loaded from Google Fonts CDN; bundling locally is a V2 polish item.
 - CodeMirror 6 for the prompt body editor with `Decoration.replace` WidgetTypes for variable refs. The decoration replaces display; source text remains `{{type:key}}` for serialization.
 
 ### Backend (Rust)
@@ -272,12 +272,13 @@ Pulled from the spec and from the verified `claude --help` reconciliation. Viola
 
 **Hard rules (from the skill, repeated here for visibility — see `SKILL.md` for the full list):**
 - Dark mode only. No light mode, ever.
-- Three faces only: Boska (display), Switzer (UI), JetBrains Mono (runtime/identifier/numeric).
-- Sodium amber is the only accent. Chartreuse for running, warm red for danger, paper-warm cream for editorial.
+- Two faces only: Outfit (display + UI), JetBrains Mono (runtime/identifier/numeric).
+- Amber `#f59e0b` is the only accent. Status colours: teal-green `#34d399` running, red `#ef4444` error, orange `#f97316` warn, info blue `#60a5fa` for paths/links.
+- § section markers preserved (12px lowercase Outfit + `§` prefix in `--ink-dim`).
 - No emoji icons — typographic glyphs (`§ ▸ ⌖ ⊟ ⎙ ↗ ▾ ⌗ ∿ ⏵ ⏸ ✓`) or Lucide outlines.
-- Film grain everywhere: include `<div class="grain"></div>` near `<body>`.
+- No grain — the dark carbon palette stands on its own.
 - Motion ≤ 240ms for transitions; the slow ambient animations (pulse 1.8s, glow 2.4s, blink 1s) are statuses, not transitions.
-- Drop shadows only on a hovered `.btn-launch`.
+- Flat — no drop shadows anywhere except a single subtle shadow on `.cmdk-dialog`. The launch button uses an outline glow, not a drop shadow.
 - No Lorem ipsum in user-facing artifacts. Use realistic Claude Code prompts.
 
 ---
@@ -342,7 +343,7 @@ Each has a spec section justifying the rule. These are the highest-value foot-gu
 | Pass `ANTHROPIC_API_KEY` to claude child env | CC handles its own auth | §7 *Environment* |
 | Compute UTF-16 offsets in a second pass | Inline in the parser, single pass | §5 *Parser contract* |
 | Auto-commit after revert | User commits when they want | §10 *Revert* |
-| Use hex colors anywhere | OKLCH tokens via CSS variables | §8 *Design tokens* |
+| Hardcode color literals in component code | Tokens from `src/styles/tokens.css` only | §8 *Design tokens* |
 | Render `bool` as literal `true`/`false` | Use `renderTrue`/`renderFalse` strings | §5 *Renderer* |
 | Skip the §15 fake-claude integration test | The PTY pipeline must be exercised, not simulated | §15 *Fake Claude launch* |
 | Add Apple code signing or notarization to V1 | Explicit V2 candidate per personal-use posture; not in scope | L5 *Installation and Gatekeeper* + §16 (patched) |
