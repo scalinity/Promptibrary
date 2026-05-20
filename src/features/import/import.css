@@ -147,7 +147,7 @@
 }
 .cand.on .check::after {
   content: "✓";
-  color: oklch(0.18 0.02 80);
+  color: #0c0c0c;
 }
 .cand .title {
   font-family: var(--font-ui);
