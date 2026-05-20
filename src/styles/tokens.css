@@ -1,53 +1,51 @@
 /* ============================================================
    Promptibrary — Design Tokens
    Source of truth for color, geometry, spacing, motion.
-   All colors in OKLCH. Dark-mode only (V1).
+   Dark carbon palette (hex). Dark-mode only.
    ============================================================ */
 
 :root {
-  /* ---------- Surfaces (dark, faint blue-green undertone) ---------- */
-  --bg-deep:     oklch(0.135 0.012 220);  /* outer app, behind frame      */
-  --bg-base:     oklch(0.170 0.012 220);  /* primary surface              */
-  --bg-raised:   oklch(0.205 0.013 220);  /* cards, hovered rows          */
-  --bg-sunken:   oklch(0.110 0.012 220);  /* inputs, code blocks, status  */
-  --bg-terminal: oklch(0.095 0.010 220);  /* embedded terminal surface    */
+  /* ---------- Surfaces (dark carbon) ---------- */
+  --bg-deep:     #0c0c0c;  /* outer app, behind frame      */
+  --bg-base:     #161616;  /* primary surface              */
+  --bg-raised:   #1c1c1c;  /* cards, hovered rows          */
+  --bg-sunken:   #0c0c0c;  /* inputs, code blocks, status  */
+  --bg-terminal: #0a0a0a;  /* embedded terminal surface    */
 
   /* ---------- Borders ---------- */
-  --border-subtle: oklch(0.24 0.012 220); /* hairlines, default 1px       */
-  --border-mid:    oklch(0.30 0.013 220); /* hover state on bordered els  */
-  --border-strong: oklch(0.40 0.014 220); /* deliberate emphasis          */
+  --border-subtle: #2a2a2a; /* hairlines, default 1px       */
+  --border-mid:    #3a3a3a; /* hover state on bordered els  */
+  --border-strong: #4a4a4a; /* deliberate emphasis          */
 
   /* ---------- Ink (text) ---------- */
-  --ink-primary:   oklch(0.96 0.008 80);  /* primary text, slight warm    */
-  --ink-secondary: oklch(0.74 0.012 80);  /* secondary text               */
-  --ink-tertiary:  oklch(0.54 0.012 80);  /* labels, captions             */
-  --ink-dim:       oklch(0.38 0.012 80);  /* separators, disabled         */
+  --ink-primary:   #e0e0e0;  /* primary text                 */
+  --ink-secondary: #8a8a8a;  /* secondary text               */
+  --ink-tertiary:  #5a5a5a;  /* labels, captions             */
+  --ink-dim:       #4a4a4a;  /* separators, disabled         */
 
-  /* ---------- Accent — sodium amber, the signature ---------- */
-  --accent:      oklch(0.82 0.16 75);
-  --accent-warm: oklch(0.88 0.14 70);                  /* hover / active   */
-  --accent-dim:  oklch(0.62 0.14 75);                  /* secondary use    */
-  --accent-deep: oklch(0.42 0.10 75);                  /* outlines         */
-  --accent-glow: oklch(0.82 0.16 75 / 0.30);           /* halo             */
-  --accent-tint: oklch(0.82 0.16 75 / 0.08);           /* selected bg      */
+  /* ---------- Accent — amber, the signature ---------- */
+  --accent:      #f59e0b;
+  --accent-warm: #fbbf24;                    /* hover / on-panel */
+  --accent-dim:  #b45309;                    /* secondary use    */
+  --accent-deep: #b45309;                    /* outlines         */
+  --accent-glow: rgba(245, 158, 11, 0.30);   /* halo             */
+  --accent-tint: rgba(245, 158, 11, 0.10);   /* selected bg      */
 
   /* ---------- Status ---------- */
-  --status-running: oklch(0.78 0.18 145);  /* chartreuse — alive          */
-  --status-error:   oklch(0.68 0.22 25);   /* warm red                    */
-  --status-warn:    oklch(0.82 0.15 90);   /* amber-yellow                */
-  --status-error-dim: oklch(0.48 0.14 25); /* dimmed for diff/strikethru  */
+  --status-running:   #34d399;                  /* teal-green — alive */
+  --status-error:     #ef4444;                  /* red                */
+  --status-warn:      #f97316;                  /* orange             */
+  --status-error-dim: rgba(239, 68, 68, 0.30);  /* dim border         */
 
-  /* ---------- Editorial paper warm (sparing — archival warmth) ---------- */
-  --paper-warm: oklch(0.92 0.045 80);
+  /* ---------- Repurposed accent slots ---------- */
+  --paper-warm: #fbbf24;  /* amber-on-panel (kind dot, syntax kw)  */
+  --term-path:  #60a5fa;  /* info blue (file paths, links)         */
 
-  /* ---------- Terminal token tints ---------- */
-  --term-path: oklch(0.80 0.06 200);  /* teal-ish file paths              */
-
-  /* ---------- Geometry ---------- */
-  --r-xs: 3px;   /* pills, small tags                                     */
-  --r-sm: 5px;   /* buttons, secondary inputs                             */
-  --r-md: 8px;   /* cards, primary inputs                                 */
-  --r-lg: 12px;  /* outer frame                                           */
+  /* ---------- Geometry (flat — small radii) ---------- */
+  --r-xs: 2px;
+  --r-sm: 3px;
+  --r-md: 4px;
+  --r-lg: 6px;
 
   --hairline: 1px solid var(--border-subtle);
 
@@ -81,21 +79,19 @@
 /* === Additions beyond canonical design system ===
    Tokens added by Promptibrary's React app where the canonical Promptibrary
    Design System CSS doesn't cover the use case. Keeping them in tokens.css
-   (rather than inline oklch() literals in component styles) means a future
+   (rather than inline literals in component styles) means a future
    design-system sync just adds a `--bg-overlay` etc. to the canonical file
    and removes the addition. */
 :root {
-  /* Modal/overlay scrim — used behind the cmdk palette. Subtle cool-cyan
-     tint matching the surface family with α 0.5. */
-  --bg-overlay: oklch(0.08 0.01 220 / 0.5);
+  /* Modal/overlay scrim — used behind the cmdk palette. */
+  --bg-overlay: rgba(0, 0, 0, 0.70);
 
   /* Drop shadow tint used on the cmdk palette card. Per design rule the
-     launch button is the ONLY drop-shadowed element on a screen, so this
-     is reserved for the modal palette and is intentionally subtler than
-     the launch glow. */
-  --shadow-modal: oklch(0 0 0 / 0.6);
+     cmdk modal is the ONLY drop-shadowed element on a screen, so this
+     is reserved for the modal palette. */
+  --shadow-modal: rgba(0, 0, 0, 0.60);
 
-  /* Danger border — same hue family as --status-error but dimmer for
-     containers (telemetry "delete all run history" card). */
-  --border-danger: oklch(0.4 0.1 25);
+  /* Danger border — dimmed red for containers (telemetry "delete all
+     run history" card). */
+  --border-danger: rgba(239, 68, 68, 0.30);
 }
