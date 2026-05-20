@@ -2415,8 +2415,10 @@ export const terminalOptions: ITerminalOptions = {
 /**
  * The xterm.js theme reads from the Promptibrary design tokens at terminal init
  * so the terminal stays in lockstep with the rest of the app's surfaces and
- * accent color. Do not hard-code hex values — the design system uses OKLCH and
- * a sodium-amber accent that must propagate into the ANSI palette.
+ * accent color. The Dark Carbon × Promptibrary design system uses a hex
+ * palette with an amber accent (#f59e0b) that propagates into the ANSI
+ * palette. Prefer reading tokens via `tok("--…")`; only the bright variants
+ * inline literals where no canonical token exists.
  */
 export function getTerminalTheme(): ITheme {
   const css = getComputedStyle(document.documentElement);
@@ -2431,25 +2433,25 @@ export function getTerminalTheme(): ITheme {
     selectionBackground: tok("--accent-tint"),
     selectionForeground: tok("--ink-primary"),
 
-    // ANSI palette — tied to the sodium-amber accent and status colors.
-    // Every color is an oklch(...) value from the same lightness/chroma family
-    // as the rest of the design system. No invented hex values.
-    black:         tok("--bg-terminal"),                      // oklch(0.095 0.010 220)
-    brightBlack:   tok("--ink-dim"),                          // oklch(0.38  0.012 80)
-    red:           tok("--status-error"),                     // oklch(0.68  0.22  25)
-    brightRed:     "oklch(0.78 0.20 25)",
-    green:         tok("--status-running"),                   // chartreuse oklch(0.78 0.18 145)
-    brightGreen:   "oklch(0.86 0.18 145)",
-    yellow:        tok("--accent"),                           // sodium amber oklch(0.82 0.16 75)
-    brightYellow:  tok("--accent-warm"),                      // oklch(0.88 0.14 70)
-    blue:          "oklch(0.62 0.08 200)",                    // muted teal
-    brightBlue:    "oklch(0.74 0.08 200)",
-    magenta:       "oklch(0.62 0.12 0)",                      // desaturated rose, distinct from accent
-    brightMagenta: "oklch(0.74 0.12 0)",
-    cyan:          "oklch(0.70 0.08 200)",
-    brightCyan:    "oklch(0.82 0.08 200)",
-    white:         tok("--ink-primary"),                      // oklch(0.96 0.008 80)
-    brightWhite:   "oklch(0.99 0 0)"
+    // ANSI palette — tied to the amber accent and status colors.
+    // Tokens flow through tokens.css; bright variants use hex literals
+    // pulled from the same hue family.
+    black:         tok("--bg-terminal"),    // #0a0a0a
+    brightBlack:   tok("--ink-dim"),        // #4a4a4a
+    red:           tok("--status-error"),   // #ef4444
+    brightRed:     "#fca5a5",
+    green:         tok("--status-running"), // teal-green #34d399
+    brightGreen:   "#6ee7b7",
+    yellow:        tok("--accent"),         // amber #f59e0b
+    brightYellow:  tok("--accent-warm"),    // #fbbf24
+    blue:          tok("--term-path"),      // info blue #60a5fa
+    brightBlue:    "#93c5fd",
+    magenta:       "#c084fc",               // distinct from accent
+    brightMagenta: "#d8b4fe",
+    cyan:          "#67e8f9",
+    brightCyan:    "#a5f3fc",
+    white:         tok("--ink-primary"),    // #e0e0e0
+    brightWhite:   "#f5f5f5"
   };
 }
 ```
