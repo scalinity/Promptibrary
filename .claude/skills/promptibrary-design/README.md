@@ -1,8 +1,8 @@
 # Promptibrary — Design System
 
-> **Editorial × Instrumented.** A daily-driver tool for an opinionated power user.
-> Two halves in tension: a librarian's calm archive on the left, an operator's live cockpit on the right.
-> Harmonized by typography (serif display / sans UI / variable mono) and pacing (nothing longer than 240ms).
+> **Dark Carbon × Promptibrary.** A daily-driver tool for an opinionated power user.
+> A clean, flat, dev-tool minimalism — carbon surfaces, amber accents, JetBrains Mono everywhere it matters.
+> Harmonized by typography (Outfit display + JetBrains Mono runtime) and pacing (nothing longer than 240ms).
 
 ---
 
@@ -11,8 +11,8 @@
 | Path | What it is |
 |---|---|
 | `tokens.css` | Every CSS custom property (color, geometry, motion, spacing) under `:root` |
-| `typography.css` | `@import` Boska / Switzer / JetBrains Mono + `.t-*` utility classes |
-| `base.css` | Reset, scrollbars, focus rings, film-grain overlay, motion keyframes, reduced-motion override |
+| `typography.css` | `@import` Outfit + JetBrains Mono + `.t-*` utility classes |
+| `base.css` | Reset, scrollbars, focus rings, motion keyframes, reduced-motion override |
 | `app.css` | Every component's styles — buttons, inputs, rows, terminal, chrome |
 | `components/index.html` | Single reference page, every component × every state |
 | `screens/01..09-*.html` | Nine 1360×880 production-fidelity screens |
@@ -26,14 +26,16 @@ Load order in any new page: `tokens.css` → `typography.css` → `base.css` →
 
 ## Aesthetic philosophy
 
-The product is a launch profile catalogue. The interface honours both halves:
+Promptibrary is a launch profile catalogue for Claude Code. The interface is **dark carbon minimalism with editorial signatures**:
 
-- **Editorial** = serif headlines (Boska), `§` section markers, italic lowercase labels, hairline rules, paper-warm cream tints. Calm, archival, dense-but-quiet. Think: card catalogue.
-- **Instrumented** = monospace for every identifier, runtime, timestamp; sodium-amber accent (the colour of a high-pressure street lamp at 3am); pulsing chartreuse status indicators; an always-on operator status line at the bottom edge. Think: cockpit alive.
+- **Carbon surfaces** — three flat tones (`#0c0c0c` deep, `#161616` base, `#1c1c1c` raised) with hairline borders. No gradients, no shadows except on the ⌘K palette modal. The eye reads structure through density and contrast, not depth.
+- **Amber instrument lights** — `#f59e0b` and `#fbbf24` mark interactive primaries. Status colours (teal `#34d399` running, red `#ef4444` error, orange `#f97316` warn, info blue `#60a5fa` paths) are dialed to read clearly at small sizes without screaming.
+- **Mono for everything that matters** — identifiers, paths, runtimes, kbd badges, status pills, telemetry numbers. JetBrains Mono with `+0.01em` tracking; `+0.04em` on the cockpit status line.
+- **§ section markers** — carried over from Promptibrary's editorial origin. Outfit 500 lowercase with a `§` glyph in `--ink-dim`. The one persistent typographic signature.
 
-**Dark mode is the only theme.** Surfaces have a faint cool-cyan undertone; accents are warm. One paper-warm cream is reserved for editorial moments and a single terminal-line glyph (`⌗ tool call`).
+**Dark mode is the only theme.** No light mode, no system preference toggle, no high-contrast variant.
 
-**Restraint is the rule.** No purple gradients. No drop shadows except the launch button hover. No emoji. No celebrations. No animations longer than 240ms except the slow ambient ones (pulse, glow, blink).
+**Restraint is the rule.** No purple gradients, no drop shadows (except `.cmdk-dialog`), no emoji, no celebrations, no animations longer than 240ms except the slow ambient ones (pulse 1.8s, glow 2.4s, blink 1s — all status indicators).
 
 ---
 
@@ -41,7 +43,7 @@ The product is a launch profile catalogue. The interface honours both halves:
 
 ### "Section label above a grid"
 
-Boska italic 12px lowercase with `§` glyph, then a content grid below. Use everywhere the eye needs a quiet anchor:
+12px lowercase Outfit with `§` glyph, then a content grid below. Use everywhere the eye needs a quiet anchor:
 
 ```html
 <div class="section-label">variables</div>
@@ -61,7 +63,7 @@ A flat row of `key value` pairs separated by hairlines or whitespace. Used in: l
 
 ### "Spine + body" list row
 
-A 3px left edge whose color encodes state (running = pulsing chartreuse, selected = solid accent, recent = paper-warm 50%, idle = transparent). The title is Switzer 500; meta is mono.
+A 3px left edge whose color encodes state (running = pulsing teal-green, selected = solid amber, recent = amber-on-panel 50%, idle = transparent). The title is Outfit 500; meta is JBM.
 
 ### "Pulse on empty"
 
@@ -75,7 +77,7 @@ Each terminal line starts with a single typographic glyph in accent/accent-dim. 
 |---|---|---|
 | `›` | `.sys` | session / system marker |
 | `∿` | `.think` | agent thinking — italic ink-tertiary |
-| `⌗` | `.tool` | tool call — paper-warm |
+| `⌗` | `.tool` | tool call — amber-on-panel |
 | `▸` | `.diag` | diagnosis — ink-secondary |
 | `✓` | `.verif` | verifier — status-warn body, status-running glyph |
 | `▍` | `.term-cursor` | active cursor — blinking accent |
@@ -87,29 +89,29 @@ Each terminal line starts with a single typographic glyph in accent/accent-dim. 
 - **`--accent-warm` is not a body text colour.** It's hover & highlight. On `--bg-base` it fails AAA contrast for paragraph-length text. Use `--ink-primary` or `--ink-secondary`.
 - **Don't pulse multiple things at once.** One running indicator per pane is enough. A status dot _and_ a row spine pulsing simultaneously is jittery.
 - **Never use the accent colour as the sole carrier of meaning.** Pair it with a glyph, label, or kbd badge. Red-green colour-blind users (and grayscale exports) still need to read the UI.
-- **`§` belongs to italic lowercase Boska labels.** Don't slap it on a Switzer header or a sentence-case title.
+- **`§` belongs to lowercase Outfit section labels.** Don't slap it on a UI header or a sentence-case title. Outfit has no true italic — drop italic on display headings even when you're tempted.
 - **Mono needs +0.01em tracking.** Without it, JetBrains Mono looks claustrophobic at 11px. On the status line, push it to +0.04em for the instrument-panel feel.
 - **No emoji icons, ever.** All glyphs are typographic (`§ ▸ ⌖ ⊟ ⎙ ↗ ▾ ⌗ ∿ ⏵ ⏸ ✓`) or come from a Lucide-style outline set rendered in `--ink-*` / `--accent`.
-- **The launch button is the only thing with a drop shadow.** Treat it as a single physical interaction, not a visual style.
-- **Don't crop the film grain.** It's a full-viewport overlay with `mix-blend-mode: overlay`. Removing it from a card or modal breaks the visual continuity with the rest of the app.
+- **The ⌘K palette is the only thing with a drop shadow.** The launch button uses an outline glow, not a drop shadow. Everything else is flat.
+- **No grain.** The dark carbon palette is meant to stand on its own. Don't reintroduce overlay textures.
 
 ---
 
 ## Type ramp at a glance
 
 ```
-Display XL  Boska 500   32 / 1.10   -.02   wordmark on first run
-Display L   Boska 500   26 / 1.15   -.015  detail titles
-Display M   Boska 500   22 / 1.20   -.02   brand mark
-Display S   Boska 500   18 / 1.25   -.01   list headers
-Section     Boska 500i  12 / 1.20   +.02   § labels, lowercase
-UI L        Switzer     15 / 1.5    -.005
-UI          Switzer     13 / 1.5    -.005  default body
-UI S        Switzer     12 / 1.45   -.005
-UI XS       Switzer 500 11 / 1.30    0     small labels (e.g. "REPO")
-Mono        JBM         12.5 / 1.65 +.01   prompt body, terminal
-Mono S      JBM         11   / 1.5  +.01   status line, meta
-Mono XS     JBM         10.5 / 1.4  +.01   kbd, source tags
+Display XL  Outfit 600   32 / 1.10   -.02   wordmark on first run
+Display L   Outfit 600   26 / 1.15   -.015  detail titles
+Display M   Outfit 600   22 / 1.20   -.02   brand mark
+Display S   Outfit 600   18 / 1.25   -.01   list headers
+Section     Outfit 500   12 / 1.20   +.02   § labels, lowercase
+UI L        Outfit 400   15 / 1.5    -.005
+UI          Outfit 400   13 / 1.5    -.005  default body
+UI S        Outfit 400   12 / 1.45   -.005
+UI XS       Outfit 500   11 / 1.30    0     small labels (e.g. "REPO")
+Mono        JBM 400      12.5 / 1.65 +.01   prompt body, terminal
+Mono S      JBM 400      11   / 1.5  +.01   status line, meta
+Mono XS     JBM 400      10.5 / 1.4  +.01   kbd, source tags
 ```
 
 Apply `.t-mono-instrument` on mono labels that should feel like cockpit readouts (`+.04em` tracking).
@@ -119,29 +121,35 @@ Apply `.t-mono-instrument` on mono labels that should feel like cockpit readouts
 ## Colour ramp at a glance
 
 ```
-SURFACES (cool-cyan undertone)
-  bg-deep    L .135   outer app, behind frame
-  bg-base    L .170   primary surface
-  bg-raised  L .205   cards, hovered rows
-  bg-sunken  L .110   inputs, code, status line
-  bg-terminal L .095  terminal only
+SURFACES (dark carbon)
+  bg-deep      #0c0c0c   outer app, behind frame
+  bg-base      #161616   primary surface
+  bg-raised    #1c1c1c   cards, hovered rows
+  bg-sunken    #0c0c0c   inputs, code, status line
+  bg-terminal  #0a0a0a   terminal only
 
-INK (warm cast)
-  ink-primary    L .96   body & titles
-  ink-secondary  L .74   supporting
-  ink-tertiary   L .54   labels
-  ink-dim        L .38   separators, disabled
+INK
+  ink-primary    #e0e0e0   body & titles
+  ink-secondary  #8a8a8a   supporting
+  ink-tertiary   #5a5a5a   labels
+  ink-dim        #4a4a4a   separators, disabled
 
-ACCENT (sodium amber — chroma 0.16, hue 75)
-  accent / -warm / -dim / -deep / -glow (α 0.30) / -tint (α 0.08)
+ACCENT (amber)
+  accent       #f59e0b   primary
+  accent-warm  #fbbf24   hover / on-panel
+  accent-dim   #b45309   secondary
+  accent-deep  #b45309   outlines
+  accent-glow  rgba(245,158,11,0.30)  halo
+  accent-tint  rgba(245,158,11,0.10)  selected bg
 
 STATUS
-  running    chartreuse  oklch(.78 .18 145)
-  error      warm red    oklch(.68 .22 25)
-  warn       amber-yel   oklch(.82 .15 90)
+  running    #34d399   teal-green (alive)
+  error      #ef4444   red
+  warn       #f97316   orange
 
-EDITORIAL
-  paper-warm  oklch(.92 .045 80)  — sparing
+REPURPOSED SLOTS
+  paper-warm  #fbbf24   amber-on-panel (kind dot, syntax kw)
+  term-path   #60a5fa   info blue (file paths, links)
 ```
 
 ---
@@ -162,6 +170,7 @@ EDITORIAL
 | `.row` (list) | Promptibrary's primary "thing-in-a-list" pattern. Pick exactly one state class: `.selected`, `.running`, `.recent` |
 | `.terminal` | Only inside a run/past-run pane. Don't recreate elsewhere |
 | `.statusbar` | Pinned to the bottom of every full-app screen |
+| `.cmdk-dialog` | The ⌘K command palette. Only modal in the system with a drop shadow |
 
 ---
 
