@@ -21,7 +21,10 @@ export const useSearchStore = create<SearchState>((set) => ({
   query: "",
   semantic: false,
   open: (seed = "") => set({ isOpen: true, query: seed }),
-  close: () => set({ isOpen: false }),
+  // SCA-925 (W11): clear the query in the close action itself so the
+  // palette body doesn't need a useEffect to bridge a Zustand boolean
+  // to a Zustand string. Reopening always starts fresh.
+  close: () => set({ isOpen: false, query: "" }),
   setQuery: (query) => set({ query }),
   toggleSemantic: () => set((s) => ({ semantic: !s.semantic })),
 }));

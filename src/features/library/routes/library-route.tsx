@@ -27,9 +27,11 @@ export function LibraryRoute(): React.JSX.Element {
   const selectedId = useLibraryStore((s) => s.selectedPromptId);
 
   // Sidebar + status line counts stay in sync with the prompt query.
-  // Direct `useEffect` here is the rare legitimate use: we're syncing
-  // external (global Zustand) stores with the result of a TanStack Query —
-  // there's no declarative React pattern that bridges those two systems.
+  // SCA-925 (W11): the proper fix is to refactor every consumer of
+  // useLibraryStats + useStatusLine to read directly from `usePrompts`
+  // with a select callback — that work is V2 (see docs/V2-CANDIDATES.md
+  // "Library-route TanStack→Zustand effect bridge"). The effect stays
+  // here as the documented exception until that lands.
   useEffect(() => {
     if (prompts.data == null) return;
     const all = prompts.data;

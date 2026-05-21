@@ -113,14 +113,10 @@ export function CmdKPalette(): React.JSX.Element {
     { enableOnFormTags: true },
   );
 
-  // Clear the query when the dialog closes so reopening starts fresh.
-  // useEffect is the right fit here: bridging a Zustand boolean to a
-  // Zustand string is exactly the cross-store sync useEffect is for.
-  useEffect(() => {
-    if (!isOpen) setQuery("");
-  }, [isOpen, setQuery]);
+  // SCA-925 (W11): query reset now lives in the store's close()
+  // action — no useEffect bridge needed.
 
-  // SCA-922 (W26): debounce the IPC trigger via useDeferredValue so a
+// SCA-922 (W26): debounce the IPC trigger via useDeferredValue so a
   // 12-character query fires ~2 round-trips during the keystroke burst
   // instead of 12. Keystroke input stays responsive (uses `query`);
   // the IPC + results layer reads `deferredQuery`.
