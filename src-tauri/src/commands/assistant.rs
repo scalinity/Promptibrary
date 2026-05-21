@@ -205,8 +205,10 @@ fn streaming_error_to_app_error(e: StreamingError) -> AppError {
             AppError::new(AppErrorKind::RateLimited, "anthropic rate limited")
         }
         StreamingError::Network(m) => AppError::new(AppErrorKind::NetworkUnavailable, m),
-        StreamingError::InvalidStream(m) => AppError::new(AppErrorKind::ExtractionFailed, m),
-        StreamingError::Other(m) => AppError::new(AppErrorKind::ExtractionFailed, m),
+        StreamingError::InvalidStream(m) => {
+            AppError::new(AppErrorKind::AssistantStreamInvalid, m)
+        }
+        StreamingError::Other(m) => AppError::new(AppErrorKind::AssistantStreamInvalid, m),
     }
 }
 
@@ -306,11 +308,11 @@ mod tests {
         );
         assert_eq!(
             streaming_error_to_app_error(StreamingError::InvalidStream("x".into())).kind,
-            AppErrorKind::ExtractionFailed
+            AppErrorKind::AssistantStreamInvalid
         );
         assert_eq!(
             streaming_error_to_app_error(StreamingError::Other("x".into())).kind,
-            AppErrorKind::ExtractionFailed
+            AppErrorKind::AssistantStreamInvalid
         );
     }
 

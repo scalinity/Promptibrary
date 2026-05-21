@@ -36,6 +36,7 @@ export type AppErrorKind =
   | "UnsupportedSource"
   | "TranscriptUnavailable"
   | "PathNotFound"
+  | "AssistantStreamInvalid"
   | "Internal";
 
 export interface AppErrorDto {

@@ -47,6 +47,12 @@ pub enum AppErrorKind {
     /// Distinct from `VaultMissing`, which means the *vault* root is
     /// unattached.
     PathNotFound,
+    /// SCA-956 — assistant streaming transport produced an invalid SSE
+    /// frame stream (malformed JSON past tolerance threshold, malformed
+    /// UTF-8 in a complete frame, or non-401/403/429 HTTP error from
+    /// Anthropic). Distinct from `ExtractionFailed` so the FE doesn't
+    /// claim the article extractor broke when it was the assistant.
+    AssistantStreamInvalid,
     Internal,
 }
 
