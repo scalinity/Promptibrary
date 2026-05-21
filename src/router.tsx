@@ -4,10 +4,11 @@
 // outlet so every screen shares the same chrome (topbar, sidebar, status bar).
 
 import { lazy, Suspense } from "react";
-import { createBrowserRouter, Navigate } from "react-router-dom";
+import { createBrowserRouter, Navigate, useLocation } from "react-router-dom";
 
 import { App } from "./app";
 import { LoadingSpinner } from "@/shared/ui/loading-spinner";
+import { RouteErrorBoundary } from "@/shared/ui/error-boundary";
 
 const LibraryRoute = lazy(() =>
   import("@/features/library/routes/library-route").then((m) => ({
@@ -50,8 +51,20 @@ function RouteFallback() {
   );
 }
 
-function withSuspense(node: React.ReactNode) {
-  return <Suspense fallback={<RouteFallback />}>{node}</Suspense>;
+// SCA-911 (C6): wrap each route in an ErrorBoundary that auto-resets when
+// the pathname changes. `useLocation` requires being inside a Router child,
+// hence this small wrapper component rather than calling it at module scope.
+function withBoundary(node: React.ReactNode) {
+  return <RouteBoundaryShell>{node}</RouteBoundaryShell>;
+}
+
+function RouteBoundaryShell({ children }: { children: React.ReactNode }) {
+  const location = useLocation();
+  return (
+    <RouteErrorBoundary resetKey={location.pathname}>
+      <Suspense fallback={<RouteFallback />}>{children}</Suspense>
+    </RouteErrorBoundary>
+  );
 }
 
 export const router = createBrowserRouter([
@@ -59,22 +72,22 @@ export const router = createBrowserRouter([
     path: "/",
     element: <App />,
     children: [
-      { index: true, element: withSuspense(<LibraryRoute />) },
+      { index: true, element: withBoundary(<LibraryRoute />) },
       {
         path: "prompt/:promptId",
-        element: withSuspense(<PromptRoute />),
+        element: withBoundary(<PromptRoute />),
       },
       {
         path: "run/:runId",
-        element: withSuspense(<RunRoute />),
+        element: withBoundary(<RunRoute />),
       },
       {
         path: "import",
-        element: withSuspense(<ImportRoute />),
+        element: withBoundary(<ImportRoute />),
       },
       {
         path: "settings",
-        element: withSuspense(<SettingsRoute />),
+        element: withBoundary(<SettingsRoute />),
       },
       { path: "*", element: <Navigate to="/" replace /> },
     ],

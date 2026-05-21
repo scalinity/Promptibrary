@@ -35,6 +35,7 @@ export type AppErrorKind =
   | "KeychainError"
   | "UnsupportedSource"
   | "TranscriptUnavailable"
+  | "PathNotFound"
   | "Internal";
 
 export interface AppErrorDto {

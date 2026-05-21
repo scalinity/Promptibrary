@@ -274,7 +274,7 @@ pub struct PathInput {
 pub async fn reveal_in_terminal(input: PathInput) -> Result<()> {
     if !input.path.exists() {
         return Err(AppError::new(
-            AppErrorKind::VaultMissing,
+            AppErrorKind::PathNotFound,
             "path does not exist",
         ));
     }
@@ -285,7 +285,7 @@ pub async fn reveal_in_terminal(input: PathInput) -> Result<()> {
 pub async fn open_path(input: PathInput) -> Result<()> {
     if !input.path.exists() {
         return Err(AppError::new(
-            AppErrorKind::VaultMissing,
+            AppErrorKind::PathNotFound,
             "path does not exist",
         ));
     }

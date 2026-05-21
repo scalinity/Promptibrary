@@ -75,6 +75,8 @@ export function defaultMessage(kind: import("@/shared/types/ipc").AppErrorKind):
       return "This source URL is not supported.";
     case "TranscriptUnavailable":
       return "Transcript file is unavailable.";
+    case "PathNotFound":
+      return "Path not found.";
     case "Internal":
       return "An internal error occurred.";
   }

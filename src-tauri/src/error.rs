@@ -42,6 +42,11 @@ pub enum AppErrorKind {
     KeychainError,
     UnsupportedSource,
     TranscriptUnavailable,
+    /// SCA-911 (W17): filesystem path requested by an IPC handler
+    /// (e.g. `open_path`, `reveal_in_terminal`) does not exist.
+    /// Distinct from `VaultMissing`, which means the *vault* root is
+    /// unattached.
+    PathNotFound,
     Internal,
 }
 
@@ -314,7 +319,7 @@ mod tests {
     fn app_error_kind_variant_parity() {
         // Keep in lockstep with `src/shared/types/ipc.ts::AppErrorKind`.
         // Adding a variant: bump this AND extend the TS union.
-        const TS_VARIANT_COUNT: usize = 31;
+        const TS_VARIANT_COUNT: usize = 32;
         fn wire_name(k: AppErrorKind) -> &'static str {
             match k {
                 AppErrorKind::VaultMissing => "VaultMissing",
@@ -347,6 +352,7 @@ mod tests {
                 AppErrorKind::KeychainError => "KeychainError",
                 AppErrorKind::UnsupportedSource => "UnsupportedSource",
                 AppErrorKind::TranscriptUnavailable => "TranscriptUnavailable",
+                AppErrorKind::PathNotFound => "PathNotFound",
                 AppErrorKind::Internal => "Internal",
             }
         }
@@ -381,6 +387,7 @@ mod tests {
             AppErrorKind::KeychainError,
             AppErrorKind::UnsupportedSource,
             AppErrorKind::TranscriptUnavailable,
+            AppErrorKind::PathNotFound,
             AppErrorKind::Internal,
         ];
         assert_eq!(all.len(), TS_VARIANT_COUNT);
