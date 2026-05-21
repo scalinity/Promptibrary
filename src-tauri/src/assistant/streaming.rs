@@ -110,15 +110,38 @@ pub enum SseParseError {
 /// `feed(chunk) -> Vec<event>` consumes whatever bytes `reqwest` produces,
 /// buffers any incomplete trailing frame, and returns the events for every
 /// complete frame seen so far.
+///
+/// SCA-948 — a single malformed frame (e.g. Anthropic edge case,
+/// intermediary corruption) does NOT abort the whole stream. Bad-JSON
+/// frames are skipped and counted; the parser only surfaces an error
+/// when `consecutive_bad_frames` exceeds `BAD_FRAME_THRESHOLD`. A good
+/// frame zeroes the consecutive counter.
 #[derive(Default)]
 pub struct SseParser {
     /// Accumulated bytes for the partial trailing frame.
     buffer: String,
+    /// Bad frames seen in a row. Reset on every good frame. The parser
+    /// aborts when this exceeds [`BAD_FRAME_THRESHOLD`].
+    consecutive_bad_frames: u32,
+    /// Lifetime bad-frame count, surfaced via `bad_frames_total()` for
+    /// diagnostics and logging.
+    bad_frames_total: u32,
 }
+
+/// Maximum consecutive malformed-JSON frames before the parser declares
+/// the stream broken. 3 is enough to tolerate a transient blip without
+/// hiding a genuine wire-format break.
+const BAD_FRAME_THRESHOLD: u32 = 3;
 
 impl SseParser {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Lifetime count of malformed frames silently skipped. Surfaced for
+    /// telemetry / logging only.
+    pub fn bad_frames_total(&self) -> u32 {
+        self.bad_frames_total
     }
 
     pub fn feed(&mut self, chunk: &[u8]) -> Result<Vec<AssistantStreamEvent>, SseParseError> {
@@ -126,15 +149,34 @@ impl SseParser {
         self.buffer.push_str(text);
 
         let mut events = Vec::new();
-        // SSE frames are separated by a blank line — `\n\n`. We accept
-        // `\r\n\r\n` too because some intermediaries normalize newlines.
         loop {
             let split = find_frame_boundary(&self.buffer);
             let Some((boundary, sep_len)) = split else { break };
             let frame = self.buffer[..boundary].to_string();
             self.buffer.drain(..boundary + sep_len);
-            if let Some(ev) = parse_frame(&frame)? {
-                events.push(ev);
+            match parse_frame(&frame) {
+                Ok(Some(ev)) => {
+                    self.consecutive_bad_frames = 0;
+                    events.push(ev);
+                }
+                Ok(None) => {
+                    // Empty / pure-comment frame — neutral.
+                }
+                Err(SseParseError::InvalidJson { .. }) => {
+                    // SCA-948 — non-fatal; count + skip. Surface only
+                    // when the run of bad frames crosses the threshold.
+                    self.bad_frames_total = self.bad_frames_total.saturating_add(1);
+                    self.consecutive_bad_frames =
+                        self.consecutive_bad_frames.saturating_add(1);
+                    if self.consecutive_bad_frames > BAD_FRAME_THRESHOLD {
+                        // Re-parse the offending frame to attach its
+                        // context to the propagated error.
+                        if let Err(e) = parse_frame(&frame) {
+                            return Err(e);
+                        }
+                    }
+                }
+                Err(e) => return Err(e),
             }
         }
         Ok(events)
@@ -149,8 +191,24 @@ impl SseParser {
         let trailing = std::mem::take(&mut self.buffer);
         let trimmed = trailing.trim_matches(|c| c == '\r' || c == '\n');
         if !trimmed.is_empty() {
-            if let Some(ev) = parse_frame(trimmed)? {
-                events.push(ev);
+            match parse_frame(trimmed) {
+                Ok(Some(ev)) => {
+                    self.consecutive_bad_frames = 0;
+                    events.push(ev);
+                }
+                Ok(None) => {}
+                Err(SseParseError::InvalidJson { .. }) => {
+                    // SCA-948 — same tolerance policy at finish().
+                    self.bad_frames_total = self.bad_frames_total.saturating_add(1);
+                    self.consecutive_bad_frames =
+                        self.consecutive_bad_frames.saturating_add(1);
+                    if self.consecutive_bad_frames > BAD_FRAME_THRESHOLD {
+                        if let Err(e) = parse_frame(trimmed) {
+                            return Err(e);
+                        }
+                    }
+                }
+                Err(e) => return Err(e),
             }
         }
         Ok(events)
@@ -531,9 +589,33 @@ data: {\"type\":\"message_stop\"}
 
     #[test]
     fn invalid_json_reports_event_and_raw() {
+        // SCA-948 — a single bad-JSON frame is tolerated (skipped and
+        // counted). The parser no longer aborts the stream on the first
+        // malformed frame; only when consecutive bad frames cross the
+        // threshold does it propagate the error.
         let stream = "event: message_start\ndata: not json\n\n";
         let mut p = SseParser::new();
-        let err = p.feed(stream.as_bytes()).unwrap_err();
+        let events = p.feed(stream.as_bytes()).unwrap();
+        assert!(events.is_empty(), "no events emitted for bad frame");
+        assert_eq!(
+            p.bad_frames_total(),
+            1,
+            "bad frame counted for diagnostics"
+        );
+    }
+
+    #[test]
+    fn consecutive_bad_frames_above_threshold_abort_with_context() {
+        // SCA-948 — threshold-many bad frames in a row DOES abort, and
+        // the error carries the offending frame's `event:` name + raw
+        // payload so the caller / log has something to debug from.
+        let bad_frame = "event: message_start\ndata: not json\n\n";
+        let mut p = SseParser::new();
+        // BAD_FRAME_THRESHOLD = 3 — the 4th consecutive bad frame trips it.
+        p.feed(bad_frame.as_bytes()).unwrap();
+        p.feed(bad_frame.as_bytes()).unwrap();
+        p.feed(bad_frame.as_bytes()).unwrap();
+        let err = p.feed(bad_frame.as_bytes()).unwrap_err();
         match err {
             SseParseError::InvalidJson { event, raw, .. } => {
                 assert_eq!(event, "message_start");
@@ -541,6 +623,25 @@ data: {\"type\":\"message_stop\"}
             }
             other => panic!("expected InvalidJson, got {other:?}"),
         }
+        assert!(p.bad_frames_total() >= 4);
+    }
+
+    #[test]
+    fn good_frame_resets_consecutive_bad_counter() {
+        // SCA-948 — a transient blip (e.g. one corrupted frame followed
+        // by recovery) must not eventually trip the threshold after a
+        // long-running stream has accumulated occasional bad frames.
+        let bad = "event: message_start\ndata: not json\n\n";
+        let good =
+            "event: ping\ndata: {}\n\nevent: message_stop\ndata: {\"type\":\"message_stop\"}\n\n";
+        let mut p = SseParser::new();
+        for _ in 0..10 {
+            p.feed(bad.as_bytes()).unwrap();
+            let evs = p.feed(good.as_bytes()).unwrap();
+            // ping + message_stop = 2 events from each good chunk.
+            assert_eq!(evs.len(), 2);
+        }
+        assert_eq!(p.bad_frames_total(), 10);
     }
 
     #[test]

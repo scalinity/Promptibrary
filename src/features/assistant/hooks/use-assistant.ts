@@ -244,6 +244,11 @@ async function runAgentLoop(args: RunArgs): Promise<void> {
     // Per-turn accumulators.
     let textSoFar = "";
     const pendingTools = new Map<number, PendingToolUse>();
+    // SCA-948 — captured if Anthropic emits an `error` SSE frame
+    // mid-stream. Anthropic typically follows it with `message_stop`,
+    // so the IPC returns Ok — without this check the loop would
+    // silently continue and the user would never see the error.
+    let turnError: { message: string; errorType: string } | null = null;
 
     // SCA-946 — register this turn's handler with the send-scoped
     // listener. The listener (in send() above) reads turnContextRef
@@ -277,10 +282,17 @@ async function runAgentLoop(args: RunArgs): Promise<void> {
             if (t) t.inputJson += payload.partial_json;
             break;
           }
+          case "error": {
+            // SCA-948 — record the error so the for-loop below can
+            // short-circuit AFTER the in-flight stream drains; the
+            // IPC promise still resolves with whatever stop_reason
+            // Anthropic emits after the error frame.
+            turnError = { message: payload.message, errorType: payload.error_type };
+            break;
+          }
           default:
             // message_start, content_block_stop, message_delta,
-            // message_stop, ping, error — all observable in the IPC
-            // return value or covered by status updates already.
+            // message_stop, ping — observable in the IPC return value.
             break;
         }
       },
@@ -335,6 +347,21 @@ async function runAgentLoop(args: RunArgs): Promise<void> {
       content: finalContent,
       isStreaming: false,
     }));
+
+    // SCA-948 — if Anthropic emitted an `error` SSE frame during this
+    // turn, surface it now and stop the loop. The IPC may still have
+    // returned Ok because Anthropic chases the error with a normal
+    // message_stop; without this we'd silently loop into the next
+    // iteration.
+    if (turnError != null) {
+      const captured: { message: string; errorType: string } = turnError;
+      setStatus({
+        kind: "error",
+        message: `${captured.errorType}: ${captured.message}`,
+        turnId,
+      });
+      return;
+    }
 
     if (result.stopReason !== "tool_use" || toolUses.length === 0) {
       setStatus({ kind: "idle" });
