@@ -34,14 +34,17 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(services)
-        // SCA-894 — replace Tauri's default macOS menu so ⌘N isn't bound
-        // anywhere in the chrome. The default menu's File > New Window item
-        // captures ⌘N at the AppKit layer before keydown reaches the WKWebView,
-        // making react-hotkeys-hook's binding inert. We only need an App
-        // submenu (for ⌘Q / About / Hide) and an Edit submenu (so ⌘C / ⌘V /
-        // ⌘X / ⌘A keep working inside native inputs + CodeMirror).
+        // SCA-894 / SCA-895 — replace Tauri's default macOS menu, and own
+        // ⌘N via a menu item. ⌘N is one of WKWebView's reserved shortcuts;
+        // even with no menu binding the keystroke is intercepted at the
+        // AppKit / responder-chain layer and never reaches JS keydown
+        // handlers. The canonical macOS fix is to give the shortcut to a
+        // menu item we control, then emit a Tauri event to the frontend on
+        // activation. App + Edit submenus keep ⌘Q and ⌘C/⌘V/⌘X/⌘A working
+        // inside native inputs + CodeMirror.
         .setup(|app| {
-            use tauri::menu::{MenuBuilder, SubmenuBuilder};
+            use tauri::menu::{MenuBuilder, MenuItemBuilder, SubmenuBuilder};
+            use tauri::Emitter;
 
             let app_submenu = SubmenuBuilder::new(app, "Promptibrary")
                 .about(None)
@@ -55,6 +58,13 @@ pub fn run() {
                 .quit()
                 .build()?;
 
+            let new_prompt = MenuItemBuilder::with_id("new_prompt", "New prompt")
+                .accelerator("CmdOrCtrl+N")
+                .build(app)?;
+            let file_submenu = SubmenuBuilder::new(app, "File")
+                .item(&new_prompt)
+                .build()?;
+
             let edit_submenu = SubmenuBuilder::new(app, "Edit")
                 .undo()
                 .redo()
@@ -66,9 +76,16 @@ pub fn run() {
                 .build()?;
 
             let menu = MenuBuilder::new(app)
-                .items(&[&app_submenu, &edit_submenu])
+                .items(&[&app_submenu, &file_submenu, &edit_submenu])
                 .build()?;
             app.set_menu(menu)?;
+
+            app.on_menu_event(|app, event| {
+                if event.id().as_ref() == "new_prompt" {
+                    let _ = app.emit("menu:new-prompt", ());
+                }
+            });
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

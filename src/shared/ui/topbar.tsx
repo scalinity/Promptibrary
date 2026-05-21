@@ -3,8 +3,11 @@
 // Mirrors `.topbar` from the canonical app.css. Search field is a *trigger*
 // for the cmdk palette; clicking it (or pressing ⌘K / `/`) opens the dialog.
 
+// eslint-disable-next-line no-restricted-imports -- SCA-895: external sync with Tauri menu-event bus, no declarative alternative
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useHotkeys } from "react-hotkeys-hook";
+import { listen } from "@tauri-apps/api/event";
 
 import { useCreatePrompt } from "@/features/library/hooks/use-create-prompt";
 import { useSearchStore } from "@/features/search/stores/search-store";
@@ -13,11 +16,26 @@ export function Topbar(): React.JSX.Element {
   const navigate = useNavigate();
   const openPalette = useSearchStore((s) => s.open);
   const createPromptMutation = useCreatePrompt();
+  const { mutate: createPromptMutate } = createPromptMutation;
 
   const handleNewPrompt = () => {
     if (createPromptMutation.isPending) return;
-    createPromptMutation.mutate(undefined);
+    createPromptMutate(undefined);
   };
+
+  // SCA-895 — listen for the `menu:new-prompt` event the Rust side emits
+  // when the ⌘N menu item fires. WKWebView swallows ⌘N before keydown
+  // reaches JS, so the menu has to own the shortcut; this hook bridges the
+  // OS-level activation back into the React mutation. `mutate` is a stable
+  // reference per TanStack Query so the listener doesn't churn.
+  useEffect(() => {
+    const unlistenPromise = listen("menu:new-prompt", () => {
+      createPromptMutate(undefined);
+    });
+    return () => {
+      unlistenPromise.then((unlisten) => unlisten());
+    };
+  }, [createPromptMutate]);
 
   useHotkeys(
     "meta+k, ctrl+k",
@@ -43,15 +61,6 @@ export function Topbar(): React.JSX.Element {
       e.preventDefault();
       navigate("/import");
     },
-  );
-
-  useHotkeys(
-    "meta+n, ctrl+n",
-    (e) => {
-      e.preventDefault();
-      handleNewPrompt();
-    },
-    { enableOnFormTags: true },
   );
 
   useHotkeys(
