@@ -77,6 +77,8 @@ export function defaultMessage(kind: import("@/shared/types/ipc").AppErrorKind):
       return "Transcript file is unavailable.";
     case "PathNotFound":
       return "Path not found.";
+    case "AssistantStreamInvalid":
+      return "The assistant stream returned malformed or unrecognized data.";
     case "Internal":
       return "An internal error occurred.";
   }

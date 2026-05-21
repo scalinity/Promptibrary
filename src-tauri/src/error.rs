@@ -378,7 +378,7 @@ mod tests {
     fn app_error_kind_variant_parity() {
         // Keep in lockstep with `src/shared/types/ipc.ts::AppErrorKind`.
         // Adding a variant: bump this AND extend the TS union.
-        const TS_VARIANT_COUNT: usize = 32;
+        const TS_VARIANT_COUNT: usize = 33;
         fn wire_name(k: AppErrorKind) -> &'static str {
             match k {
                 AppErrorKind::VaultMissing => "VaultMissing",
@@ -412,6 +412,7 @@ mod tests {
                 AppErrorKind::UnsupportedSource => "UnsupportedSource",
                 AppErrorKind::TranscriptUnavailable => "TranscriptUnavailable",
                 AppErrorKind::PathNotFound => "PathNotFound",
+                AppErrorKind::AssistantStreamInvalid => "AssistantStreamInvalid",
                 AppErrorKind::Internal => "Internal",
             }
         }
