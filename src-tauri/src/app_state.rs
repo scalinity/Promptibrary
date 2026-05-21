@@ -15,6 +15,9 @@ use tokio::sync::{Mutex, RwLock};
 use crate::extraction::anthropic::{AnthropicTransport, HttpAnthropicTransport};
 use crate::extraction::fetchers::youtube::{RealYtDlpRunner, YtDlpRunner};
 use crate::extraction::rate_limit::RateLimiter;
+use crate::assistant::transport::{
+    HttpStreamingAnthropicTransport, StreamingAnthropicTransport,
+};
 use crate::index::embeddings::{EmbeddingService, MockEmbeddingService};
 use crate::launch::pty_pool::PtyPool;
 use crate::settings::secret_store::SecretStore;
@@ -50,6 +53,10 @@ pub struct AppServices {
     /// Anthropic Messages API transport. Tests can swap in a mock that
     /// replays canned JSON responses without hitting the real API.
     pub anthropic_transport: Arc<dyn AnthropicTransport>,
+    /// Streaming Anthropic transport for the in-app assistant. Independent
+    /// of `anthropic_transport` because the streaming SSE shape and
+    /// tool-use request schema diverge from the one-shot extraction path.
+    pub streaming_anthropic_transport: Arc<dyn StreamingAnthropicTransport>,
     /// Directory where yt-dlp drops transcript files. Created on demand.
     pub extraction_temp_dir: PathBuf,
     /// SCA-782: AppData root for the local settings JSON, the embedding
@@ -97,6 +104,9 @@ impl AppServices {
         let anthropic_transport: Arc<dyn AnthropicTransport> = Arc::new(
             HttpAnthropicTransport::new(http.clone(), secrets.clone()),
         );
+        let streaming_anthropic_transport: Arc<dyn StreamingAnthropicTransport> = Arc::new(
+            HttpStreamingAnthropicTransport::new(http.clone(), secrets.clone()),
+        );
         let yt_dlp: Arc<dyn YtDlpRunner> = Arc::new(RealYtDlpRunner);
 
         let extraction_temp_dir = std::env::temp_dir().join("promptibrary").join("extraction");
@@ -135,6 +145,7 @@ impl AppServices {
             rate_limiter: Arc::new(RateLimiter::new()),
             yt_dlp,
             anthropic_transport,
+            streaming_anthropic_transport,
             extraction_temp_dir,
             app_data_dir,
             embedding_service,
@@ -152,6 +163,9 @@ impl AppServices {
         let anthropic_transport: Arc<dyn AnthropicTransport> = Arc::new(
             HttpAnthropicTransport::new(http.clone(), secrets.clone()),
         );
+        let streaming_anthropic_transport: Arc<dyn StreamingAnthropicTransport> = Arc::new(
+            HttpStreamingAnthropicTransport::new(http.clone(), secrets.clone()),
+        );
         Self {
             state: RwLock::default(),
             create_prompt_lock: Mutex::new(()),
@@ -160,6 +174,7 @@ impl AppServices {
             rate_limiter: Arc::new(RateLimiter::new()),
             yt_dlp: Arc::new(RealYtDlpRunner),
             anthropic_transport,
+            streaming_anthropic_transport,
             extraction_temp_dir: std::env::temp_dir().join("promptibrary").join("extraction"),
             app_data_dir: default_app_data_dir(),
             embedding_service: MockEmbeddingService::new(),
@@ -198,6 +213,18 @@ impl AppServices {
         Self {
             anthropic_transport,
             yt_dlp,
+            ..self
+        }
+    }
+
+    /// Test helper that replaces the streaming Anthropic transport with a
+    /// mock so assistant-command tests can drive canned event sequences.
+    pub fn with_streaming_anthropic_transport(
+        self,
+        streaming_anthropic_transport: Arc<dyn StreamingAnthropicTransport>,
+    ) -> Self {
+        Self {
+            streaming_anthropic_transport,
             ..self
         }
     }

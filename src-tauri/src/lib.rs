@@ -28,12 +28,49 @@ use std::sync::Arc;
 
 use app_state::AppServices;
 
+/// Compile-time check that the updater pubkey was populated in
+/// tauri.conf.json before this binary was built. tauri.conf.json is
+/// the canonical source of truth; we don't re-read it at runtime to
+/// avoid divergent paths. The strict `"pubkey": ""` literal indicates
+/// the keypair was never generated.
+fn updater_pubkey_is_set() -> bool {
+    // SCA-919: include the literal config bytes so a release build
+    // with an unpopulated pubkey hard-warns instead of silently
+    // shipping an unsigned updater path. include_str! resolves at
+    // compile time; the boolean is the trivial substring check.
+    const TAURI_CONF: &str = include_str!("../tauri.conf.json");
+    // Empty-pubkey marker covers both formatted variations the user
+    // might encounter (`"pubkey": ""` and `"pubkey":""`).
+    !TAURI_CONF.contains("\"pubkey\": \"\"") && !TAURI_CONF.contains("\"pubkey\":\"\"")
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let services = Arc::new(AppServices::new());
 
-    tauri::Builder::default()
-        .plugin(tauri_plugin_dialog::init())
+    // SCA-919 (C3): wire the updater plugin only when a real pubkey is
+    // configured. tauri-plugin-updater 2.x reads `pubkey` from the
+    // bundled tauri.conf.json at runtime and refuses to install
+    // unsigned bundles when set — that's the fail-closed posture spec
+    // §16 mandates. Until the user generates the Tauri signer keypair
+    // (interactive: `tauri signer generate` + paste pubkey here +
+    // TAURI_SIGNING_PRIVATE_KEY GH secret), skip the plugin entirely
+    // so the app doesn't ship a non-functional updater path. A loud
+    // warning at startup documents the deferred state.
+    let updater_pubkey_present = updater_pubkey_is_set();
+    if !updater_pubkey_present {
+        tracing::warn!(
+            "SCA-919: tauri.conf.json updater.pubkey is empty — updater plugin NOT wired. \
+             Run `tauri signer generate` and populate pubkey before shipping a release."
+        );
+    }
+
+    let mut builder = tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init());
+    if updater_pubkey_present {
+        builder = builder.plugin(tauri_plugin_updater::Builder::new().build());
+    }
+    builder
         .manage(services)
         // SCA-894 / SCA-895 — replace Tauri's default macOS menu, and own
         // ⌘N via a menu item. ⌘N is one of WKWebView's reserved shortcuts;

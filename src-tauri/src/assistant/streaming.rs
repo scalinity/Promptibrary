@@ -46,10 +46,11 @@
 //! can use them as a keep-alive heartbeat if it wants, but consumers can
 //! safely ignore them.
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 /// High-level event the parser surfaces to consumers. One frame ↔ one event.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
 pub enum AssistantStreamEvent {
     MessageStart {
         message_id: String,
@@ -87,7 +88,8 @@ pub enum AssistantStreamEvent {
     },
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
 pub enum ContentBlockHeader {
     Text,
     ToolUse { id: String, name: String },

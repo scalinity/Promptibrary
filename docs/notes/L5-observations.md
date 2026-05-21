@@ -183,3 +183,11 @@ The remaining items each need infrastructure outside the build agent's reach:
 - Native-dep tickets (fastembed, git2) are each multi-hour focused work with their own test infrastructure cost.
 
 A deeper-but-still-incomplete L5 would be net worse than the explicit handoff this leaves behind. The acceptance-criteria pass at the top of `Prompts/L5.md` is unchecked except for what specifically landed; the reviewer should walk it before unlocking the V1 ship gate.
+
+### 2026-05-21 — SCA-919 updater plugin wiring + CSP audit (review B9)
+
+The `/review-orchestrator` 2026-05-21 deep review flagged the updater plugin as configured but never wired into the Tauri `Builder`. Action taken:
+
+**Updater (C3, CWE-494 / CWE-1188).** `src-tauri/src/lib.rs` now wires `tauri_plugin_updater::Builder::new().build()` into the Tauri builder ONLY when the `pubkey` field in `tauri.conf.json` is populated. A compile-time check (`updater_pubkey_is_set`) uses `include_str!("../tauri.conf.json")` to detect the empty-string sentinel and skip the plugin if the keypair was never generated. At startup, a `tracing::warn!` documents the deferred state. Once the user runs `tauri signer generate` and populates `pubkey`, the plugin is wired automatically with no further code change. Note: the active=true / pubkey="" state in tauri.conf.json is intentional — V1 ships pre-keypair per the L5 handoff list (#4 above) and the plugin would refuse to install unsigned bundles anyway. The fix removes the "plugin never reached the Builder" gap; ship-blocking item for v0.1.0 release remains the keypair generation.
+
+**CSP (W6, CWE-1021 / CWE-829).** `https://api.fontshare.com` was in `style-src`, `font-src`, and `connect-src` in `tauri.conf.json` from an earlier aesthetic. Grep confirmed nothing in the codebase references Fontshare today — the Outfit + JetBrains Mono pivot (SCA-866) eliminated it. Removed from all three directives. `style-src 'unsafe-inline'` retained: Tailwind v4 with the @theme runtime emits inline `<style>` tags, and CodeMirror 6's runtime stylesheets are similarly inline-injected; nonces/hashes are a V2 hardening item once we have a build-time CSP generator.

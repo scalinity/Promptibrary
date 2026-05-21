@@ -8,6 +8,7 @@ import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useHotkeys } from "react-hotkeys-hook";
 import { listen } from "@tauri-apps/api/event";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 
 import { useCreatePrompt } from "@/features/library/hooks/use-create-prompt";
 import { useSearchStore } from "@/features/search/stores/search-store";
@@ -21,6 +22,30 @@ export function Topbar(): React.JSX.Element {
   const handleNewPrompt = () => {
     if (createPromptMutation.isPending) return;
     createPromptMutate(undefined);
+  };
+
+  // SCA-930 — explicit OS drag invocation. Tauri 2's data-tauri-drag-region
+  // shim should do this for us, but the attribute-based path wasn't firing
+  // in our setup. Calling startDragging() directly from a mousedown handler
+  // is bulletproof: it goes through the same IPC + permission as the shim
+  // but without the attribute-walk indirection. Skip the call when the
+  // user clicked an interactive control so button/search clicks still
+  // register.
+  const handleTopbarMouseDown = (e: React.MouseEvent<HTMLDivElement>): void => {
+    if (e.button !== 0) return;
+    const target = e.target as HTMLElement | null;
+    if (
+      target == null ||
+      target.closest(
+        'button, input, a, select, textarea, [role="button"], [role="textbox"], [role="combobox"]',
+      ) != null
+    ) {
+      return;
+    }
+    void getCurrentWindow().startDragging().catch(() => {
+      // E2E mock mode runs in a plain browser where @tauri-apps/api is
+      // a stub — calls reject. Silent so we don't spam the console.
+    });
   };
 
   // SCA-895 — listen for the `menu:new-prompt` event the Rust side emits
@@ -80,7 +105,11 @@ export function Topbar(): React.JSX.Element {
     // is the Electron/Chromium convention and is silently ignored by
     // WKWebView, which is why the previous CSS-only attempt did
     // nothing.
-    <div className="topbar" data-tauri-drag-region>
+    <div
+      className="topbar"
+      data-tauri-drag-region
+      onMouseDown={handleTopbarMouseDown}
+    >
       <div className="brand" data-tauri-drag-region>
         <span className="brand-name" data-tauri-drag-region>
           Promptibrary<span className="dot">.</span>
