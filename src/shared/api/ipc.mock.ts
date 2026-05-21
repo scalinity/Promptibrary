@@ -343,6 +343,8 @@ const baseSettings: AppSettings = {
     deepExtractionModel: "claude-opus-4-7",
     sourceCapStandard: 60_000,
     sourceCapDeep: 160_000,
+    assistantDefaultPattern: "improve_prompt",
+    assistantModel: "claude-sonnet-4-6",
   },
   vault: { tagColors: {} },
   effective: {
@@ -360,6 +362,8 @@ const baseSettings: AppSettings = {
     deepExtractionModel: "claude-opus-4-7",
     sourceCapStandard: 60_000,
     sourceCapDeep: 160_000,
+    assistantDefaultPattern: "improve_prompt",
+    assistantModel: "claude-sonnet-4-6",
     vaultSettings: { tagColors: {} },
   },
 };

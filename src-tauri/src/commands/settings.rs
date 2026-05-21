@@ -216,6 +216,11 @@ fn default_local(vault_paths: Option<&VaultPaths>) -> LocalSettings {
         deep_extraction_model: ClaudeModelId::ClaudeOpus47,
         source_cap_standard: 60_000,
         source_cap_deep: 160_000,
+        // SCA-933 — assistant defaults. Improve Prompt is the default
+        // Fabric pattern; assistant turns run on Sonnet 4.6 unless the
+        // user picks otherwise in Settings.
+        assistant_default_pattern: crate::assistant::patterns::AssistantPattern::ImprovePrompt,
+        assistant_model: ClaudeModelId::ClaudeSonnet46,
     }
 }
 

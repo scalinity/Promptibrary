@@ -10,6 +10,7 @@ use crate::ids::{PromptId, RunId};
 
 use super::prompt::{ClaudeModelId, ClaudePermissionMode, LaunchDestination, VerifierMode};
 use super::tag::TagColorSlug;
+use crate::assistant::patterns::AssistantPattern;
 
 /// Spec §13 hard-codes the extraction models and vault directory layout for V1.
 /// They're application-level constants rather than user-tunable settings, so
@@ -53,6 +54,18 @@ pub struct LocalSettings {
     pub source_cap_standard: u32,
     #[serde(default = "default_source_cap_deep")]
     pub source_cap_deep: u32,
+    /// SCA-933 — Fabric AI prompt pattern the in-app assistant uses by
+    /// default when the user opens the drawer without picking one.
+    /// Defaults to `ImprovePrompt`. Pre-SCA-933 settings.json files
+    /// without this key parse via the serde default below.
+    #[serde(default)]
+    pub assistant_default_pattern: AssistantPattern,
+    /// SCA-933 — Claude model used for assistant turns. Decoupled from
+    /// `extraction_model` and `default_model` so users can run the
+    /// assistant on a different (often cheaper / faster) model than the
+    /// model they launch Claude Code with.
+    #[serde(default = "default_assistant_model")]
+    pub assistant_model: ClaudeModelId,
 }
 
 fn default_extraction_model() -> ClaudeModelId {
@@ -66,6 +79,9 @@ fn default_source_cap_standard() -> u32 {
 }
 fn default_source_cap_deep() -> u32 {
     160_000
+}
+fn default_assistant_model() -> ClaudeModelId {
+    ClaudeModelId::ClaudeSonnet46
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

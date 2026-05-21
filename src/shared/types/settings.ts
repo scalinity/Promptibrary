@@ -20,6 +20,13 @@ export const DEEP_EXTRACTION_MODEL = "claude-opus-4-7" as const;
 export const DEFAULT_PROMPT_DIRECTORY = "promptibrary/prompts" as const;
 export const DEFAULT_RUN_DIRECTORY = "promptibrary/runs" as const;
 
+// SCA-933 — assistant default pattern wire form. Mirrors
+// `assistant::patterns::AssistantPattern` (serde snake_case).
+export type AssistantPattern =
+  | "improve_prompt"
+  | "improve_prompt_xml"
+  | "improve_writing";
+
 export interface LocalSettings {
   vaultPath: AbsolutePath | null;
   defaultDestination: "claude_code_cli";
@@ -41,6 +48,11 @@ export interface LocalSettings {
   deepExtractionModel: ClaudeModelId;
   sourceCapStandard: number;
   sourceCapDeep: number;
+  // SCA-933 — assistant defaults. The pattern selector in the assistant
+  // drawer reads from `assistantDefaultPattern`; the assistant Anthropic
+  // calls use `assistantModel`.
+  assistantDefaultPattern: AssistantPattern;
+  assistantModel: ClaudeModelId;
 }
 
 export interface VaultSettings {
