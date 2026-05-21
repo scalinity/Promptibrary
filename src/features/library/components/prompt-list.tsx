@@ -7,6 +7,7 @@
 // timestamps are absent from this surface — sort by launch count requires
 // the full Prompt and is deferred to L5 when the FTS-backed search lands.
 
+import { useMemo } from "react";
 import { Virtuoso } from "react-virtuoso";
 
 import { PromptCard } from "./prompt-card";
@@ -43,7 +44,13 @@ export function PromptList({ prompts, loading }: PromptListProps): React.JSX.Ele
     );
   }
 
-  const filtered = filterAndSort(prompts, filter, sort);
+  // SCA-922 (W27): memoize the filter + sort so a render driven by an
+  // unrelated Zustand subscription (cmdk store, library selection)
+  // doesn't pay the 10k-row sort cost on every keystroke elsewhere.
+  const filtered = useMemo(
+    () => filterAndSort(prompts, filter, sort),
+    [prompts, filter, sort],
+  );
 
   if (filtered.length === 0) {
     return (
@@ -61,7 +68,12 @@ export function PromptList({ prompts, loading }: PromptListProps): React.JSX.Ele
   // timestamps on the slim shape, "recent" tracks list position rather than
   // wall-clock recency. L5 swaps in real timestamps when the detail/list
   // queries are unified.
-  const recentIds = new Set(filtered.slice(0, 3).map((p) => p.id));
+  // Memoize the Set so `recent` prop identity is stable across renders
+  // and PromptCard's React.memo (when present) can skip unchanged rows.
+  const recentIds = useMemo(
+    () => new Set(filtered.slice(0, 3).map((p) => p.id)),
+    [filtered],
+  );
 
   return (
     <div className="list-rows" data-testid="prompt-list">

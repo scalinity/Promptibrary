@@ -15,7 +15,7 @@ import { Command } from "cmdk";
 import { useNavigate } from "react-router-dom";
 import { useHotkeys } from "react-hotkeys-hook";
 // eslint-disable-next-line no-restricted-imports -- SCA-723: pre-CLAUDE.md useEffect, refactor in follow-up cleanup pass
-import { useEffect, useRef } from "react";
+import { useDeferredValue, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import { cmdkSearch, type CmdkResult } from "@/shared/api/ipc";
@@ -120,9 +120,14 @@ export function CmdKPalette(): React.JSX.Element {
     if (!isOpen) setQuery("");
   }, [isOpen, setQuery]);
 
+  // SCA-922 (W26): debounce the IPC trigger via useDeferredValue so a
+  // 12-character query fires ~2 round-trips during the keystroke burst
+  // instead of 12. Keystroke input stays responsive (uses `query`);
+  // the IPC + results layer reads `deferredQuery`.
+  const deferredQuery = useDeferredValue(query);
   const search = useQuery({
-    queryKey: searchKeys.cmdk(query),
-    queryFn: () => cmdkSearch(query),
+    queryKey: searchKeys.cmdk(deferredQuery),
+    queryFn: () => cmdkSearch(deferredQuery),
     enabled: isOpen,
     staleTime: 1_000,
     placeholderData: (previous) => previous,

@@ -168,23 +168,42 @@ pub async fn scan_vault<F: FnMut(ScanProgress)>(
     // successfully-parsed files (SCA-592). A single DELETE by vault_path
     // suffices; FK CASCADE handles prompt_tags (SCA-593, removes the prior
     // SELECT id → DELETE id round-trip and its inter-statement race).
+    //
+    // SCA-922 (W23): build a HashSet for O(1) membership lookup (was
+    // O(N·M) linear-scan over on_disk_paths per existing row), and
+    // batch the DELETE into chunks of 500 inside a single transaction
+    // (was N individual round-trips fighting the WAL writer).
     let existing_paths: Vec<String> =
         sqlx::query_scalar("SELECT vault_path FROM prompts WHERE vault_path LIKE ?")
             .bind("promptibrary/prompts/%")
             .fetch_all(db)
             .await
             .map_err(AppError::from)?;
-    for path in existing_paths {
-        if !on_disk_paths.iter().any(|p| p == &path) {
-            let result = sqlx::query("DELETE FROM prompts WHERE vault_path = ?")
-                .bind(&path)
-                .execute(db)
-                .await
-                .map_err(AppError::from)?;
-            if result.rows_affected() > 0 {
-                summary.deleted_rows += 1;
+    let disk_set: std::collections::HashSet<&str> =
+        on_disk_paths.iter().map(String::as_str).collect();
+    let stale: Vec<&str> = existing_paths
+        .iter()
+        .filter(|p| !disk_set.contains(p.as_str()))
+        .map(String::as_str)
+        .collect();
+    if !stale.is_empty() {
+        let mut tx = db.begin().await.map_err(AppError::from)?;
+        for chunk in stale.chunks(500) {
+            let placeholders = std::iter::repeat("?")
+                .take(chunk.len())
+                .collect::<Vec<_>>()
+                .join(",");
+            let sql = format!(
+                "DELETE FROM prompts WHERE vault_path IN ({placeholders})"
+            );
+            let mut q = sqlx::query(&sql);
+            for path in chunk {
+                q = q.bind(*path);
             }
+            let result = q.execute(&mut *tx).await.map_err(AppError::from)?;
+            summary.deleted_rows += result.rows_affected() as usize;
         }
+        tx.commit().await.map_err(AppError::from)?;
     }
 
     summary.duration_ms = started.elapsed().as_millis();

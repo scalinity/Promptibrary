@@ -67,10 +67,17 @@ pub async fn upsert_prompt(db: &SqlitePool, prompt: &Prompt) -> Result<()> {
         .execute(&mut *tx)
         .await
         .map_err(AppError::from)?;
-    for tag in &prompt.tags {
-        sqlx::query("INSERT INTO prompt_tags (prompt_id, tag_name) VALUES (?, ?)")
-            .bind(&prompt.id.0)
-            .bind(tag)
+    // SCA-922 (W22): batch tag inserts into one multi-VALUES INSERT.
+    // Previously this was K serial INSERTs per upsert; during a cold
+    // vault scan that's K × N round-trips plus K × N FTS trigger fires.
+    if !prompt.tags.is_empty() {
+        let mut qb = sqlx::QueryBuilder::<sqlx::Sqlite>::new(
+            "INSERT INTO prompt_tags (prompt_id, tag_name) ",
+        );
+        qb.push_values(prompt.tags.iter(), |mut row, tag| {
+            row.push_bind(&prompt.id.0).push_bind(tag);
+        });
+        qb.build()
             .execute(&mut *tx)
             .await
             .map_err(AppError::from)?;
@@ -146,34 +153,46 @@ pub async fn list_prompts_for_library(
     db: &SqlitePool,
     filters: LibraryFilters,
 ) -> Result<Vec<PromptIndexRow>> {
-    // Single query (was N+1 prior to SCA-590). LEFT JOIN keeps prompts
-    // with zero tags in the result set; GROUP_CONCAT aggregates the
-    // tags per row using the Unit Separator so we can split them back
-    // in Rust without ambiguity.
+    // SCA-922 (W25): pagination happens BEFORE the LEFT JOIN with
+    // prompt_tags so SQLite doesn't materialize a (prompts × tags)
+    // intermediate just to drop most rows at LIMIT. The page CTE
+    // applies the WHERE + ORDER BY + LIMIT/OFFSET to `prompts` alone
+    // (it can use `prompts_updated_at_idx`); the outer join then
+    // aggregates tags for only the rows we'll actually return.
     let mut sql = String::from(
-        "SELECT p.id, p.title, p.slug, p.summary, p.vault_path, p.archived_at, \
-                COALESCE(GROUP_CONCAT(pt.tag_name, '\u{001f}'), '') AS tags \
-         FROM prompts p \
-         LEFT JOIN prompt_tags pt ON pt.prompt_id = p.id",
+        "WITH page AS ( \
+            SELECT p.id, p.title, p.slug, p.summary, p.vault_path, \
+                   p.archived_at, p.updated_at \
+            FROM prompts p",
     );
-    let mut clauses: Vec<&'static str> = Vec::new();
+    let mut where_clauses: Vec<&'static str> = Vec::new();
     if !filters.include_archived {
-        clauses.push("p.archived_at IS NULL");
+        where_clauses.push("p.archived_at IS NULL");
     }
     if filters.tag.is_some() {
-        clauses.push("p.id IN (SELECT prompt_id FROM prompt_tags WHERE tag_name = ?)");
+        where_clauses.push("p.id IN (SELECT prompt_id FROM prompt_tags WHERE tag_name = ?)");
     }
-    if !clauses.is_empty() {
+    if !where_clauses.is_empty() {
         sql.push_str(" WHERE ");
-        sql.push_str(&clauses.join(" AND "));
+        sql.push_str(&where_clauses.join(" AND "));
     }
-    sql.push_str(" GROUP BY p.id ORDER BY p.updated_at DESC");
+    sql.push_str(" ORDER BY p.updated_at DESC");
     if filters.limit.is_some() {
         sql.push_str(" LIMIT ?");
         if filters.offset.is_some() {
             sql.push_str(" OFFSET ?");
         }
     }
+    sql.push_str(
+        ") \
+         SELECT page.id, page.title, page.slug, page.summary, page.vault_path, \
+                page.archived_at, \
+                COALESCE(GROUP_CONCAT(pt.tag_name, '\u{001f}'), '') AS tags \
+         FROM page \
+         LEFT JOIN prompt_tags pt ON pt.prompt_id = page.id \
+         GROUP BY page.id \
+         ORDER BY page.updated_at DESC",
+    );
 
     let mut q = sqlx::query_as::<
         _,
@@ -182,9 +201,6 @@ pub async fn list_prompts_for_library(
     if let Some(tag) = filters.tag {
         q = q.bind(tag);
     }
-    // SCA-606: LIMIT/OFFSET via sqlx bind for parameterization consistency
-    // with the rest of the query (no SQL injection risk since the inputs
-    // are u32, but mixed inline/parameterized style was inconsistent).
     if let Some(limit) = filters.limit {
         q = q.bind(limit as i64);
         if let Some(offset) = filters.offset {
