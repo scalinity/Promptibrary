@@ -60,7 +60,6 @@ export function AssistantPanel({ promptId }: Props): React.JSX.Element {
   const { send } = useAssistant({
     promptId,
     systemPrompt: patternDef.systemPrompt,
-    pattern,
     model: settingsModel,
     tools: ASSISTANT_TOOL_DEFINITIONS,
     dispatchTool,

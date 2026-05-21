@@ -32,7 +32,6 @@ import {
   ASSISTANT_CHUNK_EVENT,
   type AssistantChunkPayload,
   type AssistantMessage,
-  type AssistantPattern,
   type MessageContent,
   type ToolDefinition,
 } from "@/shared/types/assistant";
@@ -62,7 +61,6 @@ export type ToolDispatcher = (
 export interface UseAssistantOptions {
   promptId: PromptId | null;
   systemPrompt: string;
-  pattern: AssistantPattern;
   model: ClaudeModelId;
   tools: ToolDefinition[];
   dispatchTool: ToolDispatcher;
@@ -78,14 +76,10 @@ export interface UseAssistantApi {
   send: (text: string) => Promise<void>;
 }
 
-/** Generate a short opaque ID. Crypto-random when available, time-based
- * fallback otherwise — only needs to be unique within the running app. */
+/** Generate a short opaque ID. Tauri's WKWebView (and every modern
+ * browser env we target) ships `crypto.randomUUID()`. */
 function generateId(prefix: string): string {
-  const rand =
-    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
-      ? crypto.randomUUID()
-      : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
-  return `${prefix}_${rand}`;
+  return `${prefix}_${crypto.randomUUID()}`;
 }
 
 interface PendingToolUse {
