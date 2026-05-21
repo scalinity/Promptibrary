@@ -44,6 +44,8 @@ export function PromptCard({
   const startX = useRef<number | null>(null);
   const draggedDistance = useRef(0);
   const rowRef = useRef<HTMLDivElement | null>(null);
+  const innerRowRef = useRef<HTMLDivElement | null>(null);
+  const wheelSnapTimer = useRef<number | null>(null);
   const isOpen = offset <= -SWIPE_REVEAL_THRESHOLD;
 
   // Outside-pointerdown closes the revealed panel. Only subscribed while
@@ -59,6 +61,52 @@ export function PromptCard({
     document.addEventListener("pointerdown", onPointer);
     return () => document.removeEventListener("pointerdown", onPointer);
   }, [isOpen]);
+
+  // SCA-914 — trackpad two-finger horizontal swipe emits wheel events
+  // (with deltaX), not pointer events. React's onWheel prop is passive
+  // since React 17, so preventDefault is a no-op there. Attach a
+  // non-passive native listener to the inner row so we can intercept
+  // horizontal swipes and update the offset.
+  useEffect(() => {
+    const el = innerRowRef.current;
+    if (el == null) return;
+
+    const onWheel = (e: WheelEvent) => {
+      // Horizontal-dominant only — don't interfere with vertical scroll
+      // of the list itself.
+      if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return;
+      e.preventDefault();
+      setOffset((cur) => {
+        // Natural-scroll deltaX: swipe-left → positive deltaX → we want
+        // offset to go MORE negative (slide left). cur - deltaX does it.
+        const next = cur - e.deltaX;
+        return Math.min(0, Math.max(-DELETE_PANEL_WIDTH, next));
+      });
+
+      // Debounced snap: 120ms after the last wheel event, snap to fully
+      // open or closed based on whether the offset crossed the reveal
+      // threshold. Clear and reset on every event so a continuous
+      // gesture doesn't snap mid-swipe.
+      if (wheelSnapTimer.current != null) {
+        window.clearTimeout(wheelSnapTimer.current);
+      }
+      wheelSnapTimer.current = window.setTimeout(() => {
+        wheelSnapTimer.current = null;
+        setOffset((cur) =>
+          cur <= -SWIPE_REVEAL_THRESHOLD ? -DELETE_PANEL_WIDTH : 0,
+        );
+      }, 120);
+    };
+
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => {
+      el.removeEventListener("wheel", onWheel);
+      if (wheelSnapTimer.current != null) {
+        window.clearTimeout(wheelSnapTimer.current);
+        wheelSnapTimer.current = null;
+      }
+    };
+  }, []);
 
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>): void => {
     if (e.button !== 0) return;
@@ -143,6 +191,7 @@ export function PromptCard({
         {deleteMutation.isPending ? "…" : "delete"}
       </button>
       <div
+        ref={innerRowRef}
         role="button"
         tabIndex={0}
         className={cn(

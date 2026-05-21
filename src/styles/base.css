@@ -17,6 +17,13 @@ html, body {
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
   font-feature-settings: "ss01", "ss02", "kern";
+  /* SCA-914 — pin the viewport. Without these, two-finger trackpad
+     horizontal swipes inside Tauri/WKWebView trigger the body's overscroll
+     and "back navigation" gesture instead of reaching JS as wheel events
+     on the target row. Locking the body + disabling overscroll behavior
+     lets row-level wheel handlers intercept the gesture cleanly. */
+  overflow: hidden;
+  overscroll-behavior: none;
 }
 
 button, input, select, textarea {
