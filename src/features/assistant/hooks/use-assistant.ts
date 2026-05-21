@@ -43,20 +43,24 @@ import {
 } from "@/features/assistant/store/assistant-store";
 import type { ClaudeModelId } from "@/shared/types/enums";
 
-/** What a tool handler returns. Stringified content goes back as the
- * tool_result content body; `isError: true` flags the call as failed. */
-export interface ToolDispatchResult {
-  content: string;
-  isError?: boolean;
-}
+/** Discriminated union returned by a tool dispatcher.
+ *
+ * - `ok`: tool ran successfully; `content` goes into the tool_result.
+ * - `error`: tool ran but failed; `content` is the error message and
+ *   the tool_result is flagged `is_error: true`.
+ * - `unknown_tool`: dispatcher does not handle this name. The hook
+ *   synthesizes a generic "unknown tool: <name>" error tool_result.
+ */
+export type ToolDispatchResult =
+  | { kind: "ok"; content: string }
+  | { kind: "error"; content: string }
+  | { kind: "unknown_tool" };
 
-/** Caller-supplied tool dispatcher. Returns `null` for an unknown tool
- * name so the hook can synthesize a generic "no such tool" tool_result
- * rather than throwing. */
+/** Caller-supplied tool dispatcher. */
 export type ToolDispatcher = (
   name: string,
   input: Record<string, unknown>,
-) => Promise<ToolDispatchResult | null>;
+) => Promise<ToolDispatchResult>;
 
 export interface UseAssistantOptions {
   promptId: PromptId | null;
@@ -414,29 +418,39 @@ async function runAgentLoop(args: RunArgs): Promise<void> {
         });
         continue;
       }
-      let r: ToolDispatchResult | null;
+      let r: ToolDispatchResult;
       try {
         r = await dispatchTool(t.name, t.input);
       } catch (err) {
         r = {
+          kind: "error",
           content: err instanceof Error ? err.message : String(err),
-          isError: true,
         };
       }
-      if (r == null) {
-        toolResults.push({
-          type: "tool_result",
-          tool_use_id: t.id,
-          content: `unknown tool: ${t.name}`,
-          is_error: true,
-        });
-      } else {
-        toolResults.push({
-          type: "tool_result",
-          tool_use_id: t.id,
-          content: r.content,
-          is_error: r.isError ?? undefined,
-        });
+      switch (r.kind) {
+        case "unknown_tool":
+          toolResults.push({
+            type: "tool_result",
+            tool_use_id: t.id,
+            content: `unknown tool: ${t.name}`,
+            is_error: true,
+          });
+          break;
+        case "error":
+          toolResults.push({
+            type: "tool_result",
+            tool_use_id: t.id,
+            content: r.content,
+            is_error: true,
+          });
+          break;
+        case "ok":
+          toolResults.push({
+            type: "tool_result",
+            tool_use_id: t.id,
+            content: r.content,
+          });
+          break;
       }
     }
 

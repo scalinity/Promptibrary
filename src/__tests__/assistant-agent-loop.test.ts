@@ -57,7 +57,7 @@ function buildArgs(overrides: Partial<RunArgs> = {}): RunArgs {
     systemPrompt: "be helpful",
     model: "claude-sonnet-4-6",
     tools: [],
-    dispatchTool: async () => null,
+    dispatchTool: async () => ({ kind: "unknown_tool" }),
     maxIterations: 3,
     maxTokens: 4096,
     temperature: 0.3,
@@ -185,6 +185,7 @@ describe("assistant agent loop", () => {
       },
     ];
     const dispatcher = vi.fn<ToolDispatcher>(async () => ({
+      kind: "ok",
       content: "Body updated.",
     } as ToolDispatchResult));
     const args = buildArgs({ tools, dispatchTool: dispatcher });
@@ -241,7 +242,7 @@ describe("assistant agent loop", () => {
         input_schema: { type: "object", properties: {} },
       },
     ];
-    const dispatcher: ToolDispatcher = async () => ({ content: "ok" });
+    const dispatcher: ToolDispatcher = async () => ({ kind: "ok", content: "ok" });
     const args = buildArgs({ tools, dispatchTool: dispatcher, maxIterations: 2 });
 
     // Every turn says stop_reason: tool_use with a tool_use block —
