@@ -3,6 +3,7 @@
 import { VaultSettings } from "@/features/settings/components/vault-settings";
 import { DefaultsSettings } from "@/features/settings/components/defaults-settings";
 import { ExtractionSettings } from "@/features/settings/components/extraction-settings";
+import { AssistantSettings } from "@/features/settings/components/assistant-settings";
 import { SecretsSettings } from "@/features/settings/components/secrets-settings";
 import { TelemetrySettings } from "@/features/settings/components/telemetry-settings";
 import { DiagnosticsPanel } from "@/features/settings/components/diagnostics-panel";
@@ -12,6 +13,7 @@ const NAV = [
   { id: "vault", label: "vault" },
   { id: "defaults", label: "defaults" },
   { id: "extraction", label: "extraction" },
+  { id: "assistant", label: "assistant" },
   { id: "secrets", label: "secrets" },
   { id: "telemetry", label: "telemetry" },
   { id: "diagnostics", label: "diagnostics" },
@@ -73,6 +75,7 @@ export function SettingsRoute(): React.JSX.Element {
           <VaultSettings />
           <DefaultsSettings />
           <ExtractionSettings />
+          <AssistantSettings />
           <SecretsSettings />
           <TelemetrySettings />
           <DiagnosticsPanel />
