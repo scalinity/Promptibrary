@@ -92,7 +92,13 @@ interface PendingToolUse {
   id: string;
   name: string;
   inputJson: string;
+  oversized: boolean;
 }
+
+/** Maximum bytes the frontend will accumulate for a single tool's
+ * `input_json_delta` stream. A misbehaving model (or one coerced via
+ * SCA-945) can stream multi-MB tool inputs; cap at 256KB. SCA-949. */
+const MAX_INPUT_JSON_CHARS = 256 * 1024;
 
 /** Per-turn handler bundle. The send-scoped listener reads `current` and
  * routes events into the active turn's accumulators. */
@@ -263,6 +269,7 @@ async function runAgentLoop(args: RunArgs): Promise<void> {
                 id: payload.block.id,
                 name: payload.block.name,
                 inputJson: "",
+                oversized: false,
               });
             }
             break;
@@ -279,7 +286,21 @@ async function runAgentLoop(args: RunArgs): Promise<void> {
           }
           case "input_json_delta": {
             const t = pendingTools.get(payload.index);
-            if (t) t.inputJson += payload.partial_json;
+            if (t == null) break;
+            // SCA-949 — refuse to accumulate beyond MAX_INPUT_JSON_CHARS.
+            // Mark the tool as oversized; dispatch will short-circuit
+            // to a tool_result is_error so the model gets feedback and
+            // can stop trying.
+            if (
+              !t.oversized &&
+              t.inputJson.length + payload.partial_json.length >
+                MAX_INPUT_JSON_CHARS
+            ) {
+              t.oversized = true;
+            }
+            if (!t.oversized) {
+              t.inputJson += payload.partial_json;
+            }
             break;
           }
           case "error": {
@@ -326,7 +347,7 @@ async function runAgentLoop(args: RunArgs): Promise<void> {
     const toolUses = orderedToolIndexes.map((i) => {
       const t = pendingTools.get(i)!;
       let parsed: Record<string, unknown> = {};
-      if (t.inputJson.trim().length > 0) {
+      if (!t.oversized && t.inputJson.trim().length > 0) {
         try {
           parsed = JSON.parse(t.inputJson) as Record<string, unknown>;
         } catch {
@@ -340,7 +361,7 @@ async function runAgentLoop(args: RunArgs): Promise<void> {
         input: parsed,
       };
       finalContent.push(block);
-      return { id: t.id, name: t.name, input: parsed };
+      return { id: t.id, name: t.name, input: parsed, oversized: t.oversized };
     });
     updateMessage(assistantMessageId, (m) => ({
       ...m,
@@ -372,6 +393,17 @@ async function runAgentLoop(args: RunArgs): Promise<void> {
     setStatus({ kind: "tool_dispatch", turnId, promptId: args.promptId });
     const toolResults: MessageContent[] = [];
     for (const t of toolUses) {
+      // SCA-949 — short-circuit oversized tool inputs with an is_error
+      // tool_result. The model sees the failure and can stop emitting.
+      if (t.oversized) {
+        toolResults.push({
+          type: "tool_result",
+          tool_use_id: t.id,
+          content: `tool input too large (exceeded ${MAX_INPUT_JSON_CHARS} chars)`,
+          is_error: true,
+        });
+        continue;
+      }
       let r: ToolDispatchResult | null;
       try {
         r = await dispatchTool(t.name, t.input);
