@@ -5,7 +5,9 @@
   "windows": ["main"],
   "permissions": [
     "core:default",
+    "core:window:allow-start-dragging",
     "dialog:default"
   ],
+  "_NOTE_start_dragging": "SCA-930 — core:default doesn't include start-dragging. The data-tauri-drag-region JS shim fires the IPC, but without this permission Tauri rejects it silently. titleBarStyle: Overlay + hiddenTitle remove the OS's native drag handle, so this permission is required for the window to be movable.",
   "_TODO_L5_updater": "When the updater is activated in L5, add 'updater:default' (or the narrower allowlist) here."
 }

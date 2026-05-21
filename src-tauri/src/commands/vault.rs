@@ -87,7 +87,7 @@ pub(crate) async fn attach_vault(
     }
     let vault = VaultPaths::new(vault_root.clone());
     repair_missing_dirs(&vault)?;
-    let db = open_index_pool().await?;
+    let db = open_index_pool(&services.app_data_dir).await?;
     run_migrations(&db).await?;
 
     // Best-effort: drop expired extraction-cache rows on every vault
@@ -202,18 +202,17 @@ pub(crate) async fn current_vault_db_inner(
     Ok((vault, db))
 }
 
-/// Open the L1 single-vault index pool at the canonical app-support path.
+/// Open the L1 single-vault index pool at the canonical app-data path.
 ///
-/// SCA-620: this took a `&VaultPaths` parameter that was immediately
-/// dropped (`let _ = vault;`). L1 uses a single shared index DB regardless
-/// of which vault is open; multi-vault DB routing would land in L5 with a
-/// hash-keyed filename. Renamed to `open_index_pool` and dropped the
-/// unused parameter.
-async fn open_index_pool() -> Result<SqlitePool> {
-    let dir = app_support_dir()?;
-    std::fs::create_dir_all(&dir).map_err(AppError::from)?;
-    let path = dir.join("index.sqlite");
-    let opts = connect_options(&path);
+/// SCA-921 (W5): the path is now sourced from `AppServices.app_data_dir`
+/// — the single source of truth. The legacy "promptibrary" / XDG_DATA_HOME
+/// dir is migrated on first call if present, so users with on-disk index
+/// data don't lose their search index.
+async fn open_index_pool(app_data_dir: &std::path::Path) -> Result<SqlitePool> {
+    std::fs::create_dir_all(app_data_dir).map_err(AppError::from)?;
+    let canonical = app_data_dir.join("index.sqlite");
+    migrate_legacy_index_if_present(&canonical);
+    let opts = connect_options(&canonical);
     let pool = SqlitePoolOptions::new()
         .max_connections(4)
         .connect_with(opts)
@@ -222,28 +221,62 @@ async fn open_index_pool() -> Result<SqlitePool> {
     Ok(pool)
 }
 
-fn app_support_dir() -> Result<PathBuf> {
+/// One-shot migration: pre-SCA-921 the index DB lived under
+/// `~/Library/Application Support/promptibrary/index.sqlite` (macOS)
+/// or `$XDG_DATA_HOME/promptibrary/index.sqlite` (Linux). The canonical
+/// app-data path now matches `AppServices.app_data_dir`. If the legacy
+/// path has a DB and the canonical location does not, move it across
+/// so the user keeps their search index. Best-effort; failures fall
+/// through to a fresh DB.
+fn migrate_legacy_index_if_present(canonical: &std::path::Path) {
+    if canonical.exists() {
+        return;
+    }
+    let Some(legacy) = legacy_index_path() else {
+        return;
+    };
+    if !legacy.exists() {
+        return;
+    }
+    if let Some(parent) = canonical.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    match std::fs::rename(&legacy, canonical) {
+        Ok(()) => tracing::info!(
+            from = %legacy.display(),
+            to = %canonical.display(),
+            "SCA-921: migrated legacy index.sqlite to canonical app-data path"
+        ),
+        Err(e) => tracing::warn!(
+            error = %e,
+            from = %legacy.display(),
+            to = %canonical.display(),
+            "SCA-921: legacy index migration failed; will create fresh DB at canonical path"
+        ),
+    }
+}
+
+fn legacy_index_path() -> Option<PathBuf> {
     if cfg!(target_os = "macos") {
-        let home = std::env::var("HOME")
-            .map_err(|_| AppError::new(AppErrorKind::Internal, "HOME env var not set"))?;
-        Ok(PathBuf::from(home).join("Library/Application Support/promptibrary"))
+        let home = std::env::var("HOME").ok()?;
+        Some(
+            PathBuf::from(home)
+                .join("Library/Application Support/promptibrary")
+                .join("index.sqlite"),
+        )
     } else if cfg!(target_os = "linux") {
-        // SCA-602: honor $XDG_DATA_HOME per XDG Base Directory spec, falling
-        // back to $HOME/.local/share only when XDG_DATA_HOME is unset or
-        // empty. Managed Linux environments and Flatpak/snap-style sandboxes
-        // depend on this override to point apps at their own data prefix.
         if let Ok(xdg) = std::env::var("XDG_DATA_HOME") {
             if !xdg.is_empty() {
-                return Ok(PathBuf::from(xdg).join("promptibrary"));
+                return Some(PathBuf::from(xdg).join("promptibrary").join("index.sqlite"));
             }
         }
-        let home = std::env::var("HOME")
-            .map_err(|_| AppError::new(AppErrorKind::Internal, "HOME env var not set"))?;
-        Ok(PathBuf::from(home).join(".local/share/promptibrary"))
+        let home = std::env::var("HOME").ok()?;
+        Some(
+            PathBuf::from(home)
+                .join(".local/share/promptibrary")
+                .join("index.sqlite"),
+        )
     } else {
-        Err(AppError::new(
-            AppErrorKind::Internal,
-            "unsupported platform",
-        ))
+        None
     }
 }
