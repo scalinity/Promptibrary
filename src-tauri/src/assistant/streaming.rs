@@ -151,26 +151,35 @@ impl SseParser {
     }
 
     pub fn feed(&mut self, chunk: &[u8]) -> Result<Vec<AssistantStreamEvent>, SseParseError> {
+        let mut events = Vec::new();
+        self.feed_with(chunk, |ev| events.push(ev))?;
+        Ok(events)
+    }
+
+    /// SCA-959 — callback variant of [`feed`] that skips the intermediate
+    /// Vec allocation on the hot streaming path. Each parsed event is
+    /// emitted via `on_event` as soon as it's available; the caller can
+    /// forward straight to an mpsc sender (or drop / count) without ever
+    /// owning a Vec.
+    pub fn feed_with<F: FnMut(AssistantStreamEvent)>(
+        &mut self,
+        chunk: &[u8],
+        mut on_event: F,
+    ) -> Result<(), SseParseError> {
         // SCA-954 — extend the byte buffer; do NOT attempt UTF-8 decode
         // on the chunk itself, because reqwest's chunks can split a
         // multi-byte codepoint.
         self.buffer.extend_from_slice(chunk);
 
-        let mut events = Vec::new();
         loop {
             let Some((boundary, sep_len)) = find_frame_boundary_bytes(&self.buffer) else {
                 break;
             };
-            // Copy the frame bytes out and drop them from the buffer.
             let frame_bytes: Vec<u8> = self.buffer.drain(..boundary + sep_len).collect();
             let frame_slice = &frame_bytes[..boundary];
             let frame = match std::str::from_utf8(frame_slice) {
                 Ok(s) => s,
                 Err(_) => {
-                    // A complete frame whose bytes are not valid UTF-8 is
-                    // a real wire-format break (not the chunk-boundary
-                    // problem this parser is designed for). Treat as a
-                    // bad frame per the SCA-948 tolerance policy.
                     self.bad_frames_total = self.bad_frames_total.saturating_add(1);
                     self.consecutive_bad_frames =
                         self.consecutive_bad_frames.saturating_add(1);
@@ -183,7 +192,7 @@ impl SseParser {
             match parse_frame(frame) {
                 Ok(Some(ev)) => {
                     self.consecutive_bad_frames = 0;
-                    events.push(ev);
+                    on_event(ev);
                 }
                 Ok(None) => {}
                 Err(SseParseError::InvalidJson { .. }) => {
@@ -199,7 +208,7 @@ impl SseParser {
                 Err(e) => return Err(e),
             }
         }
-        Ok(events)
+        Ok(())
     }
 
     /// Drain any remaining buffered frame at end-of-stream. Anthropic
@@ -208,9 +217,18 @@ impl SseParser {
     /// real-world possibility we accommodate.
     pub fn finish(&mut self) -> Result<Vec<AssistantStreamEvent>, SseParseError> {
         let mut events = Vec::new();
+        self.finish_with(|ev| events.push(ev))?;
+        Ok(events)
+    }
+
+    /// SCA-959 — callback variant of [`finish`].
+    pub fn finish_with<F: FnMut(AssistantStreamEvent)>(
+        &mut self,
+        mut on_event: F,
+    ) -> Result<(), SseParseError> {
         let trailing = std::mem::take(&mut self.buffer);
         if trailing.is_empty() {
-            return Ok(events);
+            return Ok(());
         }
         let trailing_str = match std::str::from_utf8(&trailing) {
             Ok(s) => s,
@@ -221,7 +239,7 @@ impl SseParser {
             match parse_frame(trimmed) {
                 Ok(Some(ev)) => {
                     self.consecutive_bad_frames = 0;
-                    events.push(ev);
+                    on_event(ev);
                 }
                 Ok(None) => {}
                 Err(SseParseError::InvalidJson { .. }) => {
@@ -237,7 +255,7 @@ impl SseParser {
                 Err(e) => return Err(e),
             }
         }
-        Ok(events)
+        Ok(())
     }
 }
 
