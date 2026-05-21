@@ -224,7 +224,19 @@ export const resizeTerminal: typeof Real.resizeTerminal = () =>
 // ─── Runs ─────────────────────────────────────────────────────────────────
 
 export const listRuns: typeof Real.listRuns = () => ok([]);
+export const getRun: typeof Real.getRun = (runId) =>
+  Promise.reject({
+    kind: "RunNotFound",
+    message: `Run ${runId} not found in mock fixtures`,
+    details: { run_id: String(runId) },
+  });
 export const getPromptRuns: typeof Real.getPromptRuns = () => ok([]);
+export const fetchTranscript: typeof Real.fetchTranscript = (runId) =>
+  Promise.reject({
+    kind: "TranscriptUnavailable",
+    message: `Transcript for run ${runId} unavailable in mock fixtures`,
+    details: { run_id: String(runId) },
+  });
 export const repairOrphanedTranscripts: typeof Real.repairOrphanedTranscripts =
   () => ok({ recovered: 0, lost: 0 });
 

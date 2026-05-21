@@ -151,6 +151,147 @@ pub async fn complete_run(db: &SqlitePool, input: &CompleteRunInput<'_>) -> Resu
     Ok(())
 }
 
+// ─── SCA-917: read-path helpers ────────────────────────────────────
+
+/// Raw DB shape — every column from the `runs` table. Converted to
+/// `domain::run::Run` via `to_domain_run` (which parses profile_json,
+/// token_count_json, error_json, and the timestamp/signal columns).
+#[derive(Debug, sqlx::FromRow)]
+pub struct RunRow {
+    pub id: String,
+    pub prompt_id: String,
+    pub prompt_title: String,
+    pub status: String,
+    pub profile_json: String,
+    pub started_at: String,
+    pub ended_at: Option<String>,
+    pub exit_code: Option<i32>,
+    pub signal: Option<String>,
+    pub transcript_vault_path: Option<String>,
+    pub transcript_spool_path: Option<String>,
+    pub stdout_bytes: i64,
+    pub stderr_bytes: i64,
+    pub token_count_json: Option<String>,
+    pub cost_usd: Option<f64>,
+    pub error_json: Option<String>,
+}
+
+const ALL_COLUMNS: &str =
+    "id, prompt_id, prompt_title, status, profile_json, started_at, ended_at, \
+     exit_code, signal, transcript_vault_path, transcript_spool_path, \
+     stdout_bytes, stderr_bytes, token_count_json, cost_usd, error_json";
+
+/// List the most recent runs across all prompts.
+pub async fn list_runs(db: &SqlitePool, limit: i64) -> Result<Vec<RunRow>> {
+    let sql = format!(
+        "SELECT {ALL_COLUMNS} FROM runs ORDER BY started_at DESC LIMIT ?"
+    );
+    let rows = sqlx::query_as::<_, RunRow>(&sql)
+        .bind(limit.max(0))
+        .fetch_all(db)
+        .await
+        .map_err(AppError::from)?;
+    Ok(rows)
+}
+
+/// Fetch a single run by id, or None if missing.
+pub async fn get_run(db: &SqlitePool, run_id: &str) -> Result<Option<RunRow>> {
+    let sql = format!("SELECT {ALL_COLUMNS} FROM runs WHERE id = ?");
+    let row = sqlx::query_as::<_, RunRow>(&sql)
+        .bind(run_id)
+        .fetch_optional(db)
+        .await
+        .map_err(AppError::from)?;
+    Ok(row)
+}
+
+/// List runs for a specific prompt, newest first.
+pub async fn get_prompt_runs(
+    db: &SqlitePool,
+    prompt_id: &str,
+    limit: i64,
+) -> Result<Vec<RunRow>> {
+    let sql = format!(
+        "SELECT {ALL_COLUMNS} FROM runs WHERE prompt_id = ? \
+         ORDER BY started_at DESC LIMIT ?"
+    );
+    let rows = sqlx::query_as::<_, RunRow>(&sql)
+        .bind(prompt_id)
+        .bind(limit.max(0))
+        .fetch_all(db)
+        .await
+        .map_err(AppError::from)?;
+    Ok(rows)
+}
+
+/// Hydrate a raw row into a `domain::run::Run` ready for the wire.
+pub fn to_domain_run(row: RunRow) -> Result<crate::domain::run::Run> {
+    use crate::domain::launch::LaunchProfile;
+    use crate::domain::run::{Run, RunStatus as CanonicalRunStatus, StopSignal, TokenCount};
+    use crate::error::{AppError, AppErrorDto, AppErrorKind};
+    use crate::ids::{PromptId, RunId};
+    use chrono::{DateTime, Utc};
+    use std::path::PathBuf;
+
+    let status = CanonicalRunStatus::from_str(&row.status).ok_or_else(|| {
+        AppError::new(
+            AppErrorKind::Internal,
+            format!("unknown run status `{}` in runs row", row.status),
+        )
+    })?;
+
+    let profile: LaunchProfile = serde_json::from_str(&row.profile_json)
+        .map_err(|e| AppError::new(AppErrorKind::Internal, format!("profile_json: {e}")))?;
+
+    let started_at = DateTime::parse_from_rfc3339(&row.started_at)
+        .map_err(|e| AppError::new(AppErrorKind::Internal, format!("started_at: {e}")))?
+        .with_timezone(&Utc);
+    let ended_at = match row.ended_at {
+        Some(s) => Some(
+            DateTime::parse_from_rfc3339(&s)
+                .map_err(|e| AppError::new(AppErrorKind::Internal, format!("ended_at: {e}")))?
+                .with_timezone(&Utc),
+        ),
+        None => None,
+    };
+
+    let signal = match row.signal.as_deref() {
+        Some("SIGINT") => Some(StopSignal::SigInt),
+        Some("SIGTERM") => Some(StopSignal::SigTerm),
+        Some("SIGKILL") => Some(StopSignal::SigKill),
+        _ => None,
+    };
+
+    let token_count: Option<TokenCount> = match row.token_count_json {
+        Some(s) if !s.is_empty() => serde_json::from_str(&s).ok(),
+        _ => None,
+    };
+
+    let error: Option<AppErrorDto> = match row.error_json {
+        Some(s) if !s.is_empty() => serde_json::from_str(&s).ok(),
+        _ => None,
+    };
+
+    Ok(Run {
+        id: RunId(row.id),
+        prompt_id: PromptId(row.prompt_id),
+        prompt_title: row.prompt_title,
+        status,
+        profile,
+        started_at,
+        ended_at,
+        exit_code: row.exit_code,
+        signal,
+        transcript_vault_path: row.transcript_vault_path,
+        transcript_spool_path: row.transcript_spool_path.map(PathBuf::from),
+        stdout_bytes: row.stdout_bytes,
+        stderr_bytes: row.stderr_bytes,
+        token_count,
+        cost_usd: row.cost_usd,
+        error,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -303,6 +444,72 @@ mod tests {
         .await
         .unwrap_err();
         assert_eq!(err.kind, crate::error::AppErrorKind::RunNotFound);
+    }
+
+    #[tokio::test]
+    async fn list_runs_orders_by_started_desc() {
+        let db = temp_pool().await;
+        seed_prompt(&db, "p1").await;
+        let times = [
+            "2026-05-19T01:00:00Z",
+            "2026-05-19T02:00:00Z",
+            "2026-05-19T03:00:00Z",
+        ];
+        for (i, t) in times.iter().enumerate() {
+            insert_run(
+                &db,
+                &InsertRunInput {
+                    run_id: &format!("r{i}"),
+                    prompt_id: "p1",
+                    prompt_title: "T",
+                    profile_json: "{}",
+                    started_at: t.parse::<DateTime<Utc>>().unwrap(),
+                },
+            )
+            .await
+            .unwrap();
+        }
+        let rows = list_runs(&db, 10).await.unwrap();
+        assert_eq!(rows.len(), 3);
+        assert_eq!(rows[0].id, "r2");
+        assert_eq!(rows[2].id, "r0");
+
+        let only_one = list_runs(&db, 1).await.unwrap();
+        assert_eq!(only_one.len(), 1);
+        assert_eq!(only_one[0].id, "r2");
+    }
+
+    #[tokio::test]
+    async fn get_run_returns_none_for_missing() {
+        let db = temp_pool().await;
+        assert!(get_run(&db, "nope").await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn get_prompt_runs_filters_by_prompt_id() {
+        let db = temp_pool().await;
+        seed_prompt(&db, "pA").await;
+        seed_prompt(&db, "pB").await;
+        for (id, pid) in [("a1", "pA"), ("a2", "pA"), ("b1", "pB")] {
+            insert_run(
+                &db,
+                &InsertRunInput {
+                    run_id: id,
+                    prompt_id: pid,
+                    prompt_title: "T",
+                    profile_json: "{}",
+                    started_at: Utc::now(),
+                },
+            )
+            .await
+            .unwrap();
+        }
+        let a_runs = get_prompt_runs(&db, "pA", 10).await.unwrap();
+        assert_eq!(a_runs.len(), 2);
+        assert!(a_runs.iter().all(|r| r.prompt_id == "pA"));
+        let b_runs = get_prompt_runs(&db, "pB", 10).await.unwrap();
+        assert_eq!(b_runs.len(), 1);
+        assert_eq!(b_runs[0].id, "b1");
     }
 
     #[tokio::test]

@@ -374,8 +374,26 @@ export interface TermFinishedEvent {
 export const listRuns = (limit = 50) =>
   invoke<Run[]>("list_runs", { input: { limit } });
 
+export const getRun = (runId: RunId) =>
+  invoke<Run>("get_run", { input: { runId } });
+
 export const getPromptRuns = (promptId: PromptId, limit = 25) =>
   invoke<Run[]>("get_prompt_runs", { input: { promptId, limit } });
+
+// SCA-917: transcript source distinguishes the vault-resident
+// canonical file from the spooled in-flight file.
+export type TranscriptSource = "vault" | "spool";
+
+export interface FetchTranscriptOutput {
+  runId: RunId;
+  source: TranscriptSource;
+  path: AbsolutePath;
+  content: string;
+  byteLen: number;
+}
+
+export const fetchTranscript = (runId: RunId) =>
+  invoke<FetchTranscriptOutput>("fetch_transcript", { input: { runId } });
 
 export const repairOrphanedTranscripts = () =>
   invoke<{ recovered: number; lost: number }>("repair_orphaned_transcripts");
