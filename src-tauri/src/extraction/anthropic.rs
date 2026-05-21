@@ -153,7 +153,7 @@ impl AnthropicTransport for HttpAnthropicTransport {
             return Err(AnthropicTransportError::AuthInvalid);
         }
         if status == reqwest::StatusCode::TOO_MANY_REQUESTS {
-            let reset_at = parse_anthropic_rate_limit_reset(resp.headers());
+            let reset_at = crate::anthropic_common::parse_rate_limit_reset(resp.headers());
             return Err(AnthropicTransportError::RateLimited { reset_at });
         }
         if !status.is_success() {
@@ -176,48 +176,6 @@ impl AnthropicTransport for HttpAnthropicTransport {
         }
         Ok(combined)
     }
-}
-
-/// Parse the reset-at timestamp from Anthropic's rate-limit headers.
-///
-/// Header contract (Anthropic Messages API, as of 2026-05):
-/// - `anthropic-ratelimit-requests-reset` — RFC3339 absolute timestamp
-///   (e.g. `2026-05-19T12:00:00Z`). Preferred when present because the
-///   value is wall-clock, immune to clock-skew on the client.
-/// - `retry-after` — RFC7231 seconds-until-reset. Fallback when the
-///   Anthropic-specific header is absent.
-///
-/// Other Anthropic rate-limit headers are emitted too
-/// (`anthropic-ratelimit-tokens-{remaining,reset}`,
-/// `anthropic-ratelimit-input-tokens-*`, etc.). We only care about the
-/// "you can retry at X" answer here; the others are dashboarding signals.
-///
-/// Reference: https://docs.anthropic.com/en/api/rate-limits — keep this
-/// pointer current when adjusting parsing. If Anthropic renames the
-/// preferred header, the `RateLimited` failure silently degrades to the
-/// `retry-after` path, so update both the constant strings below AND
-/// the test in `rate_limited_surfaces_as_failure_with_reset` when the
-/// header schema changes.
-fn parse_anthropic_rate_limit_reset(
-    headers: &reqwest::header::HeaderMap,
-) -> Option<chrono::DateTime<chrono::Utc>> {
-    if let Some(reset) = headers
-        .get("anthropic-ratelimit-requests-reset")
-        .and_then(|v| v.to_str().ok())
-    {
-        if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(reset) {
-            return Some(dt.with_timezone(&chrono::Utc));
-        }
-    }
-    if let Some(retry_after) = headers
-        .get(reqwest::header::RETRY_AFTER)
-        .and_then(|v| v.to_str().ok())
-    {
-        if let Ok(secs) = retry_after.parse::<i64>() {
-            return Some(chrono::Utc::now() + chrono::Duration::seconds(secs));
-        }
-    }
-    None
 }
 
 // ─── Mock transport for tests ────────────────────────────────────────────────

@@ -23,6 +23,7 @@ pub mod git;
 pub mod settings;
 pub mod system;
 pub mod util;
+pub mod anthropic_common;
 
 use std::sync::Arc;
 

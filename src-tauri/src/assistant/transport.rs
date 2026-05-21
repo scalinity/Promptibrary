@@ -182,7 +182,7 @@ impl StreamingAnthropicTransport for HttpStreamingAnthropicTransport {
             return Err(StreamingError::AuthInvalid);
         }
         if status == reqwest::StatusCode::TOO_MANY_REQUESTS {
-            let reset_at = parse_rate_limit_reset(resp.headers());
+            let reset_at = crate::anthropic_common::parse_rate_limit_reset(resp.headers());
             return Err(StreamingError::RateLimited { reset_at });
         }
         if !status.is_success() {
@@ -253,31 +253,6 @@ impl StreamingAnthropicTransport for HttpStreamingAnthropicTransport {
         }
         Ok(())
     }
-}
-
-/// Same logic as `extraction::anthropic::parse_anthropic_rate_limit_reset`,
-/// duplicated here to keep the assistant transport independent of the
-/// extraction module's internals.
-fn parse_rate_limit_reset(
-    headers: &reqwest::header::HeaderMap,
-) -> Option<chrono::DateTime<chrono::Utc>> {
-    if let Some(reset) = headers
-        .get("anthropic-ratelimit-requests-reset")
-        .and_then(|v| v.to_str().ok())
-    {
-        if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(reset) {
-            return Some(dt.with_timezone(&chrono::Utc));
-        }
-    }
-    if let Some(retry_after) = headers
-        .get(reqwest::header::RETRY_AFTER)
-        .and_then(|v| v.to_str().ok())
-    {
-        if let Ok(secs) = retry_after.parse::<i64>() {
-            return Some(chrono::Utc::now() + chrono::Duration::seconds(secs));
-        }
-    }
-    None
 }
 
 // ─── Mock transport for tests + IPC integration ─────────────────────────────
