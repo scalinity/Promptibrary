@@ -184,6 +184,33 @@ fn scan_for_secrets(text: &str) -> Option<&'static str> {
     None
 }
 
+/// SCA-913 (W7, CWE-201 / CWE-209): truncate + redact a raw model
+/// response before shipping it over IPC. We keep at most 2 KB so the
+/// "show raw" panel still has something useful, and we collapse any
+/// fragment that pattern-matches our credential allow-list to a
+/// `[REDACTED:<name>]` marker. The unredacted raw is still available
+/// in backend logs via `tracing::warn!` at the call site.
+pub fn sanitize_raw_for_wire(raw: &str) -> String {
+    const MAX_LEN: usize = 2048;
+    let mut truncated = if raw.len() > MAX_LEN {
+        let mut end = MAX_LEN;
+        while end > 0 && !raw.is_char_boundary(end) {
+            end -= 1;
+        }
+        let mut out = String::with_capacity(end + 32);
+        out.push_str(&raw[..end]);
+        out.push_str("\n…[truncated]");
+        out
+    } else {
+        raw.to_string()
+    };
+    for (name, re) in SECRET_PATTERNS.iter() {
+        let marker = format!("[REDACTED:{name}]");
+        truncated = re.replace_all(&truncated, marker.as_str()).into_owned();
+    }
+    truncated
+}
+
 fn format_variable_error(e: &VariableParseError) -> String {
     match e {
         VariableParseError::UnclosedVariableRef { start_utf16 } => {

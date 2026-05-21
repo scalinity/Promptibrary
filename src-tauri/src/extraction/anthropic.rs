@@ -17,7 +17,9 @@ use sqlx::SqlitePool;
 
 use super::cache;
 use super::prompts::{build_user_payload, EXTRACTION_PROMPT_VERSION, EXTRACTION_SYSTEM_PROMPT};
-use super::response::{parse_and_validate, salvage_first_json_object, ValidationError};
+use super::response::{
+    parse_and_validate, salvage_first_json_object, sanitize_raw_for_wire, ValidationError,
+};
 use super::types::{ExtractionFailure, ExtractionInput, ExtractionMode, ExtractionResponse};
 use crate::error::{AppError, AppErrorKind, Result};
 use crate::settings::keychain::{get_secret, SecretKey};
@@ -123,7 +125,10 @@ impl AnthropicTransport for HttpAnthropicTransport {
         let api_key = match get_secret(self.secret_store.as_ref(), SecretKey::AnthropicApiKey) {
             Ok(Some(k)) => k,
             Ok(None) => return Err(AnthropicTransportError::KeyMissing),
-            Err(e) => return Err(AnthropicTransportError::Other(format!("keychain: {e:?}"))),
+            // SCA-913 (W9, CWE-209): Display, not Debug. keyring_core's
+            // Debug format is not stability-guaranteed and may include
+            // sensitive context in future versions.
+            Err(e) => return Err(AnthropicTransportError::Other(format!("keychain: {e}"))),
         };
 
         let resp = self
@@ -393,10 +398,20 @@ impl AnthropicClient {
                         }
                         Ok(Ok(response))
                     }
-                    Err(final_errors) => Ok(Err(ExtractionFailure::MalformedModelOutput {
-                        raw: repaired_raw,
-                        errors: final_errors.iter().map(|e| format!("{e:?}")).collect(),
-                    })),
+                    Err(final_errors) => {
+                        // SCA-913 (W7, CWE-201 / CWE-209): redact any secret
+                        // material the model echoed back from a hostile source
+                        // page, and cap the wire payload at ~2 KB. The full raw
+                        // string is still backend-visible via tracing.
+                        tracing::warn!(
+                            raw_len = repaired_raw.len(),
+                            "extraction MalformedModelOutput — raw response sanitized for IPC"
+                        );
+                        Ok(Err(ExtractionFailure::MalformedModelOutput {
+                            raw: sanitize_raw_for_wire(&repaired_raw),
+                            errors: final_errors.iter().map(|e| format!("{e:?}")).collect(),
+                        }))
+                    }
                 }
             }
         }

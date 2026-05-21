@@ -164,7 +164,14 @@ impl From<std::io::Error> for AppError {
 
 impl From<serde_json::Error> for AppError {
     fn from(e: serde_json::Error) -> Self {
-        Self::new(AppErrorKind::Internal, format!("json: {}", e))
+        // SCA-913 (W10, CWE-209): serde_json::Error can include the
+        // raw input excerpt. Log full detail; keep wire surface to the
+        // line/column metadata.
+        tracing::warn!(error = ?e, "serde_json error converted to AppError");
+        Self::new(
+            AppErrorKind::Internal,
+            format!("json: line {} col {}", e.line(), e.column()),
+        )
     }
 }
 
@@ -179,6 +186,10 @@ impl From<sqlx::Error> for AppError {
         //   — surface FK violations distinctly so callers can recognize
         //   "referenced row doesn't exist" rather than masking as Internal)
         // Reference: https://sqlite.org/rescode.html
+        //
+        // SCA-913 (W10, CWE-209): non-database variants (encode/decode,
+        // pool, IO) leak SQL text and column names verbatim. Log full,
+        // surface only the variant discriminator.
         match &e {
             sqlx::Error::Database(db_err) => match db_err.code().as_deref() {
                 Some("5") | Some("6") => {
@@ -191,51 +202,93 @@ impl From<sqlx::Error> for AppError {
                     AppErrorKind::ForeignKeyViolation,
                     db_err.message().to_string(),
                 ),
-                _ => Self::new(AppErrorKind::Internal, format!("sqlx: {}", e)),
+                _ => {
+                    tracing::warn!(error = ?e, "sqlx database error converted to AppError");
+                    Self::new(AppErrorKind::Internal, "sqlx: database error")
+                }
             },
-            _ => Self::new(AppErrorKind::Internal, format!("sqlx: {}", e)),
+            other => {
+                tracing::warn!(error = ?other, "sqlx error converted to AppError");
+                let label = match other {
+                    sqlx::Error::Configuration(_) => "configuration",
+                    sqlx::Error::Io(_) => "io",
+                    sqlx::Error::Tls(_) => "tls",
+                    sqlx::Error::Protocol(_) => "protocol",
+                    sqlx::Error::RowNotFound => "row_not_found",
+                    sqlx::Error::TypeNotFound { .. } => "type_not_found",
+                    sqlx::Error::ColumnIndexOutOfBounds { .. } => "column_index",
+                    sqlx::Error::ColumnNotFound(_) => "column_not_found",
+                    sqlx::Error::ColumnDecode { .. } => "column_decode",
+                    sqlx::Error::Decode(_) => "decode",
+                    sqlx::Error::PoolTimedOut => "pool_timed_out",
+                    sqlx::Error::PoolClosed => "pool_closed",
+                    sqlx::Error::WorkerCrashed => "worker_crashed",
+                    sqlx::Error::Migrate(_) => "migrate",
+                    _ => "other",
+                };
+                Self::new(AppErrorKind::Internal, format!("sqlx: {label}"))
+            }
         }
     }
 }
 
 impl From<sqlx::migrate::MigrateError> for AppError {
     fn from(e: sqlx::migrate::MigrateError) -> Self {
-        Self::new(AppErrorKind::Internal, format!("migrate: {}", e))
+        // SCA-913 (W10, CWE-209): migrate errors can include absolute
+        // filesystem paths for migration sources. Log full, surface
+        // only the variant discriminator.
+        tracing::warn!(error = ?e, "sqlx migrate error converted to AppError");
+        Self::new(AppErrorKind::Internal, "migrate: error")
     }
 }
 
 impl From<reqwest::Error> for AppError {
     fn from(e: reqwest::Error) -> Self {
-        // TODO(L4): refine when the real extraction call path lands. Today only
-        // is_connect() and is_timeout() route to NetworkUnavailable — DNS
-        // resolution failures, TLS handshake errors, and "couldn't reach the
-        // server" cases fall through to Internal. The right shape once L4 has
-        // real callsites is roughly:
-        //   is_connect() || is_timeout() || (is_request() && status().is_none())
-        // so reachability problems all classify as NetworkUnavailable.
+        // SCA-913 (W10, CWE-209): reqwest::Error.to_string() includes
+        // the target URL with query string (and the resolved IP in
+        // some failure modes). Log full; surface only the failure
+        // category.
+        tracing::warn!(error = ?e, "reqwest error converted to AppError");
         if e.is_connect() || e.is_timeout() {
-            Self::new(AppErrorKind::NetworkUnavailable, format!("network: {}", e))
+            Self::new(AppErrorKind::NetworkUnavailable, "network: unreachable")
+        } else if e.is_decode() {
+            Self::new(AppErrorKind::Internal, "http: decode failed")
+        } else if e.is_status() {
+            let status = e.status().map(|s| s.as_u16()).unwrap_or(0);
+            Self::new(AppErrorKind::Internal, format!("http: status {status}"))
         } else {
-            Self::new(AppErrorKind::Internal, format!("http: {}", e))
+            Self::new(AppErrorKind::Internal, "http: request failed")
         }
     }
 }
 
 impl From<notify::Error> for AppError {
     fn from(e: notify::Error) -> Self {
-        Self::new(AppErrorKind::Internal, format!("watcher: {}", e))
+        // SCA-913 (W10, CWE-209): notify::Error includes the path the
+        // watcher was monitoring. Log full; surface only the category.
+        tracing::warn!(error = ?e, "notify error converted to AppError");
+        Self::new(AppErrorKind::Internal, "watcher: error")
     }
 }
 
 impl From<keyring_core::error::Error> for AppError {
     fn from(e: keyring_core::error::Error) -> Self {
-        Self::new(AppErrorKind::KeychainError, format!("keychain: {}", e))
+        // SCA-913 (W9, CWE-209): Display, not Debug.
+        tracing::warn!(error = %e, "keychain error converted to AppError");
+        Self::new(AppErrorKind::KeychainError, "keychain: error")
     }
 }
 
 impl From<serde_yaml::Error> for AppError {
     fn from(e: serde_yaml::Error) -> Self {
-        Self::new(AppErrorKind::YamlMalformed, format!("yaml: {}", e))
+        // SCA-913 (W10, CWE-209): serde_yaml::Error includes the
+        // offending line text. Log full; surface only the location.
+        tracing::warn!(error = ?e, "serde_yaml error converted to AppError");
+        let loc = e
+            .location()
+            .map(|l| format!("line {} col {}", l.line(), l.column()))
+            .unwrap_or_else(|| "unknown location".to_string());
+        Self::new(AppErrorKind::YamlMalformed, format!("yaml: {loc}"))
     }
 }
 
