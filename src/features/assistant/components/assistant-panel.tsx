@@ -19,6 +19,7 @@ import {
 } from "@/features/assistant/store/assistant-store";
 import { useAssistant } from "@/features/assistant/hooks/use-assistant";
 import { AssistantPatternSelector } from "@/features/assistant/components/pattern-selector";
+import { StreamingText } from "@/features/assistant/components/streaming-text";
 import { Patterns } from "@/features/assistant/constants";
 import type { PromptId } from "@/shared/types/ids";
 
@@ -275,7 +276,20 @@ function MessageBubble({ message }: { message: UiMessage }): React.JSX.Element {
         }}
       >
         {message.content.map((block, i) => {
-          if (block.type === "text") return <span key={i}>{block.text}</span>;
+          if (block.type === "text") {
+            // Assistant text uses the fade-in stream component; user text
+            // doesn't stream and stays plain.
+            if (message.role === "assistant") {
+              return (
+                <StreamingText
+                  key={i}
+                  text={block.text}
+                  isStreaming={message.isStreaming}
+                />
+              );
+            }
+            return <span key={i}>{block.text}</span>;
+          }
           if (block.type === "tool_use") {
             return (
               <ToolCallChip
