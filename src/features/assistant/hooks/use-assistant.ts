@@ -15,6 +15,13 @@
 //        - `tool_use` → dispatch each accumulated tool_use to the caller-
 //          supplied handler, append a tool_result message, and recurse.
 //   5. Errors surface via the store's `status.kind === "error"` slot.
+//
+// SCA-946 — the `assistant:chunk` Tauri listener is registered ONCE per
+// `send()` call (covering every iteration of the agent loop) rather than
+// once per turn inside the loop. A `TurnContext` held in a closed-over
+// ref tells the listener handler where to route the current event. This
+// avoids per-turn listen/unlisten churn and prepares the ground for the
+// next iteration to share infrastructure.
 
 import { useCallback, useRef } from "react";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
@@ -87,6 +94,15 @@ interface PendingToolUse {
   inputJson: string;
 }
 
+/** Per-turn handler bundle. The send-scoped listener reads `current` and
+ * routes events into the active turn's accumulators. */
+interface TurnContext {
+  turnId: string;
+  handle: (payload: AssistantChunkPayload) => void;
+}
+
+type TurnContextRef = { current: TurnContext | null };
+
 export function useAssistant(opts: UseAssistantOptions): UseAssistantApi {
   const {
     promptId,
@@ -120,6 +136,21 @@ export function useAssistant(opts: UseAssistantOptions): UseAssistantApi {
       };
       appendMessage(promptId, userMessage);
 
+      // SCA-946 — one listener for the whole send() call. The agent loop
+      // updates `turnContextRef.current` per iteration; the listener
+      // routes events into whichever turn is active.
+      const turnContextRef: TurnContextRef = { current: null };
+      const unlisten: UnlistenFn = await listen<AssistantChunkPayload>(
+        ASSISTANT_CHUNK_EVENT,
+        (event) => {
+          const ctx = turnContextRef.current;
+          if (ctx == null) return;
+          const payload = event.payload;
+          if (payload.turnId !== ctx.turnId) return;
+          ctx.handle(payload);
+        },
+      );
+
       try {
         await runAgentLoop({
           promptId,
@@ -128,6 +159,7 @@ export function useAssistant(opts: UseAssistantOptions): UseAssistantApi {
           tools,
           dispatchTool,
           maxIterations,
+          turnContextRef,
           getConversation: () =>
             conversationFor(storeRef.current(), promptId).map(toWireMessage),
           appendMessage: (m) => appendMessage(promptId, m),
@@ -140,6 +172,8 @@ export function useAssistant(opts: UseAssistantOptions): UseAssistantApi {
           message: err instanceof Error ? err.message : String(err),
           turnId: null,
         });
+      } finally {
+        unlisten();
       }
     },
     [
@@ -165,6 +199,7 @@ interface RunArgs {
   tools: ToolDefinition[];
   dispatchTool: ToolDispatcher;
   maxIterations: number;
+  turnContextRef: TurnContextRef;
   getConversation: () => AssistantMessage[];
   appendMessage: (m: UiMessage) => void;
   updateMessage: (mid: string, patch: (m: UiMessage) => UiMessage) => void;
@@ -178,6 +213,7 @@ async function runAgentLoop(args: RunArgs): Promise<void> {
     tools,
     dispatchTool,
     maxIterations,
+    turnContextRef,
     getConversation,
     appendMessage,
     updateMessage,
@@ -209,24 +245,25 @@ async function runAgentLoop(args: RunArgs): Promise<void> {
     let textSoFar = "";
     const pendingTools = new Map<number, PendingToolUse>();
 
-    const unlisten: UnlistenFn = await listen<AssistantChunkPayload>(
-      ASSISTANT_CHUNK_EVENT,
-      (event) => {
-        const p = event.payload;
-        if (p.turnId !== turnId) return;
-        switch (p.type) {
+    // SCA-946 — register this turn's handler with the send-scoped
+    // listener. The listener (in send() above) reads turnContextRef
+    // on each event and dispatches here.
+    turnContextRef.current = {
+      turnId,
+      handle: (payload) => {
+        switch (payload.type) {
           case "content_block_start": {
-            if (p.block.type === "tool_use") {
-              pendingTools.set(p.index, {
-                id: p.block.id,
-                name: p.block.name,
+            if (payload.block.type === "tool_use") {
+              pendingTools.set(payload.index, {
+                id: payload.block.id,
+                name: payload.block.name,
                 inputJson: "",
               });
             }
             break;
           }
           case "text_delta": {
-            textSoFar += p.text;
+            textSoFar += payload.text;
             updateMessage(assistantMessageId, (m) => ({
               ...m,
               content: textSoFar.length
@@ -236,8 +273,8 @@ async function runAgentLoop(args: RunArgs): Promise<void> {
             break;
           }
           case "input_json_delta": {
-            const t = pendingTools.get(p.index);
-            if (t) t.inputJson += p.partial_json;
+            const t = pendingTools.get(payload.index);
+            if (t) t.inputJson += payload.partial_json;
             break;
           }
           default:
@@ -247,7 +284,7 @@ async function runAgentLoop(args: RunArgs): Promise<void> {
             break;
         }
       },
-    );
+    };
 
     let result;
     try {
@@ -261,7 +298,10 @@ async function runAgentLoop(args: RunArgs): Promise<void> {
         temperature: 0.3,
       });
     } finally {
-      unlisten();
+      // SCA-946 — clear the active turn so any late-delivered events
+      // (e.g. a stragger message_stop) for this turnId aren't routed
+      // into the next iteration's accumulators.
+      turnContextRef.current = null;
     }
 
     // Finalize the streamed assistant content: text block (if any) plus
