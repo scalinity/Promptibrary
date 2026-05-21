@@ -1,0 +1,159 @@
+/* SCA-951 — Assistant drawer feature-local CSS.
+   Mirrors the convention from screens/*.html: per-feature CSS module
+   beside the component, scoped via the `.assistant-drawer` prefix.
+   Tokens-only — no hex literals in this file.
+
+   Token map (existing tokens — see src/styles/tokens.css):
+   - --bg-raised        the drawer fill (replaces inline #0f1216 fallback)
+   - --bg-base          composer textarea fill
+   - --bg-sunken        bubble background for user messages
+   - --ink-primary      drawer body text
+   - --ink-secondary    quieter labels
+   - --ink-tertiary     uppercase metadata + § marker
+   - --ink-dim          separators
+   - --accent           the warm amber for tool-use chips
+   - --status-error     error banners + failed tool results
+   - --hairline         standard 1px subtle border. */
+
+.assistant-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 380px;
+  background: var(--bg-raised);
+  border-left: var(--hairline);
+  display: flex;
+  flex-direction: column;
+  z-index: 60;
+}
+.assistant-drawer[data-open="false"] {
+  display: none;
+}
+
+.assistant-drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--sp-4) var(--sp-5);
+  border-bottom: var(--hairline);
+}
+.assistant-drawer-label {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ink-tertiary);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.assistant-drawer-body {
+  flex: 1;
+  overflow: auto;
+  padding: var(--sp-5);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.assistant-empty-hint {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  color: var(--ink-secondary);
+  padding: var(--sp-3);
+}
+.assistant-empty-hint p {
+  margin: 0;
+}
+.assistant-empty-hint .hint-meta {
+  margin-top: 8px;
+  color: var(--ink-tertiary);
+}
+
+.assistant-error-banner {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--status-error);
+  padding: 8px 12px;
+  border: var(--hairline);
+  border-radius: var(--r-sm);
+}
+
+.assistant-drawer-footer {
+  padding: var(--sp-4);
+  border-top: var(--hairline);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.assistant-drawer-footer .assistant-composer {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  resize: none;
+  width: 100%;
+  background: var(--bg-base);
+  color: var(--ink-primary);
+  border: var(--hairline);
+  border-radius: var(--r-sm);
+  padding: 8px 10px;
+}
+.assistant-drawer-footer .assistant-composer-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.assistant-message {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.assistant-message[data-role="user"] {
+  align-items: flex-end;
+}
+.assistant-message[data-role="assistant"] {
+  align-items: flex-start;
+}
+.assistant-message-role {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-tertiary);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.assistant-message-bubble {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-primary);
+  border-radius: var(--r-sm);
+  max-width: 100%;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.assistant-message[data-role="user"] .assistant-message-bubble {
+  background: var(--bg-sunken);
+  border: var(--hairline);
+  padding: 8px 12px;
+}
+.assistant-message[data-role="assistant"] .assistant-message-bubble {
+  background: transparent;
+  border: none;
+  padding: 0;
+}
+
+.assistant-tool-chip {
+  display: inline-flex;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--accent);
+  margin-top: 4px;
+}
+
+.assistant-tool-result {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-secondary);
+}
+.assistant-tool-result[data-error="true"] {
+  color: var(--status-error);
+}

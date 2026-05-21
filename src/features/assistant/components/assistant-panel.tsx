@@ -6,8 +6,9 @@
 //
 // The agent loop lives in `useAssistant`; this component is a thin shell
 // that wires user input → `send` and renders the store's message state.
-// Tool dispatch is a stub here (returns null for every tool) and lands
-// for real in SCA-XXX (#10).
+//
+// SCA-951 — styling lives in the feature-local CSS module (./assistant-panel.css)
+// per the tokens-only policy. No hex literals in this file.
 
 import { useMemo } from "react";
 
@@ -28,11 +29,13 @@ import {
 import { usePrompt } from "@/features/prompt/hooks/use-prompt";
 import type { PromptId } from "@/shared/types/ids";
 
+import "@/features/assistant/assistant-panel.css";
+
 interface Props {
   promptId: PromptId;
 }
 
-export function AssistantPanel({ promptId }: Props): React.JSX.Element | null {
+export function AssistantPanel({ promptId }: Props): React.JSX.Element {
   const isOpen = useAssistantStore((s) => s.isOpen);
   const setOpen = useAssistantStore((s) => s.setOpen);
   const draft = useAssistantStore((s) => s.draft);
@@ -46,7 +49,7 @@ export function AssistantPanel({ promptId }: Props): React.JSX.Element | null {
   const settingsModel =
     settings.data?.local.assistantModel ?? "claude-sonnet-4-6";
   const pattern = selectedPattern ?? settingsPattern;
-  const patternDef = Patterns[pattern];
+  const patternDef = Patterns[pattern] ?? Patterns.improve_prompt;
 
   const messages = useAssistantStore((s) => conversationFor(s, promptId));
 
@@ -63,58 +66,30 @@ export function AssistantPanel({ promptId }: Props): React.JSX.Element | null {
     dispatchTool,
   });
 
-  const isStreaming = status.kind === "streaming" || status.kind === "tool_dispatch";
+  const isStreaming =
+    status.kind === "streaming" || status.kind === "tool_dispatch";
 
-  // We render the drawer with a transition; keeping the DOM mounted while
-  // closed (display: none) avoids losing scroll + composer state across
-  // toggles.
-  const drawerStyle = useMemo<React.CSSProperties>(
-    () => ({
-      position: "fixed",
-      top: 0,
-      right: 0,
-      bottom: 0,
-      width: 380,
-      background: "var(--bg-elev-1, #0f1216)",
-      borderLeft: "var(--hairline)",
-      display: isOpen ? "flex" : "none",
-      flexDirection: "column",
-      zIndex: 60,
-      boxShadow: "-1px 0 0 rgba(255,255,255,0.04)",
-    }),
-    [isOpen],
-  );
+  async function onSend(): Promise<void> {
+    const text = draft;
+    setDraft("");
+    await send(text);
+  }
 
-  if (!isOpen) return <div style={drawerStyle} aria-hidden />;
-
+  // SCA-953 — keep the entire DOM tree mounted even when closed so
+  // scroll position and any other internal child state survives a
+  // ⌘I close/reopen cycle. `data-open` drives the display: none rule.
   return (
     <aside
       role="complementary"
       aria-label="Assistant"
+      aria-hidden={!isOpen}
       data-testid="assistant-panel"
-      style={drawerStyle}
+      data-open={isOpen ? "true" : "false"}
+      className="assistant-drawer"
     >
-      <header
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "var(--sp-4) var(--sp-5)",
-          borderBottom: "var(--hairline)",
-        }}
-      >
+      <header className="assistant-drawer-header">
         <div>
-          <div
-            style={{
-              fontFamily: "var(--font-mono)",
-              fontSize: 10.5,
-              color: "var(--ink-tertiary)",
-              letterSpacing: "0.04em",
-              textTransform: "uppercase",
-            }}
-          >
-            § assistant
-          </div>
+          <div className="assistant-drawer-label">§ assistant</div>
           <AssistantPatternSelector />
         </div>
         <button
@@ -128,16 +103,9 @@ export function AssistantPanel({ promptId }: Props): React.JSX.Element | null {
         </button>
       </header>
       <div
+        className="assistant-drawer-body"
         role="log"
         aria-live="polite"
-        style={{
-          flex: 1,
-          overflow: "auto",
-          padding: "var(--sp-5)",
-          display: "flex",
-          flexDirection: "column",
-          gap: 12,
-        }}
       >
         {messages.length === 0 && (
           <EmptyConversationHint patternLabel={patternDef.label} />
@@ -146,30 +114,12 @@ export function AssistantPanel({ promptId }: Props): React.JSX.Element | null {
           <MessageBubble key={m.id} message={m} />
         ))}
         {status.kind === "error" && (
-          <div
-            role="alert"
-            style={{
-              fontFamily: "var(--font-mono)",
-              fontSize: 11,
-              color: "var(--ink-danger, #ef4444)",
-              padding: "8px 12px",
-              border: "var(--hairline)",
-              borderRadius: "var(--r-sm)",
-            }}
-          >
+          <div role="alert" className="assistant-error-banner">
             error · {status.message}
           </div>
         )}
       </div>
-      <footer
-        style={{
-          padding: "var(--sp-4)",
-          borderTop: "var(--hairline)",
-          display: "flex",
-          flexDirection: "column",
-          gap: 8,
-        }}
-      >
+      <footer className="assistant-drawer-footer">
         <textarea
           aria-label="Message to assistant"
           value={draft}
@@ -187,20 +137,9 @@ export function AssistantPanel({ promptId }: Props): React.JSX.Element | null {
           }
           rows={3}
           disabled={isStreaming}
-          className="input"
-          style={{
-            fontFamily: "var(--font-ui)",
-            fontSize: 13,
-            resize: "none",
-            width: "100%",
-            background: "var(--bg-base)",
-            color: "var(--ink)",
-            border: "var(--hairline)",
-            borderRadius: "var(--r-sm)",
-            padding: "8px 10px",
-          }}
+          className="assistant-composer"
         />
-        <div style={{ display: "flex", justifyContent: "flex-end" }}>
+        <div className="assistant-composer-actions">
           <button
             type="button"
             className="btn-launch"
@@ -213,12 +152,6 @@ export function AssistantPanel({ promptId }: Props): React.JSX.Element | null {
       </footer>
     </aside>
   );
-
-  async function onSend(): Promise<void> {
-    const text = draft;
-    setDraft("");
-    await send(text);
-  }
 }
 
 function EmptyConversationHint({
@@ -227,63 +160,24 @@ function EmptyConversationHint({
   patternLabel: string;
 }): React.JSX.Element {
   return (
-    <div
-      style={{
-        fontFamily: "var(--font-ui)",
-        fontSize: 12,
-        color: "var(--ink-secondary, var(--ink-dim))",
-        padding: "var(--sp-3)",
-      }}
-    >
-      <p style={{ margin: 0 }}>
+    <div className="assistant-empty-hint">
+      <p>
         Describe what you want, then send. The assistant uses{" "}
         <strong>{patternLabel}</strong> to shape the prompt.
       </p>
-      <p style={{ margin: "8px 0 0", color: "var(--ink-tertiary)" }}>
-        ⌘I closes the drawer · ⌘↵ sends
-      </p>
+      <p className="hint-meta">⌘I closes the drawer · ⌘↵ sends</p>
     </div>
   );
 }
 
 function MessageBubble({ message }: { message: UiMessage }): React.JSX.Element {
-  const isUser = message.role === "user";
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: 4,
-        alignItems: isUser ? "flex-end" : "flex-start",
-      }}
-    >
-      <div
-        style={{
-          fontFamily: "var(--font-mono)",
-          fontSize: 10,
-          color: "var(--ink-tertiary)",
-          letterSpacing: "0.04em",
-          textTransform: "uppercase",
-        }}
-      >
-        {isUser ? "you" : "assistant"}
+    <div className="assistant-message" data-role={message.role}>
+      <div className="assistant-message-role">
+        {message.role === "user" ? "you" : "assistant"}
         {message.isStreaming ? " · streaming…" : null}
       </div>
-      <div
-        style={{
-          fontFamily: "var(--font-ui)",
-          fontSize: 13,
-          lineHeight: 1.5,
-          color: "var(--ink)",
-          background: isUser ? "var(--bg-elev-2, #161a1f)" : "transparent",
-          border: isUser ? "var(--hairline)" : "none",
-          borderRadius: "var(--r-sm)",
-          padding: isUser ? "8px 12px" : 0,
-          maxWidth: "100%",
-          whiteSpace: "pre-wrap",
-          wordBreak: "break-word",
-        }}
-      >
+      <div className="assistant-message-bubble">
         {message.content.map((block, i) => {
           if (block.type === "text") {
             // Assistant text uses the fade-in stream component; user text
@@ -337,16 +231,7 @@ function ToolCallChip({
     return keys.join(", ");
   }, [input]);
   return (
-    <div
-      style={{
-        display: "inline-flex",
-        gap: 6,
-        fontFamily: "var(--font-mono)",
-        fontSize: 11,
-        color: "var(--accent-amber, #f59e0b)",
-        marginTop: 4,
-      }}
-    >
+    <div className="assistant-tool-chip">
       <span>⚙</span>
       <span>
         {name}({summary})
@@ -364,13 +249,11 @@ function ToolResultChip({
 }): React.JSX.Element {
   return (
     <div
-      style={{
-        fontFamily: "var(--font-mono)",
-        fontSize: 11,
-        color: isError ? "var(--ink-danger, #ef4444)" : "var(--ink-secondary)",
-      }}
+      className="assistant-tool-result"
+      data-error={isError ? "true" : "false"}
     >
-      {isError ? "✗" : "✓"} {content.length > 80 ? content.slice(0, 80) + "…" : content}
+      {isError ? "✗" : "✓"}{" "}
+      {content.length > 80 ? content.slice(0, 80) + "…" : content}
     </div>
   );
 }
