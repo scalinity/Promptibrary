@@ -63,6 +63,8 @@ export function defaultMessage(kind: import("@/shared/types/ipc").AppErrorKind):
       return "The local index is busy. Retrying may help.";
     case "SqliteCorrupt":
       return "The local index is corrupt and was rebuilt.";
+    case "ForeignKeyViolation":
+      return "Operation rejected — a referenced record is missing.";
     case "GitError":
       return "Git operation failed.";
     case "SettingsInvalid":

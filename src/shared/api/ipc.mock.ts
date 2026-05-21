@@ -8,7 +8,7 @@
 // import the same shapes for assertions.
 
 import type * as Real from "./ipc";
-import { asAbsolutePath, asPromptId } from "@/shared/types/ids";
+import { asAbsolutePath, asIsoDateTime, asPromptId } from "@/shared/types/ids";
 import type {
   AppSettings,
   SecretStatusMap,
@@ -105,7 +105,17 @@ export const updatePrompt: typeof Real.updatePrompt = (args) => {
   });
 };
 
-export const archivePrompt: typeof Real.archivePrompt = () => ok(undefined);
+export const archivePrompt: typeof Real.archivePrompt = (id) => {
+  const existing = PROMPT_FIXTURES.find((p) => p.id === id);
+  if (existing == null) {
+    return Promise.reject({
+      kind: "PromptNotFound",
+      message: `Prompt ${id} not found in mock fixtures`,
+      details: { id: String(id) },
+    });
+  }
+  return ok({ ...existing, archivedAt: asIsoDateTime(new Date().toISOString()) });
+};
 export const deletePrompt: typeof Real.deletePrompt = () => ok(undefined);
 
 export const exportPrompt: typeof Real.exportPrompt = ({ destination }) =>

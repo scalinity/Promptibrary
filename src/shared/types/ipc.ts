@@ -29,6 +29,7 @@ export type AppErrorKind =
   | "MalformedModelOutput"
   | "SqliteLocked"
   | "SqliteCorrupt"
+  | "ForeignKeyViolation"
   | "GitError"
   | "SettingsInvalid"
   | "KeychainError"

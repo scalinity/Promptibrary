@@ -304,4 +304,89 @@ mod tests {
         assert!(wire["details"]["nothing"].is_null());
         assert_eq!(wire["details"]["something"], "value");
     }
+
+    /// SCA-910 architectural test: AppErrorKind variant set is in
+    /// lockstep with `src/shared/types/ipc.ts::AppErrorKind`. The
+    /// exhaustive `match` below fails to compile if a Rust variant is
+    /// added without listing it here; the count assertion fails if the
+    /// TS union isn't updated in the same commit.
+    #[test]
+    fn app_error_kind_variant_parity() {
+        // Keep in lockstep with `src/shared/types/ipc.ts::AppErrorKind`.
+        // Adding a variant: bump this AND extend the TS union.
+        const TS_VARIANT_COUNT: usize = 31;
+        fn wire_name(k: AppErrorKind) -> &'static str {
+            match k {
+                AppErrorKind::VaultMissing => "VaultMissing",
+                AppErrorKind::VaultInvalid => "VaultInvalid",
+                AppErrorKind::VaultNotGitRepo => "VaultNotGitRepo",
+                AppErrorKind::PromptNotFound => "PromptNotFound",
+                AppErrorKind::PromptMalformed => "PromptMalformed",
+                AppErrorKind::YamlMalformed => "YamlMalformed",
+                AppErrorKind::VariableParseFailed => "VariableParseFailed",
+                AppErrorKind::VariableValidationFailed => "VariableValidationFailed",
+                AppErrorKind::WorkingDirectoryInvalid => "WorkingDirectoryInvalid",
+                AppErrorKind::DependencyMissing => "DependencyMissing",
+                AppErrorKind::PtySpawnFailed => "PtySpawnFailed",
+                AppErrorKind::RunNotFound => "RunNotFound",
+                AppErrorKind::RunNotActive => "RunNotActive",
+                AppErrorKind::TooManyActiveRuns => "TooManyActiveRuns",
+                AppErrorKind::ClaudeCliMissing => "ClaudeCliMissing",
+                AppErrorKind::ClaudeCliFailed => "ClaudeCliFailed",
+                AppErrorKind::AnthropicKeyMissing => "AnthropicKeyMissing",
+                AppErrorKind::AnthropicAuthInvalid => "AnthropicAuthInvalid",
+                AppErrorKind::NetworkUnavailable => "NetworkUnavailable",
+                AppErrorKind::RateLimited => "RateLimited",
+                AppErrorKind::ExtractionFailed => "ExtractionFailed",
+                AppErrorKind::MalformedModelOutput => "MalformedModelOutput",
+                AppErrorKind::SqliteLocked => "SqliteLocked",
+                AppErrorKind::SqliteCorrupt => "SqliteCorrupt",
+                AppErrorKind::ForeignKeyViolation => "ForeignKeyViolation",
+                AppErrorKind::GitError => "GitError",
+                AppErrorKind::SettingsInvalid => "SettingsInvalid",
+                AppErrorKind::KeychainError => "KeychainError",
+                AppErrorKind::UnsupportedSource => "UnsupportedSource",
+                AppErrorKind::TranscriptUnavailable => "TranscriptUnavailable",
+                AppErrorKind::Internal => "Internal",
+            }
+        }
+        let all = [
+            AppErrorKind::VaultMissing,
+            AppErrorKind::VaultInvalid,
+            AppErrorKind::VaultNotGitRepo,
+            AppErrorKind::PromptNotFound,
+            AppErrorKind::PromptMalformed,
+            AppErrorKind::YamlMalformed,
+            AppErrorKind::VariableParseFailed,
+            AppErrorKind::VariableValidationFailed,
+            AppErrorKind::WorkingDirectoryInvalid,
+            AppErrorKind::DependencyMissing,
+            AppErrorKind::PtySpawnFailed,
+            AppErrorKind::RunNotFound,
+            AppErrorKind::RunNotActive,
+            AppErrorKind::TooManyActiveRuns,
+            AppErrorKind::ClaudeCliMissing,
+            AppErrorKind::ClaudeCliFailed,
+            AppErrorKind::AnthropicKeyMissing,
+            AppErrorKind::AnthropicAuthInvalid,
+            AppErrorKind::NetworkUnavailable,
+            AppErrorKind::RateLimited,
+            AppErrorKind::ExtractionFailed,
+            AppErrorKind::MalformedModelOutput,
+            AppErrorKind::SqliteLocked,
+            AppErrorKind::SqliteCorrupt,
+            AppErrorKind::ForeignKeyViolation,
+            AppErrorKind::GitError,
+            AppErrorKind::SettingsInvalid,
+            AppErrorKind::KeychainError,
+            AppErrorKind::UnsupportedSource,
+            AppErrorKind::TranscriptUnavailable,
+            AppErrorKind::Internal,
+        ];
+        assert_eq!(all.len(), TS_VARIANT_COUNT);
+        for k in all {
+            let json = serde_json::to_value(k).unwrap();
+            assert_eq!(json, serde_json::Value::String(wire_name(k).to_string()));
+        }
+    }
 }

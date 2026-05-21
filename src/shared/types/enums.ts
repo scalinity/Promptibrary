@@ -32,16 +32,15 @@ export type TagColorSlug =
   | "purple"
   | "pink";
 
+// SCA-910: canonical RunStatus. Lockstep with
+// `src-tauri/src/domain/run.rs::RunStatus`.
+// State machine: started → first_output → {stopping → finished,
+// finished, errored}.
 export type RunStatus =
-  | "created"
-  | "validating"
-  | "spawning"
-  | "running"
+  | "started"
+  | "first_output"
   | "stopping"
-  | "succeeded"
-  | "failed"
-  | "canceled"
-  | "vault_unavailable"
-  | "transcript_spooled";
+  | "finished"
+  | "errored";
 
 export type SourceKind = "manual" | "youtube" | "x_twitter" | "article";

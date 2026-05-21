@@ -24,39 +24,15 @@
 //! launch_count: 3") still depends on the L3 launch pipeline landing.
 
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 
 use crate::error::{AppError, Result};
 
-/// Lifecycle states a run row transitions through. Stored as a
-/// lowercase string in `runs.status` for cheap `WHERE status = ?`
-/// filtering and matches the values referenced by
-/// `commands/search::recent_prompts` and
-/// `index::telemetry_repo::prompt_aggregates`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum RunStatus {
-    Started,
-    FirstOutput,
-    Running,
-    Stopping,
-    Finished,
-    Errored,
-}
-
-impl RunStatus {
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::Started => "started",
-            Self::FirstOutput => "first_output",
-            Self::Running => "running",
-            Self::Stopping => "stopping",
-            Self::Finished => "finished",
-            Self::Errored => "errored",
-        }
-    }
-}
+// SCA-910: canonical RunStatus lives in `domain::run`. We re-export it
+// here so the storage-layer callsites (insert_run, update_run_status,
+// complete_run, plus tests) keep their existing `runs_repo::RunStatus`
+// imports while the type is unified across the wire.
+pub use crate::domain::run::RunStatus;
 
 /// Input bundle for `insert_run`. Mirrors the §10 *Run record fields*
 /// schema for the values known at PTY-spawn time.
@@ -285,7 +261,7 @@ mod tests {
         .await
         .unwrap();
 
-        for s in [RunStatus::FirstOutput, RunStatus::Running, RunStatus::Stopping] {
+        for s in [RunStatus::FirstOutput, RunStatus::Stopping] {
             update_run_status(&db, "r1", s).await.unwrap();
             let (got,): (String,) = sqlx::query_as("SELECT status FROM runs WHERE id = 'r1'")
                 .fetch_one(&db)
@@ -298,7 +274,7 @@ mod tests {
     #[tokio::test]
     async fn update_run_status_unknown_run_errors() {
         let db = temp_pool().await;
-        let err = update_run_status(&db, "nope", RunStatus::Running)
+        let err = update_run_status(&db, "nope", RunStatus::FirstOutput)
             .await
             .unwrap_err();
         assert_eq!(err.kind, crate::error::AppErrorKind::RunNotFound);

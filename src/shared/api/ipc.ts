@@ -151,8 +151,10 @@ export interface UpdatePromptArgs {
 export const updatePrompt = (args: UpdatePromptArgs) =>
   invoke<Prompt>("update_prompt", { input: args });
 
+// SCA-910 (W16): Rust returns the updated Prompt snapshot; surfacing
+// it lets the caller update its query cache in the same round-trip.
 export const archivePrompt = (id: PromptId) =>
-  invoke<void>("archive_prompt_cmd", { input: { id } });
+  invoke<Prompt>("archive_prompt_cmd", { input: { id } });
 
 export const deletePrompt = (id: PromptId) =>
   invoke<void>("delete_prompt", { input: { id } });
