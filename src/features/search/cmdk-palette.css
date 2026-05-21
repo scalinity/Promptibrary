@@ -90,6 +90,20 @@
   text-align: center;
 }
 
+/* SCA-902 — cmdk Command.Group renders its heading inside an element
+   with the [cmdk-group-heading] attribute. Style it as a small label
+   that aligns with the item titles below (same horizontal padding as
+   .cmdk-item) and reads as a heading, not an item. */
+[cmdk-group-heading] {
+  padding: 10px var(--sp-4) 4px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
+  color: var(--ink-dim);
+}
+
 .cmdk-item {
   display: flex;
   align-items: center;
