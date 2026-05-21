@@ -23,6 +23,59 @@ use crate::vault::writer::{archive_prompt, render_prompt_markdown, write_prompt}
 use crate::util::atomic_write::atomic_write_bytes;
 use std::path::PathBuf;
 
+// SCA-966 — defense-in-depth length caps applied at the IPC boundary.
+// body matches the assistant tool registry's 200KB cap (SCA-944); title
+// and summary track the spec §6 candidate-schema upper bounds. Any
+// caller — assistant tool, extraction's save path, manual frontend
+// forms, or a future IPC — that goes through create_prompt or
+// update_prompt is bounded here so the vault file never holds a body
+// that wouldn't fit in memory comfortably.
+const MAX_PROMPT_BODY_CHARS: usize = 200_000;
+const MAX_PROMPT_TITLE_CHARS: usize = 200;
+const MAX_PROMPT_SUMMARY_CHARS: usize = 280;
+
+fn validate_body(body: &str) -> Result<()> {
+    if body.len() > MAX_PROMPT_BODY_CHARS {
+        return Err(AppError::new(
+            AppErrorKind::Internal,
+            format!(
+                "prompt body too large ({} > {} chars)",
+                body.len(),
+                MAX_PROMPT_BODY_CHARS
+            ),
+        ));
+    }
+    Ok(())
+}
+
+fn validate_title(title: &str) -> Result<()> {
+    if title.chars().count() > MAX_PROMPT_TITLE_CHARS {
+        return Err(AppError::new(
+            AppErrorKind::Internal,
+            format!(
+                "prompt title too long ({} > {} chars)",
+                title.chars().count(),
+                MAX_PROMPT_TITLE_CHARS
+            ),
+        ));
+    }
+    Ok(())
+}
+
+fn validate_summary(summary: &str) -> Result<()> {
+    if summary.chars().count() > MAX_PROMPT_SUMMARY_CHARS {
+        return Err(AppError::new(
+            AppErrorKind::Internal,
+            format!(
+                "prompt summary too long ({} > {} chars)",
+                summary.chars().count(),
+                MAX_PROMPT_SUMMARY_CHARS
+            ),
+        ));
+    }
+    Ok(())
+}
+
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ListPromptsInput {
@@ -166,6 +219,12 @@ pub async fn create_prompt(
     input: CreatePromptInput,
     services: State<'_, ManagedState>,
 ) -> Result<Prompt> {
+    // SCA-966 — defense-in-depth length caps. Catches multi-MB writes
+    // from any frontend or future IPC caller before they reach the
+    // atomic-write path.
+    validate_title(&input.title)?;
+    validate_summary(&input.summary)?;
+    validate_body(&input.body)?;
     // Serialize create_prompt globally to close SCA-589: without this,
     // two concurrent IPC calls observe the same slug as free, race the
     // atomic_write rename, and produce duplicate vault_path rows.
@@ -215,6 +274,17 @@ pub async fn update_prompt(
     input: UpdatePromptInput,
     services: State<'_, ManagedState>,
 ) -> Result<Prompt> {
+    // SCA-966 — same caps as create_prompt; applied to whichever
+    // partial fields the caller supplied.
+    if let Some(ref t) = input.title {
+        validate_title(t)?;
+    }
+    if let Some(ref s) = input.summary {
+        validate_summary(s)?;
+    }
+    if let Some(ref b) = input.body {
+        validate_body(b)?;
+    }
     let (vault, db) = current_vault_db(&services).await?;
     let row = get_prompt_index(&db, &input.id)
         .await?
@@ -387,3 +457,48 @@ pub(crate) fn prompt_from_file(vault_path: &str, content: &str) -> Result<Prompt
     })
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn validate_body_accepts_empty_and_normal_lengths() {
+        validate_body("").unwrap();
+        validate_body("a normal-length prompt").unwrap();
+        // Exactly at the cap is OK.
+        validate_body(&"x".repeat(MAX_PROMPT_BODY_CHARS)).unwrap();
+    }
+
+    #[test]
+    fn validate_body_rejects_oversized() {
+        let too_big = "x".repeat(MAX_PROMPT_BODY_CHARS + 1);
+        let err = validate_body(&too_big).unwrap_err();
+        assert_eq!(err.kind, AppErrorKind::Internal);
+        assert!(err.message.contains("body too large"));
+    }
+
+    #[test]
+    fn validate_title_accepts_normal_and_caps() {
+        validate_title("").unwrap();
+        validate_title("My prompt").unwrap();
+        validate_title(&"a".repeat(MAX_PROMPT_TITLE_CHARS)).unwrap();
+    }
+
+    #[test]
+    fn validate_title_rejects_oversized() {
+        let too_long = "a".repeat(MAX_PROMPT_TITLE_CHARS + 1);
+        let err = validate_title(&too_long).unwrap_err();
+        assert_eq!(err.kind, AppErrorKind::Internal);
+        assert!(err.message.contains("title too long"));
+    }
+
+    #[test]
+    fn validate_summary_uses_grapheme_count_not_byte_count() {
+        // Each em-dash is 3 bytes but 1 char. Ensure the cap is by
+        // chars (so multibyte content isn't unfairly truncated).
+        let s = "—".repeat(MAX_PROMPT_SUMMARY_CHARS);
+        validate_summary(&s).unwrap();
+        let s2 = "—".repeat(MAX_PROMPT_SUMMARY_CHARS + 1);
+        assert!(validate_summary(&s2).is_err());
+    }
+}
