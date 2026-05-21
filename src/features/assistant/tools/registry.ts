@@ -88,10 +88,32 @@ export function buildToolDispatcher(prompt: Prompt | null): ToolDispatcher {
         if (body == null) {
           return { content: "Missing required string field: body", isError: true };
         }
-        usePromptEditorStore.getState().setBody(prompt.id, body);
-        return {
-          content: `Body updated (${body.length} chars). The change is visible in the editor and will save shortly.`,
-        };
+        // SCA-944 — cap the body so a misbehaving model (or one coerced
+        // by injection-laced content per SCA-945) can't dump multi-MB
+        // payloads into the vault. 200KB is well above any human-written
+        // prompt and well below Anthropic's per-request body cap.
+        const MAX_BODY = 200_000;
+        if (body.length > MAX_BODY) {
+          return {
+            content: `body too large (${body.length} > ${MAX_BODY} chars)`,
+            isError: true,
+          };
+        }
+        try {
+          // SCA-944 — go through the canonical updatePrompt IPC so the
+          // change rides the atomic vault write, frontmatter checks, and
+          // future variable-parser invariants. Then mirror into the
+          // editor draft so the open CodeMirror view reflects the change
+          // without waiting for a refetch.
+          await updatePrompt({ id: prompt.id, body });
+          usePromptEditorStore.getState().setBody(prompt.id, body);
+          return { content: `Body updated (${body.length} chars).` };
+        } catch (err) {
+          return {
+            content: err instanceof Error ? err.message : String(err),
+            isError: true,
+          };
+        }
       }
       case "update_prompt_title": {
         const title = readString(input, "title");
