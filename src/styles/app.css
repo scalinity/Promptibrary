@@ -972,3 +972,16 @@
   gap: 22px;
 }
 .detail-scroll > .detail-header { margin: 0 -28px; padding-left: 28px; padding-right: 28px; }
+
+/* === Additions beyond canonical design system === */
+
+/* SCA-893 — macOS title-bar overlay shim.
+   tauri.conf.json sets `titleBarStyle: "Overlay"` + `hiddenTitle: true`, which
+   hides the native title bar text but keeps the traffic-light buttons floating
+   in the top-left of the window. The traffic-light cluster spans roughly the
+   first ~78px of the window's content area, which would otherwise overlap the
+   brand mark in `.topbar > .brand`. Push the brand right so the cluster has a
+   clear runway. The static mockups in `Promptibrary Design System/screens/`
+   render in a browser with no native title bar, so this override lives in the
+   runtime bundle only — keep `Promptibrary Design System/app.css` clean. */
+.topbar .brand { padding-left: 64px; }

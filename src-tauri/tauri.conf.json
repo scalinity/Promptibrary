@@ -22,7 +22,9 @@
         "fullscreen": false,
         "decorations": true,
         "transparent": false,
-        "theme": "Dark"
+        "theme": "Dark",
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true
       }
     ],
     "security": {
