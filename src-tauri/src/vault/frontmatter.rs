@@ -55,7 +55,25 @@ pub struct RunFrontmatter {
     pub exit_code: Option<i32>,
 }
 
+// SCA-915 (W19, CWE-400 / CWE-1284): cap frontmatter at 64 KiB before
+// parse. serde_yaml 0.9 is archived upstream and has no anchor-bomb
+// guard — a malicious vault YAML (e.g. emitted by the LLM through the
+// import flow into a candidate stub) could otherwise exponentially
+// expand via aliases. 64 KiB is generous for legitimate frontmatter
+// (typical: < 4 KiB).
+const FRONTMATTER_MAX_BYTES: usize = 64 * 1024;
+
 pub fn parse_prompt_frontmatter(yaml: &str) -> Result<PromptFrontmatter> {
+    if yaml.len() > FRONTMATTER_MAX_BYTES {
+        return Err(AppError::new(
+            AppErrorKind::YamlMalformed,
+            format!(
+                "frontmatter exceeds {} bytes ({}); refusing to parse",
+                FRONTMATTER_MAX_BYTES,
+                yaml.len()
+            ),
+        ));
+    }
     let fm: PromptFrontmatter = serde_yaml::from_str(yaml).map_err(|e| {
         AppError::new(
             AppErrorKind::YamlMalformed,
@@ -81,6 +99,16 @@ pub fn parse_prompt_frontmatter(yaml: &str) -> Result<PromptFrontmatter> {
 }
 
 pub fn parse_run_frontmatter(yaml: &str) -> Result<RunFrontmatter> {
+    if yaml.len() > FRONTMATTER_MAX_BYTES {
+        return Err(AppError::new(
+            AppErrorKind::YamlMalformed,
+            format!(
+                "run frontmatter exceeds {} bytes ({}); refusing to parse",
+                FRONTMATTER_MAX_BYTES,
+                yaml.len()
+            ),
+        ));
+    }
     let fm: RunFrontmatter = serde_yaml::from_str(yaml).map_err(|e| {
         AppError::new(
             AppErrorKind::YamlMalformed,

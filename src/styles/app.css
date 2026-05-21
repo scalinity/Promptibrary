@@ -1056,3 +1056,38 @@
   cursor: wait;
   color: var(--ink-dim);
 }
+
+/* SCA-937 — assistant streaming token fade-in.
+   Each delta from the streaming agent loop is wrapped in a span.pb-as-tok
+   that runs the fade-in animation once. The animation triggers on first
+   paint of a new span (the React component appends new spans rather than
+   replacing existing text), so we never re-animate already-rendered text.
+
+   Spans are inline so they don't break flow or word wrapping. Once the
+   stream completes, the parent component collapses the chunked spans
+   back into a single text node and these styles no longer apply.
+
+   prefers-reduced-motion zeroes the animation duration — the text still
+   appears, just without the soft fade. */
+.pb-as-tok {
+  display: inline;
+  animation: pb-as-tok-fade-in 180ms ease-out 1;
+  /* Keep blurred state painted until the animation runs to avoid a
+     one-frame "sharp then animate" flash on slower devices. */
+  will-change: filter, opacity;
+}
+@keyframes pb-as-tok-fade-in {
+  from {
+    opacity: 0;
+    filter: blur(2px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pb-as-tok {
+    animation-duration: 0ms;
+  }
+}

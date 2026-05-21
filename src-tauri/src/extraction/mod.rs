@@ -13,3 +13,4 @@ pub mod prompts;
 pub mod response;
 pub mod cache;
 pub mod rate_limit;
+pub mod ssrf;

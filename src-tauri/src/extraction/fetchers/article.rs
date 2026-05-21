@@ -27,9 +27,11 @@ static SEL_JSONLD: Lazy<Selector> = Lazy::new(|| {
 
 use crate::domain::source::{ArticleSource, Source};
 use crate::error::{AppError, AppErrorKind, Result};
+use crate::extraction::ssrf::validate_url_for_outbound_fetch;
 use crate::extraction::types::{
     ExtractionFailure, FetchedSourceContent, SourceChunk, SourceChunkKind,
 };
+use futures::StreamExt;
 
 const NOISE_TAGS: &[&str] = &[
     "script", "style", "noscript", "svg", "iframe", "nav", "footer", "aside", "header",
@@ -73,8 +75,25 @@ pub async fn fetch_article(
     canonical_url: &str,
     http: &reqwest::Client,
 ) -> Result<std::result::Result<FetchedSourceContent, ExtractionFailure>> {
+    // SCA-915 (C8, CWE-918): SSRF guard. Resolve + validate before we
+    // open a socket so localhost / RFC1918 / cloud-metadata addresses
+    // are refused pre-fetch instead of letting the HTTP client wander
+    // into them. The URL was already classified by `detect_source`
+    // (http/https only) but redirects + DNS rebinding can still drift,
+    // so we re-validate here.
+    let parsed_url = match url::Url::parse(url) {
+        Ok(u) => u,
+        Err(e) => {
+            return Err(AppError::new(
+                AppErrorKind::UnsupportedSource,
+                format!("invalid url: {e}"),
+            ))
+        }
+    };
+    validate_url_for_outbound_fetch(&parsed_url).await?;
+
     let resp = match http
-        .get(url)
+        .get(parsed_url)
         .header(reqwest::header::USER_AGENT, USER_AGENT)
         .send()
         .await
@@ -99,15 +118,48 @@ pub async fn fetch_article(
         }));
     }
 
-    let body = resp.bytes().await?;
-    if body.len() > MAX_BODY_BYTES {
-        return Ok(Err(ExtractionFailure::ExtractionFailed {
-            reason: format!("body too large: {} bytes (max {})", body.len(), MAX_BODY_BYTES),
-        }));
+    // SCA-915 (C8, CWE-400): stream the body with a running counter so
+    // a hostile server returning a 100 GB response can't OOM us before
+    // the cap check. Was `resp.bytes().await?` which buffered the full
+    // payload before any check.
+    let mut stream = resp.bytes_stream();
+    let mut buf: Vec<u8> = Vec::with_capacity(64 * 1024);
+    while let Some(chunk) = stream.next().await {
+        let chunk = match chunk {
+            Ok(c) => c,
+            Err(e) => {
+                return Err(AppError::new(
+                    AppErrorKind::ExtractionFailed,
+                    format!("article stream error: {e}"),
+                ))
+            }
+        };
+        if buf.len().saturating_add(chunk.len()) > MAX_BODY_BYTES {
+            return Ok(Err(ExtractionFailure::ExtractionFailed {
+                reason: format!("body exceeds {} bytes — refused mid-stream", MAX_BODY_BYTES),
+            }));
+        }
+        buf.extend_from_slice(&chunk);
     }
-    let html_text = String::from_utf8_lossy(&body).into_owned();
+    let html_text = String::from_utf8_lossy(&buf).into_owned();
 
-    let parsed = parse_html_article(&html_text);
+    // SCA-915 (W20, CWE-405): parse the DOM off the async runtime —
+    // a hostile 10MB document with deep nesting can stall the executor
+    // otherwise. spawn_blocking returns the owned ParsedArticle.
+    let parsed = match tokio::task::spawn_blocking({
+        let html_text = html_text.clone();
+        move || parse_html_article(&html_text)
+    })
+    .await
+    {
+        Ok(p) => p,
+        Err(e) => {
+            return Err(AppError::new(
+                AppErrorKind::ExtractionFailed,
+                format!("article parse panicked: {e}"),
+            ))
+        }
+    };
 
     if parsed.text.chars().count() < PAYWALL_TEXT_THRESHOLD && looks_paywalled(&html_text) {
         return Ok(Err(ExtractionFailure::PaywallLikely {
