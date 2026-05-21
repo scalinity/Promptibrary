@@ -50,6 +50,9 @@
   background: transparent;
   border: none;
   outline: none;
+  /* SCA-901 — inner padding so the cursor / placeholder doesn't kiss
+     the input's focus outline. */
+  padding: 4px 8px;
   font-family: var(--font-mono);
   font-size: 13px;
   color: var(--ink-primary);

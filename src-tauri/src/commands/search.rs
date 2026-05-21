@@ -46,7 +46,7 @@ use tauri::State;
 
 use crate::app_state::ManagedState;
 use crate::commands::vault::current_vault_db;
-use crate::error::{AppError, Result};
+use crate::error::{AppError, AppErrorKind, Result};
 use crate::index::embeddings::{self, EmbeddingService};
 use crate::index::fts::search_fts;
 use crate::index::sql_util::escape_like;
@@ -752,8 +752,20 @@ pub async fn cmdk_search(
     input: CmdkSearchInput,
     services: State<'_, ManagedState>,
 ) -> Result<Vec<CmdkResult>> {
-    let (_vault, db) = current_vault_db(&services).await?;
-    cmdk_search_inner(&db, &input).await
+    // SCA-901 — static actions/routes don't need the DB. If no vault is
+    // attached, return just those so the user can still navigate via
+    // ⌘K instead of seeing an empty "nothing matches" pane.
+    match current_vault_db(&services).await {
+        Ok((_vault, db)) => cmdk_search_inner(&db, &input).await,
+        Err(e) if e.kind == AppErrorKind::VaultMissing => {
+            let bounded = bound_query(&input.query);
+            let q = bounded.trim();
+            let mut out = cmdk_actions(q);
+            out.extend(cmdk_routes(q));
+            Ok(out)
+        }
+        Err(e) => Err(e),
+    }
 }
 
 async fn cmdk_search_inner(
