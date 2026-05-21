@@ -116,10 +116,16 @@ pub enum SseParseError {
 /// frames are skipped and counted; the parser only surfaces an error
 /// when `consecutive_bad_frames` exceeds `BAD_FRAME_THRESHOLD`. A good
 /// frame zeroes the consecutive counter.
+///
+/// SCA-954 — `buffer` holds raw bytes. A chunk that splits a multi-byte
+/// UTF-8 codepoint (em-dash, emoji, non-Latin scripts) no longer errors;
+/// decode happens at frame boundaries (`\n\n` / `\r\n\r\n`), which are
+/// ASCII and therefore always sit on a codepoint edge.
 #[derive(Default)]
 pub struct SseParser {
-    /// Accumulated bytes for the partial trailing frame.
-    buffer: String,
+    /// Raw bytes for the partial trailing frame. Decoded lazily at the
+    /// next frame boundary.
+    buffer: Vec<u8>,
     /// Bad frames seen in a row. Reset on every good frame. The parser
     /// aborts when this exceeds [`BAD_FRAME_THRESHOLD`].
     consecutive_bad_frames: u32,
@@ -145,33 +151,47 @@ impl SseParser {
     }
 
     pub fn feed(&mut self, chunk: &[u8]) -> Result<Vec<AssistantStreamEvent>, SseParseError> {
-        let text = std::str::from_utf8(chunk).map_err(|_| SseParseError::InvalidUtf8)?;
-        self.buffer.push_str(text);
+        // SCA-954 — extend the byte buffer; do NOT attempt UTF-8 decode
+        // on the chunk itself, because reqwest's chunks can split a
+        // multi-byte codepoint.
+        self.buffer.extend_from_slice(chunk);
 
         let mut events = Vec::new();
         loop {
-            let split = find_frame_boundary(&self.buffer);
-            let Some((boundary, sep_len)) = split else { break };
-            let frame = self.buffer[..boundary].to_string();
-            self.buffer.drain(..boundary + sep_len);
-            match parse_frame(&frame) {
-                Ok(Some(ev)) => {
-                    self.consecutive_bad_frames = 0;
-                    events.push(ev);
-                }
-                Ok(None) => {
-                    // Empty / pure-comment frame — neutral.
-                }
-                Err(SseParseError::InvalidJson { .. }) => {
-                    // SCA-948 — non-fatal; count + skip. Surface only
-                    // when the run of bad frames crosses the threshold.
+            let Some((boundary, sep_len)) = find_frame_boundary_bytes(&self.buffer) else {
+                break;
+            };
+            // Copy the frame bytes out and drop them from the buffer.
+            let frame_bytes: Vec<u8> = self.buffer.drain(..boundary + sep_len).collect();
+            let frame_slice = &frame_bytes[..boundary];
+            let frame = match std::str::from_utf8(frame_slice) {
+                Ok(s) => s,
+                Err(_) => {
+                    // A complete frame whose bytes are not valid UTF-8 is
+                    // a real wire-format break (not the chunk-boundary
+                    // problem this parser is designed for). Treat as a
+                    // bad frame per the SCA-948 tolerance policy.
                     self.bad_frames_total = self.bad_frames_total.saturating_add(1);
                     self.consecutive_bad_frames =
                         self.consecutive_bad_frames.saturating_add(1);
                     if self.consecutive_bad_frames > BAD_FRAME_THRESHOLD {
-                        // Re-parse the offending frame to attach its
-                        // context to the propagated error.
-                        if let Err(e) = parse_frame(&frame) {
+                        return Err(SseParseError::InvalidUtf8);
+                    }
+                    continue;
+                }
+            };
+            match parse_frame(frame) {
+                Ok(Some(ev)) => {
+                    self.consecutive_bad_frames = 0;
+                    events.push(ev);
+                }
+                Ok(None) => {}
+                Err(SseParseError::InvalidJson { .. }) => {
+                    self.bad_frames_total = self.bad_frames_total.saturating_add(1);
+                    self.consecutive_bad_frames =
+                        self.consecutive_bad_frames.saturating_add(1);
+                    if self.consecutive_bad_frames > BAD_FRAME_THRESHOLD {
+                        if let Err(e) = parse_frame(frame) {
                             return Err(e);
                         }
                     }
@@ -189,7 +209,14 @@ impl SseParser {
     pub fn finish(&mut self) -> Result<Vec<AssistantStreamEvent>, SseParseError> {
         let mut events = Vec::new();
         let trailing = std::mem::take(&mut self.buffer);
-        let trimmed = trailing.trim_matches(|c| c == '\r' || c == '\n');
+        if trailing.is_empty() {
+            return Ok(events);
+        }
+        let trailing_str = match std::str::from_utf8(&trailing) {
+            Ok(s) => s,
+            Err(_) => return Err(SseParseError::InvalidUtf8),
+        };
+        let trimmed = trailing_str.trim_matches(|c| c == '\r' || c == '\n');
         if !trimmed.is_empty() {
             match parse_frame(trimmed) {
                 Ok(Some(ev)) => {
@@ -198,7 +225,6 @@ impl SseParser {
                 }
                 Ok(None) => {}
                 Err(SseParseError::InvalidJson { .. }) => {
-                    // SCA-948 — same tolerance policy at finish().
                     self.bad_frames_total = self.bad_frames_total.saturating_add(1);
                     self.consecutive_bad_frames =
                         self.consecutive_bad_frames.saturating_add(1);
@@ -215,17 +241,25 @@ impl SseParser {
     }
 }
 
-/// Locate the next frame separator (`\n\n` or `\r\n\r\n`) and return
-/// `(position, separator_len)`.
-fn find_frame_boundary(buf: &str) -> Option<(usize, usize)> {
-    let lf2 = buf.find("\n\n").map(|i| (i, 2));
-    let crlf2 = buf.find("\r\n\r\n").map(|i| (i, 4));
+/// Locate the next frame separator (`\n\n` or `\r\n\r\n`) in the byte
+/// buffer and return `(position, separator_len)`. Both separators are
+/// pure ASCII so byte search is equivalent to char search.
+fn find_frame_boundary_bytes(buf: &[u8]) -> Option<(usize, usize)> {
+    let lf2 = position(buf, b"\n\n").map(|i| (i, 2));
+    let crlf2 = position(buf, b"\r\n\r\n").map(|i| (i, 4));
     match (lf2, crlf2) {
         (Some(a), Some(b)) if a.0 <= b.0 => Some(a),
         (Some(a), None) => Some(a),
         (_, Some(b)) => Some(b),
         (None, None) => None,
     }
+}
+
+fn position(hay: &[u8], needle: &[u8]) -> Option<usize> {
+    if needle.is_empty() || needle.len() > hay.len() {
+        return None;
+    }
+    hay.windows(needle.len()).position(|w| w == needle)
 }
 
 /// Parse one complete SSE frame into an `AssistantStreamEvent`.
@@ -560,6 +594,38 @@ data: {\"type\":\"message_stop\"}
         got.extend(p.feed(b).unwrap());
         assert!(matches!(got[0], AssistantStreamEvent::MessageStart { .. }));
         assert_eq!(got.len(), 7);
+    }
+
+    #[test]
+    fn handles_chunk_split_mid_utf8_codepoint() {
+        // SCA-954 — a chunk that ends in the middle of a multi-byte
+        // codepoint used to fail with InvalidUtf8. The em-dash "—" is
+        // 0xE2 0x80 0x94 — three bytes. We split inside it.
+        let frame =
+            "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"a—b\"}}\n\n";
+        let bytes = frame.as_bytes();
+        // Find the em-dash byte position.
+        let em_dash_start = bytes
+            .windows(3)
+            .position(|w| w == [0xE2, 0x80, 0x94])
+            .expect("em-dash present in fixture");
+        let cut = em_dash_start + 1; // mid-codepoint
+        let (a, b) = bytes.split_at(cut);
+        let mut p = SseParser::new();
+        let first = p.feed(a).unwrap();
+        assert!(
+            first.is_empty(),
+            "frame is incomplete; no events emitted on first chunk",
+        );
+        let second = p.feed(b).unwrap();
+        assert_eq!(second.len(), 1);
+        match &second[0] {
+            AssistantStreamEvent::TextDelta { text, .. } => {
+                assert_eq!(text, "a—b");
+            }
+            other => panic!("expected TextDelta with em-dash payload, got {other:?}"),
+        }
+        assert_eq!(p.bad_frames_total(), 0);
     }
 
     #[test]
