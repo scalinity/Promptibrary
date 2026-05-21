@@ -86,9 +86,21 @@ export const useAssistantStore = create<AssistantState>((set) => ({
     }),
   resetConversation: (promptId) =>
     set((s) => {
-      const next = { ...s.conversationsByPromptId };
-      delete next[promptId];
-      return { conversationsByPromptId: next, draft: "", status: { kind: "idle" } };
+      const nextConvos = { ...s.conversationsByPromptId };
+      delete nextConvos[promptId];
+      // SCA-947 — only clear in-flight status if it belongs to the
+      // prompt being reset. A streaming/tool_dispatch turn on a
+      // different prompt must not be silently flipped to idle by
+      // someone calling resetConversation("other-id").
+      const statusBelongsToReset =
+        (s.status.kind === "streaming" || s.status.kind === "tool_dispatch") &&
+        s.status.promptId === promptId;
+      const nextStatus = statusBelongsToReset ? { kind: "idle" as const } : s.status;
+      return {
+        conversationsByPromptId: nextConvos,
+        draft: "",
+        status: nextStatus,
+      };
     }),
 }));
 

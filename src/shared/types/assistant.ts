@@ -101,8 +101,8 @@ export const ASSISTANT_CHUNK_EVENT = "assistant:chunk";
 /** Status of an in-progress turn. */
 export type AssistantTurnStatus =
   | { kind: "idle" }
-  | { kind: "streaming"; turnId: string; startedAt: number }
-  | { kind: "tool_dispatch"; turnId: string }
+  | { kind: "streaming"; turnId: string; promptId: string; startedAt: number }
+  | { kind: "tool_dispatch"; turnId: string; promptId: string }
   | { kind: "error"; message: string; turnId: string | null };
 
 /** Re-export so downstream code can `import type { AssistantPattern }`

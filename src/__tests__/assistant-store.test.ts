@@ -121,6 +121,49 @@ describe("assistant store — per-prompt conversation keying", () => {
     expect(state.status.kind).toBe("idle");
   });
 
+  it("resetConversation does NOT clobber an in-flight status that belongs to another prompt (SCA-947)", () => {
+    const a = asPromptId("prompt_a");
+    const b = asPromptId("prompt_b");
+    const { appendMessage, resetConversation, setStatus } =
+      useAssistantStore.getState();
+    appendMessage(a, userMessage("m1", "hi a"));
+    appendMessage(b, userMessage("m2", "hi b"));
+    // A turn is mid-stream on prompt b.
+    setStatus({
+      kind: "streaming",
+      turnId: "turn_b",
+      promptId: b,
+      startedAt: Date.now(),
+    });
+    // User clears prompt a's conversation.
+    resetConversation(a);
+    const state = useAssistantStore.getState();
+    expect(conversationFor(state, a)).toEqual([]);
+    // The in-flight status for b is preserved — the streaming turn
+    // is NOT silently flipped to idle.
+    expect(state.status.kind).toBe("streaming");
+    if (state.status.kind === "streaming") {
+      expect(state.status.turnId).toBe("turn_b");
+      expect(state.status.promptId).toBe(b);
+    }
+  });
+
+  it("resetConversation clears in-flight status when it belongs to the reset target (SCA-947)", () => {
+    const a = asPromptId("prompt_a");
+    const { appendMessage, resetConversation, setStatus } =
+      useAssistantStore.getState();
+    appendMessage(a, userMessage("m1", "hi a"));
+    setStatus({
+      kind: "streaming",
+      turnId: "turn_a",
+      promptId: a,
+      startedAt: Date.now(),
+    });
+    resetConversation(a);
+    const state = useAssistantStore.getState();
+    expect(state.status.kind).toBe("idle");
+  });
+
   it("toWireMessage strips ui-only fields and preserves wire content", () => {
     const wire = toWireMessage({
       id: "m1",

@@ -239,7 +239,7 @@ async function runAgentLoop(args: RunArgs): Promise<void> {
       content: [],
       isStreaming: true,
     });
-    setStatus({ kind: "streaming", turnId, startedAt: Date.now() });
+    setStatus({ kind: "streaming", turnId, promptId: args.promptId, startedAt: Date.now() });
 
     // Per-turn accumulators.
     let textSoFar = "";
@@ -342,7 +342,7 @@ async function runAgentLoop(args: RunArgs): Promise<void> {
     }
 
     // Dispatch each tool, accumulate tool_result content blocks.
-    setStatus({ kind: "tool_dispatch", turnId });
+    setStatus({ kind: "tool_dispatch", turnId, promptId: args.promptId });
     const toolResults: MessageContent[] = [];
     for (const t of toolUses) {
       let r: ToolDispatchResult | null;
