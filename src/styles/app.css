@@ -995,6 +995,20 @@
    need this rule (no padding-left shim there), so it stays runtime-only. */
 .topbar .brand-tag { white-space: nowrap; }
 
+/* SCA-929 — Tauri window-drag region. With titleBarStyle "Overlay" +
+   hiddenTitle (SCA-893), the OS has no default title-bar drag handle,
+   so users can't move the window. Mark the topbar background as a
+   drag region; opt every interactive control back out so they still
+   receive clicks. CSS app-region is a no-op in plain browsers, so the
+   canonical mockup bundle doesn't need the same rule. */
+.topbar { -webkit-app-region: drag; }
+.topbar button,
+.topbar input,
+.topbar select,
+.topbar .search,
+.topbar .icon-btn,
+.topbar .kbd { -webkit-app-region: no-drag; }
+
 /* SCA-908 — hover-visible delete glyph on prompt rows. Sits in the
    top-right corner of the .row, dimmed until hover. Click runs the
    same confirm + deletePrompt flow that the swipe-revealed panel uses
