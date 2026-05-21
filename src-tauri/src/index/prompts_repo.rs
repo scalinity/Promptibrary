@@ -244,12 +244,8 @@ pub async fn slug_in_use(db: &SqlitePool, slug: &str) -> Result<bool> {
 }
 
 fn source_kind_for(s: &crate::domain::source::Source) -> String {
-    match s {
-        crate::domain::source::Source::Manual(_) => "manual".into(),
-        crate::domain::source::Source::Youtube(_) => "youtube".into(),
-        crate::domain::source::Source::XTwitter(_) => "x_twitter".into(),
-        crate::domain::source::Source::Article(_) => "article".into(),
-    }
+    // SCA-928 (B16): delegate to the canonical Source::kind_label.
+    s.kind_label().to_string()
 }
 
 #[cfg(test)]

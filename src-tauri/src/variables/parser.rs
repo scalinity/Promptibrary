@@ -479,8 +479,8 @@ fn compute_ref_id(raw: &str, start: usize, end: usize) -> String {
     h.update(start.to_le_bytes());
     h.update(end.to_le_bytes());
     let digest = h.finalize();
-    let hex: String = digest.iter().take(8).map(|b| format!("{:02x}", b)).collect();
-    hex
+    // SCA-928 (B16): single hex-encoding helper in util::hex.
+    crate::util::hex::encode_lower(&digest[..8])
 }
 
 // ---------- Default-variable construction -----------------------------------

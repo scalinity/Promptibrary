@@ -17,12 +17,8 @@ use sha2::{Digest, Sha256};
 pub fn sha256_hex(s: &str) -> String {
     let mut h = Sha256::new();
     h.update(s.as_bytes());
-    let digest = h.finalize();
-    let mut out = String::with_capacity(64);
-    for b in digest {
-        out.push_str(&format!("{:02x}", b));
-    }
-    out
+    // SCA-928 (B16): single hex-encoding implementation in util::hex.
+    crate::util::hex::encode_lower(&h.finalize())
 }
 
 #[cfg(test)]

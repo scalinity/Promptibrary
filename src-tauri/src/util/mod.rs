@@ -6,6 +6,7 @@ pub mod atomic_write;
 pub mod debounce;
 pub mod fs;
 pub mod hash;
+pub mod hex;
 pub mod json;
 pub mod slug;
 pub mod yaml;

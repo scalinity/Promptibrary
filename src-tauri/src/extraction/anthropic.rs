@@ -20,7 +20,7 @@ use super::prompts::{build_user_payload, EXTRACTION_PROMPT_VERSION, EXTRACTION_S
 use super::response::{
     parse_and_validate, salvage_first_json_object, sanitize_raw_for_wire, ValidationError,
 };
-use super::types::{ExtractionFailure, ExtractionInput, ExtractionMode, ExtractionResponse};
+use super::types::{ExtractionFailure, ExtractionInput, ExtractionResponse};
 use crate::error::{AppError, AppErrorKind, Result};
 use crate::settings::keychain::{get_secret, SecretKey};
 use crate::settings::secret_store::SecretStore;
@@ -478,13 +478,8 @@ fn build_repair_request(
 }
 
 fn source_kind_label(input: &ExtractionInput) -> &'static str {
-    use crate::domain::source::Source;
-    match input.source {
-        Source::Manual(_) => "manual",
-        Source::Youtube(_) => "youtube",
-        Source::XTwitter(_) => "x_twitter",
-        Source::Article(_) => "article",
-    }
+    // SCA-928 (B16): delegate to the canonical Source::kind_label method.
+    input.source.kind_label()
 }
 
 #[cfg(test)]
@@ -707,19 +702,4 @@ mod tests {
         assert_eq!(captured[0].max_tokens, 12000);
     }
 
-    // Reference CandidatePrompt to silence unused-import warnings.
-    #[allow(dead_code)]
-    fn _ensure_candidate_imports_compile() -> CandidatePrompt {
-        CandidatePrompt {
-            title: "x".into(),
-            summary: "s".into(),
-            body: "b".into(),
-            tags: vec![],
-            variables: vec![],
-            launch_defaults_patch: LaunchDefaultsPatch::default(),
-            confidence: CandidateConfidence::Low,
-            rationale: "r".into(),
-            source_anchors: vec![],
-        }
-    }
 }

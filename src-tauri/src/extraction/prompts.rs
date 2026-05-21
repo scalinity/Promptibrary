@@ -55,13 +55,8 @@ pub fn build_user_payload(input: &ExtractionInput) -> String {
 }
 
 fn source_kind_label(input: &ExtractionInput) -> &'static str {
-    use crate::domain::source::Source;
-    match input.source {
-        Source::Manual(_) => "manual",
-        Source::Youtube(_) => "youtube",
-        Source::XTwitter(_) => "x_twitter",
-        Source::Article(_) => "article",
-    }
+    // SCA-928 (B16): delegate to the canonical Source::kind_label method.
+    input.source.kind_label()
 }
 
 fn fetched_at_label(source: &crate::domain::source::Source) -> String {

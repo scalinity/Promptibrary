@@ -95,8 +95,13 @@ impl AppServices {
         ))]
         let secrets: Arc<dyn SecretStore> = Arc::new(InMemorySecretStore::new());
 
+        // SCA-928 (B16): explicit connect_timeout in addition to the
+        // total timeout. Without it, a TCP connect that hangs (e.g.
+        // hostile server SYN-flooding our connector) blocks for the
+        // full 60s window even if no bytes are ever exchanged.
         let http = reqwest::Client::builder()
-            .timeout(Duration::from_secs(60))
+            .timeout(Duration::from_secs(120))
+            .connect_timeout(Duration::from_secs(5))
             .user_agent("Promptibrary/1.0 (+local desktop importer)")
             .build()
             .expect("reqwest client builds");

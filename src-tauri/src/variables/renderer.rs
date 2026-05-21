@@ -22,7 +22,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use crate::domain::variable::{Variable, VariableType};
-use crate::variables::parser::{variable_key, VariableRef};
+use crate::variables::parser::VariableRef;
 
 // ---------- Public types -----------------------------------------------------
 
@@ -281,14 +281,11 @@ fn truncate_preview(s: &str, max: usize) -> String {
     }
 }
 
-// Hex helper without pulling in another crate.
+// SCA-928 (B16): hex encoding now delegates to the canonical util::hex.
+// Local module retained as a thin alias for the existing callsite.
 mod hex {
     pub fn encode_lower<T: AsRef<[u8]>>(bytes: T) -> String {
-        let mut out = String::with_capacity(bytes.as_ref().len() * 2);
-        for b in bytes.as_ref() {
-            out.push_str(&format!("{:02x}", b));
-        }
-        out
+        crate::util::hex::encode_lower(bytes.as_ref())
     }
 }
 
@@ -546,10 +543,3 @@ mod tests {
     }
 }
 
-// Use `variable_key` from parser to satisfy the unused import warning when
-// running with very narrow test sets. Keeping it imported here makes
-// downstream wiring (e.g. validation) easier.
-#[allow(dead_code)]
-fn _keep_parser_helpers_used(v: &Variable) -> String {
-    variable_key(v)
-}

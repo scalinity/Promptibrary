@@ -21,6 +21,21 @@ pub enum Source {
     Article(ArticleSource),
 }
 
+impl Source {
+    /// SCA-928 (B16, DRY): single source of truth for the snake_case
+    /// wire label for each variant. Replaces three near-identical
+    /// match arms in prompts_repo, extraction/prompts, and
+    /// extraction/anthropic.
+    pub fn kind_label(&self) -> &'static str {
+        match self {
+            Source::Manual(_) => "manual",
+            Source::Youtube(_) => "youtube",
+            Source::XTwitter(_) => "x_twitter",
+            Source::Article(_) => "article",
+        }
+    }
+}
+
 /// Manual source — user-entered prompt with no fetch origin. Per spec §4,
 /// `originUrl` is always `null` for manual sources, which is now encoded in
 /// the type itself: the field does not exist. The TS mirror uses

@@ -13,9 +13,7 @@ use std::time::{Duration, Instant};
 use sqlx::SqlitePool;
 
 use crate::domain::prompt::Prompt;
-use crate::domain::source::Source;
-use crate::domain::variable::Variable;
-use crate::error::{AppError, AppErrorKind, Result};
+use crate::error::{AppError, Result};
 use crate::ids::PromptId;
 use crate::index::prompts_repo;
 use crate::vault::frontmatter::parse_prompt_frontmatter;
@@ -215,14 +213,6 @@ pub async fn scan_vault<F: FnMut(ScanProgress)>(
     });
     Ok(summary)
 }
-
-// Silence unused-imports warnings for items only used in tests.
-#[allow(dead_code)]
-fn _keep_variable_used(_v: &Variable) {}
-#[allow(dead_code)]
-fn _keep_source_used(_s: &Source) {}
-#[allow(dead_code)]
-fn _keep_errkind_used(_k: AppErrorKind) {}
 
 #[cfg(test)]
 mod tests {

@@ -134,12 +134,10 @@ pub struct TranscriptHeader {
     pub resolved_prompt_sha256: Option<String>,
 }
 
+// SCA-928 (B16): hex_lower now delegates to the single util::hex
+// implementation.
 fn hex_lower(bytes: &[u8]) -> String {
-    let mut out = String::with_capacity(bytes.len() * 2);
-    for b in bytes {
-        out.push_str(&format!("{:02x}", b));
-    }
-    out
+    crate::util::hex::encode_lower(bytes)
 }
 
 #[cfg(test)]
