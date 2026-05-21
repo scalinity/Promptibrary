@@ -448,6 +448,7 @@ mod tests {
             AppErrorKind::UnsupportedSource,
             AppErrorKind::TranscriptUnavailable,
             AppErrorKind::PathNotFound,
+            AppErrorKind::AssistantStreamInvalid,
             AppErrorKind::Internal,
         ];
         assert_eq!(all.len(), TS_VARIANT_COUNT);
