@@ -161,6 +161,38 @@ pub async fn start_launch(
     }
     let resolved_prompt = render.rendered.clone();
 
+    // SCA-912 (C7, CWE-77/CWE-150): refuse prompts that would corrupt
+    // the bracketed-paste envelope. Vector: an extracted-article
+    // variable value containing ESC[201~ would terminate the paste
+    // early and let subsequent bytes reach claude as keystrokes /
+    // slash-commands. Check at compose-time so the user sees a typed
+    // error rather than a half-injected launch.
+    crate::launch::prompt_injector::validate_prompt_bytes(&resolved_prompt)?;
+
+    // SCA-912 (W21, CWE-20): cap `append_system_prompt`. The field
+    // flows directly into a claude CLI argv slot; unbounded user input
+    // would let a compromised frontend override the system prompt
+    // arbitrarily or exhaust OS argv space.
+    const APPEND_SYSTEM_PROMPT_MAX: usize = 16 * 1024;
+    let resolved_append = input
+        .append_system_prompt
+        .clone()
+        .or_else(|| prompt.launch_defaults.append_system_prompt.clone());
+    if let Some(ref s) = resolved_append {
+        if s.len() > APPEND_SYSTEM_PROMPT_MAX {
+            return Err(AppError::new(
+                AppErrorKind::SettingsInvalid,
+                format!(
+                    "append_system_prompt exceeds {} bytes ({}); reduce or split",
+                    APPEND_SYSTEM_PROMPT_MAX,
+                    s.len()
+                ),
+            )
+            .with_detail("limit_bytes", APPEND_SYSTEM_PROMPT_MAX as i64)
+            .with_detail("actual_bytes", s.len() as i64));
+        }
+    }
+
     // 3. Mint a RunId, build LaunchProfile, insert run row.
     let run_id = RunId(new_ulid());
     let launched_at = crate::time::now_utc();
@@ -197,9 +229,7 @@ pub async fn start_launch(
         strict_mcp_config: input
             .strict_mcp_config
             .unwrap_or(prompt.launch_defaults.strict_mcp_config),
-        append_system_prompt: input
-            .append_system_prompt
-            .or_else(|| prompt.launch_defaults.append_system_prompt.clone()),
+        append_system_prompt: resolved_append,
         max_turns: prompt.launch_defaults.max_turns,
         launched_at,
     };

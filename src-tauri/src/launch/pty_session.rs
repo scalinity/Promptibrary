@@ -266,8 +266,22 @@ pub async fn spawn(cfg: PtySessionConfig) -> Result<(PtySessionHandle, mpsc::Unb
                     break;
                 }
                 // Inject the bracketed-paste prompt immediately
-                // after the first PTY output chunk fires.
-                let inject_bytes = prompt_injector::build_inject_bytes(&resolved_prompt);
+                // after the first PTY output chunk fires. SCA-912:
+                // validate_prompt_bytes already ran at compose-time in
+                // commands::launches::start_launch, so this should
+                // always succeed; we surface an Error event rather than
+                // silently swallowing if a future call path bypasses
+                // the upstream guard.
+                let inject_bytes = match prompt_injector::build_inject_bytes(&resolved_prompt) {
+                    Ok(b) => b,
+                    Err(e) => {
+                        let _ = event_tx.send(PtyEvent::Error(format!(
+                            "prompt injection refused: {}",
+                            e.message
+                        )));
+                        break;
+                    }
+                };
                 let w = writer_for_inject.clone();
                 let _ = tokio::task::spawn_blocking(move || -> std::io::Result<()> {
                     let mut handle = w.lock();
