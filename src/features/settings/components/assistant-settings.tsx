@@ -26,8 +26,6 @@ const PATTERN_OPTIONS: DropdownOption<AssistantPattern>[] = [
 const MODEL_OPTIONS: DropdownOption<ClaudeModelId>[] = [
   { value: "claude-opus-4-7", label: "claude-opus-4-7" },
   { value: "claude-sonnet-4-6", label: "claude-sonnet-4-6" },
-  { value: "opus", label: "opus" },
-  { value: "sonnet", label: "sonnet" },
 ];
 
 export function AssistantSettings(): React.JSX.Element {
