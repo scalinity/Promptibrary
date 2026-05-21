@@ -26,6 +26,17 @@ export function PromptList({ prompts, loading }: PromptListProps): React.JSX.Ele
   const filter = useLibraryStore((s) => s.filter);
   const sort = useLibraryStore((s) => s.sort);
 
+  // SCA-922 (W27): memoize filter + sort + recentIds BEFORE any early
+  // returns so the hook order stays consistent across renders.
+  const filtered = useMemo(
+    () => filterAndSort(prompts, filter, sort),
+    [prompts, filter, sort],
+  );
+  const recentIds = useMemo(
+    () => new Set(filtered.slice(0, 3).map((p) => p.id)),
+    [filtered],
+  );
+
   if (loading && prompts.length === 0) {
     return (
       <div className="list-rows" data-testid="prompt-list-loading">
@@ -44,14 +55,6 @@ export function PromptList({ prompts, loading }: PromptListProps): React.JSX.Ele
     );
   }
 
-  // SCA-922 (W27): memoize the filter + sort so a render driven by an
-  // unrelated Zustand subscription (cmdk store, library selection)
-  // doesn't pay the 10k-row sort cost on every keystroke elsewhere.
-  const filtered = useMemo(
-    () => filterAndSort(prompts, filter, sort),
-    [prompts, filter, sort],
-  );
-
   if (filtered.length === 0) {
     return (
       <div className="list-rows">
@@ -63,17 +66,6 @@ export function PromptList({ prompts, loading }: PromptListProps): React.JSX.Ele
       </div>
     );
   }
-
-  // Recent set — first 3 in the (sorted) filtered list. Without per-row
-  // timestamps on the slim shape, "recent" tracks list position rather than
-  // wall-clock recency. L5 swaps in real timestamps when the detail/list
-  // queries are unified.
-  // Memoize the Set so `recent` prop identity is stable across renders
-  // and PromptCard's React.memo (when present) can skip unchanged rows.
-  const recentIds = useMemo(
-    () => new Set(filtered.slice(0, 3).map((p) => p.id)),
-    [filtered],
-  );
 
   return (
     <div className="list-rows" data-testid="prompt-list">

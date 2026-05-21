@@ -78,9 +78,15 @@ hr {
 
 /* ---------- Focus ring — never the OS default ---------- */
 
+/* SCA-926 (W29): the previous ring (1px @ 30% opacity = ~1.4:1
+   contrast on dark carbon) failed WCAG AA's 3:1 non-text minimum.
+   Solid amber at 2px is reachable + visible on every dark surface;
+   `outline-offset` gives the ring breathing room from rounded
+   corners without re-introducing a drop shadow. Inputs that already
+   have a stronger ring (via `.input:focus`) override this. */
 :focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 1px var(--accent-glow);
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
   border-color: var(--accent-deep) !important;
 }
 

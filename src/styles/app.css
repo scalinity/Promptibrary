@@ -68,11 +68,16 @@
   font-weight: 500;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+  /* SCA-926 (W30): permanent outline glow at rest matches the design
+     system rule "launch button uses an outline glow, not a drop
+     shadow." Hover bumps the ring to a brighter 2-stop. No drop
+     shadow anywhere on the launch button. */
+  box-shadow: 0 0 0 1px var(--accent-deep), 0 0 10px -2px var(--accent-glow);
   transition: background var(--motion-snap), box-shadow var(--motion-snap);
 }
 .btn-launch:hover, .btn-launch[data-state="hover"] {
   background: var(--accent-warm);
-  box-shadow: 0 0 0 2px var(--accent-glow);
+  box-shadow: 0 0 0 2px var(--accent-glow), 0 0 14px -2px var(--accent-glow);
 }
 .btn-launch:disabled, .btn-launch[data-state="disabled"] {
   background: var(--accent-deep);
