@@ -64,7 +64,21 @@ export const ASSISTANT_TOOL_DEFINITIONS: ToolDefinition[] = [
  * function is passed to `useAssistant({ dispatchTool: ... })`.
  */
 export function buildToolDispatcher(prompt: Prompt | null): ToolDispatcher {
+  return makeDispatcher(() => prompt);
+}
+
+/** SCA-962 — variant that reads `prompt` from a ref on each call. Lets
+ * the dispatcher's identity stay stable across renders even though the
+ * underlying prompt query refetches. */
+buildToolDispatcher.fromRef = function fromRef(
+  promptRef: { current: Prompt | null },
+): ToolDispatcher {
+  return makeDispatcher(() => promptRef.current);
+};
+
+function makeDispatcher(getPrompt: () => Prompt | null): ToolDispatcher {
   return async (name, input) => {
+    const prompt = getPrompt();
     if (prompt == null) {
       return {
         content: "No prompt is currently open — cannot execute tools.",

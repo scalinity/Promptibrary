@@ -10,7 +10,7 @@
 // SCA-951 — styling lives in the feature-local CSS module (./assistant-panel.css)
 // per the tokens-only policy. No hex literals in this file.
 
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 
 import { useSettings } from "@/features/settings/hooks/use-settings";
 import {
@@ -57,7 +57,20 @@ export function AssistantPanel({ promptId }: Props): React.JSX.Element {
 
   const promptQuery = usePrompt(promptId);
   const prompt = promptQuery.data ?? null;
-  const dispatchTool = useMemo(() => buildToolDispatcher(prompt), [prompt]);
+  // SCA-962 — stabilize the dispatcher identity across prompt-query
+  // refetches. The dispatcher closes over a ref whose `.current` always
+  // points at the latest prompt; the dispatcher fn itself is created
+  // once.
+  const promptRef = useRef(prompt);
+  promptRef.current = prompt;
+  const dispatchTool = useMemo(
+    () =>
+      buildToolDispatcher.fromRef(promptRef),
+    // promptRef itself is stable across renders; useMemo with [] is
+    // correct.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
 
   const { send } = useAssistant({
     promptId,
@@ -250,13 +263,40 @@ function ToolResultChip({
   content: string;
   isError: boolean;
 }): React.JSX.Element {
+  // SCA-962 — grapheme-aware truncation. `string.slice(0, N)` indexes by
+  // UTF-16 code units and will split a 4-byte emoji or a combining mark
+  // mid-grapheme, producing mojibake in the chip. Intl.Segmenter walks
+  // graphemes correctly.
+  const preview = truncateGraphemes(content, 80);
   return (
     <div
       className="assistant-tool-result"
       data-error={isError ? "true" : "false"}
     >
-      {isError ? "✗" : "✓"}{" "}
-      {content.length > 80 ? content.slice(0, 80) + "…" : content}
+      {isError ? "✗" : "✓"} {preview}
     </div>
   );
+}
+
+function truncateGraphemes(input: string, maxGraphemes: number): string {
+  if (input.length <= maxGraphemes) return input;
+  // Cheap fast path: if every code unit is ASCII the byte slice is
+  // already grapheme-safe.
+  // eslint-disable-next-line no-control-regex
+  if (/^[\x00-\x7f]*$/.test(input)) {
+    return input.length > maxGraphemes ? input.slice(0, maxGraphemes) + "…" : input;
+  }
+  // Intl.Segmenter is widely available in modern browsers / Tauri's
+  // WKWebView. Iterate up to maxGraphemes; bail out early.
+  const seg = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+  let count = 0;
+  let cut = 0;
+  for (const { segment, index } of seg.segment(input)) {
+    count += 1;
+    if (count > maxGraphemes) {
+      return input.slice(0, cut) + "…";
+    }
+    cut = index + segment.length;
+  }
+  return input;
 }
