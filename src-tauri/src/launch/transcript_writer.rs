@@ -21,13 +21,18 @@ use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, Datelike, Utc};
 use tokio::fs::{self, OpenOptions};
-use tokio::io::AsyncWriteExt;
+use tokio::io::{AsyncWriteExt, BufWriter};
 
 use crate::error::{AppError, Result};
 
+/// 64 KiB buffer — matches the kernel-page-aligned default for most
+/// filesystems and gives us amortized one-syscall-per-chunk-burst on
+/// claude's stdout, which typically arrives in <128-byte segments.
+const BUF_CAPACITY: usize = 64 * 1024;
+
 pub struct TranscriptWriter {
     path: PathBuf,
-    file: tokio::fs::File,
+    file: BufWriter<tokio::fs::File>,
     bytes_written: u64,
 }
 
@@ -54,7 +59,7 @@ impl TranscriptWriter {
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent).await.map_err(AppError::from)?;
         }
-        let file = OpenOptions::new()
+        let raw = OpenOptions::new()
             .create_new(true)
             .write(true)
             .open(&path)
@@ -62,7 +67,10 @@ impl TranscriptWriter {
             .map_err(AppError::from)?;
         Ok(Self {
             path,
-            file,
+            // SCA-923 (SUGG-17): wrap in BufWriter so claude's small
+            // PTY-burst writes (often <128 bytes) coalesce into one
+            // syscall per buffer fill instead of one per chunk.
+            file: BufWriter::with_capacity(BUF_CAPACITY, raw),
             bytes_written: 0,
         })
     }
@@ -84,9 +92,22 @@ impl TranscriptWriter {
         Ok(())
     }
 
+    /// Drain the in-memory buffer to the kernel. SCA-923 (SUGG-17): no
+    /// longer calls sync_all per flush — that turned every claude PTY
+    /// burst into an fsync. Persistence is guaranteed on `close`.
     pub async fn flush(&mut self) -> Result<()> {
         self.file.flush().await.map_err(AppError::from)?;
-        self.file.sync_all().await.map_err(AppError::from)?;
+        Ok(())
+    }
+
+    /// Final fsync + close. Call this at run-end (PtyEvent::Exited).
+    pub async fn close(mut self) -> Result<()> {
+        self.file.flush().await.map_err(AppError::from)?;
+        self.file
+            .get_mut()
+            .sync_all()
+            .await
+            .map_err(AppError::from)?;
         Ok(())
     }
 }

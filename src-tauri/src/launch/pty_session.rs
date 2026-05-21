@@ -302,9 +302,10 @@ pub async fn spawn(cfg: PtySessionConfig) -> Result<(PtySessionHandle, mpsc::Unb
                 break;
             }
         }
-        // Reader hit EOF or errored. Flush transcript, wait for child,
-        // emit the terminal event.
-        let _ = transcript.flush().await;
+        // Reader hit EOF or errored. SCA-923: close() drives the final
+        // fsync (was previously fsync-per-chunk via flush(); now we
+        // only durably sync at end-of-run).
+        let _ = transcript.close().await;
         let _ = reader_handle.join(); // reap the reader thread
         let (code, signal) =
             match tokio::task::spawn_blocking(move || child_for_wait.lock().wait()).await {
