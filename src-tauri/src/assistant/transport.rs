@@ -194,24 +194,62 @@ impl StreamingAnthropicTransport for HttpStreamingAnthropicTransport {
 
         let mut parser = SseParser::new();
         let mut resp = resp;
-        loop {
-            let chunk = resp
-                .chunk()
-                .await
-                .map_err(|e| StreamingError::Network(format!("{e}")))?;
-            let Some(bytes) = chunk else { break };
-            let events = parser.feed(&bytes)?;
-            for ev in events {
-                if events_tx.send(ev).await.is_err() {
-                    // Receiver dropped — caller cancelled.
-                    return Ok(());
+        let mut pump_error: Option<StreamingError> = None;
+        let mut cancelled = false;
+
+        // Pump loop — collect bytes, feed parser, forward events. Any
+        // error (network or SSE parse) breaks out into a single drain
+        // point below so SCA-955 holds: parser.finish() runs no matter
+        // how the loop exits.
+        'pump: loop {
+            let chunk_result = resp.chunk().await;
+            match chunk_result {
+                Ok(None) => break 'pump,
+                Ok(Some(bytes)) => match parser.feed(&bytes) {
+                    Ok(events) => {
+                        for ev in events {
+                            if events_tx.send(ev).await.is_err() {
+                                cancelled = true;
+                                break 'pump;
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        pump_error = Some(StreamingError::from(e));
+                        break 'pump;
+                    }
+                },
+                Err(e) => {
+                    pump_error = Some(StreamingError::Network(format!("{e}")));
+                    break 'pump;
                 }
             }
         }
-        for ev in parser.finish()? {
-            if events_tx.send(ev).await.is_err() {
-                return Ok(());
+
+        // SCA-955 — always drain the trailing frame. If the pump
+        // succeeded, propagate any finish() error. If the pump failed,
+        // finish's error (if any) is subordinated to the pump error so
+        // the original cause stays visible.
+        match parser.finish() {
+            Ok(events) => {
+                if !cancelled {
+                    for ev in events {
+                        if events_tx.send(ev).await.is_err() {
+                            break;
+                        }
+                    }
+                }
             }
+            Err(e) => {
+                if pump_error.is_none() {
+                    return Err(StreamingError::from(e));
+                }
+                // pump_error wins; drop finish's error.
+            }
+        }
+
+        if let Some(e) = pump_error {
+            return Err(e);
         }
         Ok(())
     }
