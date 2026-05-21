@@ -175,7 +175,8 @@ fn default_local(vault_paths: Option<&VaultPaths>) -> LocalSettings {
     LocalSettings {
         vault_path: vault_paths.map(|v| v.vault_root.clone()),
         default_destination: LaunchDestination::ClaudeCodeCli,
-        default_model: ClaudeModelId::ClaudeSonnet46,
+        // SCA-898 — user-pref override of spec §4's Sonnet 4-6 default.
+        default_model: ClaudeModelId::ClaudeOpus47,
         default_verifier_mode: VerifierMode::Off,
         default_permission_mode: ClaudePermissionMode::Default,
         telemetry_enabled: true,

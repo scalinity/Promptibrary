@@ -97,15 +97,17 @@ pub struct LaunchDefaults {
 }
 
 impl Default for LaunchDefaults {
-    /// Spec §4 default LaunchDefaults: ClaudeCodeCli + claude-sonnet-4-6
-    /// + verifier off + permissions default + empty tool lists + no MCP +
-    /// no append_system_prompt + no max_turns (max_turns stays unset per
+    /// Spec §4 default LaunchDefaults: ClaudeCodeCli + verifier off +
+    /// permissions default + empty tool lists + no MCP + no
+    /// append_system_prompt + no max_turns (max_turns stays unset per
     /// spec §7 risk note — never passed to claude). SCA-600 consolidates
     /// the three duplicate default_launch_defaults helpers into this impl.
+    /// SCA-898 overrides spec §4's `claude-sonnet-4-6` default model with
+    /// `claude-opus-4-7` as a user preference.
     fn default() -> Self {
         Self {
             destination: LaunchDestination::ClaudeCodeCli,
-            model: ClaudeModelId::ClaudeSonnet46,
+            model: ClaudeModelId::ClaudeOpus47,
             verifier_mode: VerifierMode::Off,
             working_directory: None,
             additional_directories: vec![],
