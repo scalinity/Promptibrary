@@ -212,6 +212,10 @@ interface RunArgs {
   setStatus: (next: ReturnType<typeof useAssistantStore.getState>["status"]) => void;
 }
 
+/** Exposed for the SCA-950 integration test only. The hook is the
+ * public entry point. */
+export { runAgentLoop as __testOnlyRunAgentLoop, type RunArgs as __TestOnlyRunArgs, type TurnContextRef as __TestOnlyTurnContextRef };
+
 async function runAgentLoop(args: RunArgs): Promise<void> {
   const {
     systemPrompt,
