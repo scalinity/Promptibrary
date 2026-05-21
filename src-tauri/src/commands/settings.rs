@@ -171,6 +171,30 @@ fn persist_settings(
     Ok(())
 }
 
+/// SCA-900 — return the on-disk `LocalSettings` (or defaults if the file
+/// is missing or malformed). Public so `lib.rs` can read the saved
+/// `vault_path` at startup without going through the IPC layer.
+pub fn load_persisted_local(app_data_dir: &Path) -> LocalSettings {
+    load_local(app_data_dir, None)
+}
+
+/// SCA-900 — write `vault_path` into the on-disk local settings without
+/// touching the vault-scoped YAML. Loads the current local settings,
+/// overwrites the vault path, atomic-writes back. Called by
+/// `select_vault` so the user's choice survives restart.
+pub fn persist_local_vault_path(
+    app_data_dir: &Path,
+    vault_root: &Path,
+) -> Result<()> {
+    let mut local = load_local(app_data_dir, None);
+    local.vault_path = Some(vault_root.to_path_buf());
+    std::fs::create_dir_all(app_data_dir).map_err(AppError::from)?;
+    let local_path = local_settings_path(app_data_dir);
+    let local_json = serde_json::to_string_pretty(&local).map_err(AppError::from)?;
+    atomic_write_string(&local_path, &local_json)?;
+    Ok(())
+}
+
 fn default_local(vault_paths: Option<&VaultPaths>) -> LocalSettings {
     LocalSettings {
         vault_path: vault_paths.map(|v| v.vault_root.clone()),

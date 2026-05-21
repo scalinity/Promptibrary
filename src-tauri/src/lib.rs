@@ -44,7 +44,7 @@ pub fn run() {
         // inside native inputs + CodeMirror.
         .setup(|app| {
             use tauri::menu::{MenuBuilder, MenuItemBuilder, SubmenuBuilder};
-            use tauri::Emitter;
+            use tauri::{Emitter, Manager};
 
             let app_submenu = SubmenuBuilder::new(app, "Promptibrary")
                 .about(None)
@@ -85,6 +85,28 @@ pub fn run() {
                     let _ = app.emit("menu:new-prompt", ());
                 }
             });
+
+            // SCA-900 — re-attach a previously-selected vault on startup
+            // so the user doesn't have to re-pick it every launch. Reads
+            // settings.json synchronously to find the path; the actual
+            // attach (DB open + migrations) runs in a spawned task so
+            // setup() returns fast and the window can render while the
+            // vault initializes. Failures log + continue — the user
+            // lands on the no-vault state and can re-select.
+            let services_for_attach: app_state::ManagedState =
+                app.state::<app_state::ManagedState>().inner().clone();
+            let local = commands::settings::load_persisted_local(&services_for_attach.app_data_dir);
+            if let Some(vault_root) = local.vault_path {
+                tauri::async_runtime::spawn(async move {
+                    if let Err(e) = commands::vault::attach_vault(&services_for_attach, vault_root.clone()).await {
+                        tracing::warn!(
+                            path = %vault_root.display(),
+                            error = ?e,
+                            "auto-attach of persisted vault failed; starting with no vault",
+                        );
+                    }
+                });
+            }
 
             Ok(())
         })

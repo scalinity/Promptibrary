@@ -43,24 +43,49 @@ pub async fn select_vault(
     input: SelectVaultInput,
     services: State<'_, ManagedState>,
 ) -> Result<VaultStatus> {
-    if !input.vault_root.exists() {
+    let status = attach_vault(services.inner(), input.vault_root.clone()).await?;
+    // SCA-900 — persist vault_path to settings.json so the next launch
+    // can re-attach automatically (see auto_attach_persisted_vault in
+    // lib.rs setup). Failure to persist is non-fatal — we already
+    // attached the vault in memory; logging gives us a paper trail if
+    // disk writes are failing silently.
+    if let Err(e) =
+        crate::commands::settings::persist_local_vault_path(&services.app_data_dir, &input.vault_root)
+    {
+        tracing::warn!(error = ?e, "select_vault: persisting vault_path failed; selection will not survive restart");
+    }
+    Ok(status)
+}
+
+/// In-memory attach of a vault: validate path, repair scaffolding,
+/// open + migrate the index DB, purge expired extraction cache, and
+/// publish to `services.state`. Shared by the `select_vault` IPC
+/// handler and the startup auto-attach in `lib.rs`.
+///
+/// Does NOT write to `settings.json` — that's the IPC handler's job so
+/// auto-attach doesn't re-persist the same value on every launch.
+pub(crate) async fn attach_vault(
+    services: &ManagedState,
+    vault_root: PathBuf,
+) -> Result<VaultStatus> {
+    if !vault_root.exists() {
         // SCA-597: don't leak the user-supplied path into the wire message
         // — the user supplied it, but the pattern would set a bad precedent
         // for paths derived from indexed rows or runtime state.
-        tracing::warn!(path = %input.vault_root.display(), "select_vault: path does not exist");
+        tracing::warn!(path = %vault_root.display(), "attach_vault: path does not exist");
         return Err(AppError::new(
             AppErrorKind::VaultMissing,
             "vault path does not exist",
         ));
     }
-    if !input.vault_root.is_dir() {
-        tracing::warn!(path = %input.vault_root.display(), "select_vault: not a directory");
+    if !vault_root.is_dir() {
+        tracing::warn!(path = %vault_root.display(), "attach_vault: not a directory");
         return Err(AppError::new(
             AppErrorKind::VaultInvalid,
             "vault path is not a directory",
         ));
     }
-    let vault = VaultPaths::new(input.vault_root.clone());
+    let vault = VaultPaths::new(vault_root.clone());
     repair_missing_dirs(&vault)?;
     let db = open_index_pool().await?;
     run_migrations(&db).await?;
@@ -80,7 +105,7 @@ pub async fn select_vault(
     state.db = Some(db);
 
     Ok(VaultStatus {
-        vault_root: Some(input.vault_root),
+        vault_root: Some(vault_root),
         initialized: true,
     })
 }
