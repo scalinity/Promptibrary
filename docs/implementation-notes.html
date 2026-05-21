@@ -33,6 +33,18 @@
 <h1>Promptibrary — implementation notes</h1>
 <p class="lede">Things the reviewer should know that the spec, Linear tickets, and commit messages don't already capture.</p>
 
+<article data-date="2026-05-21" data-layer="L5" data-ticket="SCA-942">
+  <header>2026-05-21 · L5 · SCA-942 (S11 + S12)</header>
+  <h3>Assistant API-key + CSP invariants — where to verify, what NOT to change</h3>
+  <p><strong>Context:</strong> the /review-2 audit on the Fabric-augmented assistant called out two adjacent invariants that are easy to break silently: the Anthropic API key must never reach the frontend, and the CSP must never allow the frontend to contact <code>api.anthropic.com</code>. Both are upheld by the current code, but neither was documented near where someone might accidentally undo it.</p>
+  <p><strong>Decision / change / tradeoff:</strong></p>
+  <ul>
+    <li><strong>API key never leaves Rust</strong> — verified by inspection at <code>src-tauri/src/assistant/transport.rs</code> in <code>HttpStreamingAnthropicTransport::stream</code> (~lines 155-160 — see the <code>get_secret(self.secret_store.as_ref(), SecretKey::AnthropicApiKey)</code> call). The resolved key is consumed only in the <code>x-api-key</code> request header on the immediately-following <code>self.http.post(...)</code> chain. No IPC carries the key value; the frontend gets <code>SecretStatus</code> via <code>commands::settings::get_secret_status</code> at most. Future changes touching this path MUST keep the secret inside the transport closure — do not return the key from any <code>#[tauri::command]</code>, do not log it (<code>tracing::info!</code> auto-redacts only by convention; rely on never passing it in instead).</li>
+    <li><strong>CSP intentionally does NOT include api.anthropic.com</strong> — the policy at <code>src-tauri/tauri.conf.json</code>'s <code>app.security.csp</code> only allows <code>connect-src 'self' ipc: http://ipc.localhost ws://localhost:1420 http://localhost:1420</code>. The frontend never calls Anthropic directly — the streaming transport lives in Rust per the bullet above. If a future change wants to add <code>api.anthropic.com</code> to <code>connect-src</code> as a 'quick fix,' that is the moment to STOP: it would mean a frontend code path is about to receive (or already has) the API key. Audit and reject.</li>
+  </ul>
+  <p><strong>Impact:</strong> the two invariants together preserve the "key in keychain → Rust → outbound HTTP" path that <a href="#">CLAUDE.md</a> mandates. Watch for: any new IPC that returns secret material; any new fetch / XMLHttpRequest in the assistant feature targeting an Anthropic URL. Both are caught at review time only — no automated guard yet (filed as a V2 candidate).</p>
+</article>
+
 <article data-date="2026-05-21" data-layer="L5" data-ticket="SCA-920">
   <header>2026-05-21 · L5 · SCA-920</header>
   <h3>Assistant agent loop runs in the frontend; Rust is a streaming proxy. API key stays in Rust.</h3>
