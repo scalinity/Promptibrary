@@ -186,8 +186,15 @@ async function runAgentLoop(args: RunArgs): Promise<void> {
     const turnId = generateId("turn");
     const assistantMessageId = generateId("msg");
 
+    // SCA-943 — snapshot the wire conversation BEFORE we seed the
+    // streaming placeholder below. If we read the store AFTER the
+    // append, the request body ends with `{role:"assistant", content:[]}`
+    // and Anthropic rejects it with HTTP 400.
+    const conversationSnapshot = getConversation();
+
     // Seed an empty streaming assistant message so the UI can render
-    // tokens as they arrive.
+    // tokens as they arrive. NOTE: this UI message is never sent over
+    // the wire — conversationSnapshot above was taken before it landed.
     appendMessage({
       id: assistantMessageId,
       role: "assistant",
@@ -245,7 +252,7 @@ async function runAgentLoop(args: RunArgs): Promise<void> {
       result = await assistantStreamTurn({
         turnId,
         system: systemPrompt,
-        messages: getConversation(),
+        messages: conversationSnapshot,
         tools,
         model,
         maxTokens: 4096,
