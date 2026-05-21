@@ -1,55 +1,48 @@
 // Default model / permission mode / verifier mode / destination — editable.
 //
-// Wires the `update_settings` IPC: each select sends the full current
-// settings with one field overwritten. The Rust handler re-reads and
-// returns the merged settings; we invalidate the query so the form
-// re-renders from the canonical state (handles any default-fill).
+// Wires the `update_settings` IPC: each dropdown change sends the full
+// current settings with one field overwritten. The Rust handler re-reads
+// and returns the merged settings; we invalidate the query so the form
+// re-renders from the canonical state.
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { useSettings } from "@/features/settings/hooks/use-settings";
 import { updateSettings } from "@/shared/api/ipc";
 import { settingsKeys } from "@/shared/api/queryKeys";
-import type { AppSettings } from "@/shared/types/settings";
+import { Dropdown, type DropdownOption } from "@/shared/ui/dropdown";
 import type {
   ClaudeModelId,
   ClaudePermissionMode,
   LaunchDestination,
   VerifierMode,
 } from "@/shared/types/enums";
+import type { AppSettings } from "@/shared/types/settings";
 
-const MODEL_OPTIONS: ClaudeModelId[] = [
-  "claude-opus-4-7",
-  "claude-sonnet-4-6",
-  "opus",
-  "sonnet",
+const MODEL_OPTIONS: DropdownOption<ClaudeModelId>[] = [
+  { value: "claude-opus-4-7", label: "claude-opus-4-7" },
+  { value: "claude-sonnet-4-6", label: "claude-sonnet-4-6" },
+  { value: "opus", label: "opus" },
+  { value: "sonnet", label: "sonnet" },
 ];
-const PERMISSION_OPTIONS: ClaudePermissionMode[] = [
-  "default",
-  "acceptEdits",
-  "plan",
-  "auto",
-  "dontAsk",
-  "bypassPermissions",
+const PERMISSION_OPTIONS: DropdownOption<ClaudePermissionMode>[] = [
+  { value: "default", label: "default" },
+  { value: "acceptEdits", label: "accept edits" },
+  { value: "plan", label: "plan" },
+  { value: "auto", label: "auto" },
+  { value: "dontAsk", label: "don't ask" },
+  { value: "bypassPermissions", label: "bypass permissions" },
 ];
-const VERIFIER_OPTIONS: VerifierMode[] = ["off", "manual_ultrareview_after_run"];
-const DESTINATION_OPTIONS: LaunchDestination[] = ["claude_code_cli"];
-
-const PERMISSION_LABELS: Record<ClaudePermissionMode, string> = {
-  default: "default",
-  acceptEdits: "accept edits",
-  plan: "plan",
-  auto: "auto",
-  dontAsk: "don't ask",
-  bypassPermissions: "bypass permissions",
-};
-const VERIFIER_LABELS: Record<VerifierMode, string> = {
-  off: "off",
-  manual_ultrareview_after_run: "manual ultrareview after run",
-};
-const DESTINATION_LABELS: Record<LaunchDestination, string> = {
-  claude_code_cli: "Claude Code CLI",
-};
+const VERIFIER_OPTIONS: DropdownOption<VerifierMode>[] = [
+  { value: "off", label: "off" },
+  {
+    value: "manual_ultrareview_after_run",
+    label: "manual ultrareview after run",
+  },
+];
+const DESTINATION_OPTIONS: DropdownOption<LaunchDestination>[] = [
+  { value: "claude_code_cli", label: "Claude Code CLI" },
+];
 
 export function DefaultsSettings(): React.JSX.Element {
   const settings = useSettings();
@@ -80,7 +73,8 @@ export function DefaultsSettings(): React.JSX.Element {
       </div>
       <dl className="kv-grid" style={kvGridStyle}>
         <Row label="default model">
-          <Select
+          <Dropdown
+            ariaLabel="default model"
             value={local?.defaultModel}
             options={MODEL_OPTIONS}
             disabled={isPending}
@@ -88,28 +82,28 @@ export function DefaultsSettings(): React.JSX.Element {
           />
         </Row>
         <Row label="permission mode">
-          <Select
+          <Dropdown
+            ariaLabel="permission mode"
             value={local?.defaultPermissionMode}
             options={PERMISSION_OPTIONS}
-            labels={PERMISSION_LABELS}
             disabled={isPending}
             onChange={(v) => patchLocal({ defaultPermissionMode: v })}
           />
         </Row>
         <Row label="verifier mode">
-          <Select
+          <Dropdown
+            ariaLabel="verifier mode"
             value={local?.defaultVerifierMode}
             options={VERIFIER_OPTIONS}
-            labels={VERIFIER_LABELS}
             disabled={isPending}
             onChange={(v) => patchLocal({ defaultVerifierMode: v })}
           />
         </Row>
         <Row label="destination">
-          <Select
+          <Dropdown
+            ariaLabel="destination"
             value={local?.defaultDestination}
             options={DESTINATION_OPTIONS}
-            labels={DESTINATION_LABELS}
             disabled={isPending}
             onChange={(v) => patchLocal({ defaultDestination: v })}
           />
@@ -150,44 +144,5 @@ function Row({
       </dt>
       <dd style={{ margin: 0 }}>{children}</dd>
     </>
-  );
-}
-
-function Select<T extends string>({
-  value,
-  options,
-  labels,
-  disabled,
-  onChange,
-}: {
-  value: T | undefined;
-  options: readonly T[];
-  labels?: Record<T, string>;
-  disabled?: boolean;
-  onChange: (v: T) => void;
-}): React.JSX.Element {
-  return (
-    <select
-      value={value ?? ""}
-      disabled={disabled || value == null}
-      onChange={(e) => onChange(e.target.value as T)}
-      style={{
-        fontFamily: "var(--font-mono)",
-        fontSize: "12.5px",
-        color: "var(--ink-primary)",
-        background: "var(--bg-sunken)",
-        border: "1px solid var(--border-subtle)",
-        borderRadius: "var(--r-sm)",
-        padding: "4px 8px",
-        cursor: disabled ? "not-allowed" : "pointer",
-        appearance: "auto",
-      }}
-    >
-      {options.map((opt) => (
-        <option key={opt} value={opt}>
-          {labels?.[opt] ?? opt}
-        </option>
-      ))}
-    </select>
   );
 }
