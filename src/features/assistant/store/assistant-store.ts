@@ -27,6 +27,8 @@ export interface UiMessage {
 }
 
 interface AssistantState {
+  /** Whether the drawer is visible. ⌘I toggles. */
+  isOpen: boolean;
   /** Conversation history keyed by the prompt the user is editing. */
   conversationsByPromptId: Record<string, UiMessage[]>;
   /** Pattern the user has picked for the current session. Falls back to
@@ -37,6 +39,8 @@ interface AssistantState {
   /** Composer input. */
   draft: string;
   // ─── mutators ────────────────────────────────────────────────────────
+  setOpen: (next: boolean) => void;
+  toggleOpen: () => void;
   setDraft: (next: string) => void;
   setSelectedPattern: (pattern: AssistantPattern | null) => void;
   setStatus: (next: AssistantTurnStatus) => void;
@@ -50,10 +54,13 @@ interface AssistantState {
 }
 
 export const useAssistantStore = create<AssistantState>((set) => ({
+  isOpen: false,
   conversationsByPromptId: {},
   selectedPattern: null,
   status: { kind: "idle" },
   draft: "",
+  setOpen: (next) => set({ isOpen: next }),
+  toggleOpen: () => set((s) => ({ isOpen: !s.isOpen })),
   setDraft: (next) => set({ draft: next }),
   setSelectedPattern: (pattern) => set({ selectedPattern: pattern }),
   setStatus: (next) => set({ status: next }),

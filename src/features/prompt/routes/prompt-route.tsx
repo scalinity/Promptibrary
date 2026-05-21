@@ -17,6 +17,7 @@ import { PromptHistoryPanel } from "@/features/prompt/components/prompt-history-
 import { ExportMenu } from "@/features/prompt/components/export-menu";
 import { usePromptEditorStore } from "@/features/prompt/stores/prompt-editor-store";
 import { useLaunchDraftStore } from "@/features/launch/stores/launch-draft-store";
+import { useAssistantStore } from "@/features/assistant/store/assistant-store";
 import { asPromptId } from "@/shared/types/ids";
 import { EmptyState } from "@/shared/ui/empty-state";
 import { LoadingSpinner } from "@/shared/ui/loading-spinner";
@@ -24,6 +25,12 @@ import { LoadingSpinner } from "@/shared/ui/loading-spinner";
 const LaunchDrawer = lazy(() =>
   import("@/features/launch/components/launch-drawer").then((m) => ({
     default: m.LaunchDrawer,
+  })),
+);
+
+const AssistantPanel = lazy(() =>
+  import("@/features/assistant/components/assistant-panel").then((m) => ({
+    default: m.AssistantPanel,
   })),
 );
 
@@ -38,6 +45,8 @@ export function PromptRoute(): React.JSX.Element {
   const clearDraft = usePromptEditorStore((s) => s.clear);
   const openLaunch = useLaunchDraftStore((s) => s.open);
   const drawerOpen = useLaunchDraftStore((s) => s.isOpen);
+  const toggleAssistant = useAssistantStore((s) => s.toggleOpen);
+  const assistantOpen = useAssistantStore((s) => s.isOpen);
 
   // SCA-635 — drop this prompt's editor draft on unmount so the store
   // doesn't grow unboundedly across the session. Pure cleanup; nothing
@@ -65,6 +74,15 @@ export function PromptRoute(): React.JSX.Element {
         e.preventDefault();
         openLaunch(promptQuery.data);
       }
+    },
+    { enableOnFormTags: true },
+  );
+
+  useHotkeys(
+    "meta+i, ctrl+i",
+    (e) => {
+      e.preventDefault();
+      toggleAssistant();
     },
     { enableOnFormTags: true },
   );
@@ -182,6 +200,9 @@ export function PromptRoute(): React.JSX.Element {
       </aside>
       <Suspense fallback={null}>
         {drawerOpen && <LaunchDrawer prompt={prompt} />}
+      </Suspense>
+      <Suspense fallback={null}>
+        {assistantOpen && <AssistantPanel promptId={prompt.id} />}
       </Suspense>
     </>
   );
