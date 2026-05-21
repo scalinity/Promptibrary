@@ -60,7 +60,9 @@ export interface UseAssistantOptions {
   tools: ToolDefinition[];
   dispatchTool: ToolDispatcher;
   /** Cap on agent-loop iterations — defensive bound against runaway
-   * tool_use cycles. Default 8. */
+   * tool_use cycles. Default 3 (SCA-945) bounds the blast radius of a
+   * coerced tool-use sequence; raise per-call if a workflow genuinely
+   * needs more hops. */
   maxIterations?: number;
 }
 
@@ -92,7 +94,7 @@ export function useAssistant(opts: UseAssistantOptions): UseAssistantApi {
     model,
     tools,
     dispatchTool,
-    maxIterations = 8,
+    maxIterations = 3,
   } = opts;
   const appendMessage = useAssistantStore((s) => s.appendMessage);
   const updateMessage = useAssistantStore((s) => s.updateMessage);
