@@ -13,7 +13,6 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use futures::stream::StreamExt;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 
@@ -194,9 +193,13 @@ impl StreamingAnthropicTransport for HttpStreamingAnthropicTransport {
         }
 
         let mut parser = SseParser::new();
-        let mut byte_stream = resp.bytes_stream();
-        while let Some(chunk) = byte_stream.next().await {
-            let bytes = chunk.map_err(|e| StreamingError::Network(format!("{e}")))?;
+        let mut resp = resp;
+        loop {
+            let chunk = resp
+                .chunk()
+                .await
+                .map_err(|e| StreamingError::Network(format!("{e}")))?;
+            let Some(bytes) = chunk else { break };
             let events = parser.feed(&bytes)?;
             for ev in events {
                 if events_tx.send(ev).await.is_err() {
