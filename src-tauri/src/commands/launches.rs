@@ -441,61 +441,76 @@ pub async fn stop_run(
     if force {
         // Force path: SIGTERM → 1s → SIGKILL.
         #[cfg(unix)]
-        if let Some(pid) = session.pid() {
-            let _ = crate::launch::signals::send_signal(
-                pid as i32,
-                nix::sys::signal::Signal::SIGTERM,
-            );
+        {
+            if let Some(pid) = session.pid() {
+                let _ = crate::launch::signals::send_signal(
+                    pid as i32,
+                    nix::sys::signal::Signal::SIGTERM,
+                );
+            }
+            let exited = session
+                .wait_with_timeout(crate::launch::signals::FORCE_SIGTERM_WAIT)
+                .await?;
+            if exited.is_none() {
+                let _ = session.kill().await;
+            }
         }
-        let exited = session
-            .wait_with_timeout(crate::launch::signals::FORCE_SIGTERM_WAIT)
-            .await?;
-        if exited.is_none() {
+        // SCA-916 (W1): on non-Unix builds we cannot send POSIX signals.
+        // Don't wait 13s pretending to escalate — kill immediately.
+        #[cfg(not(unix))]
+        {
             let _ = session.kill().await;
         }
     } else {
         // Graceful path: SIGINT → 5s → SIGINT → 5s → SIGTERM → 3s → SIGKILL.
+        // SCA-916 (W1): the entire escalation ladder is gated behind
+        // cfg(unix) because send_signal is unix-only. Without the gate,
+        // a Windows build would wait 13s of unconditional sleeps then
+        // hard-kill — misleading for the user and the telemetry trail.
         #[cfg(unix)]
-        let pid = session.pid().map(|p| p as i32);
-        #[cfg(not(unix))]
-        let pid: Option<i32> = None;
-
-        #[cfg(unix)]
-        if let Some(pid) = pid {
-            let _ = crate::launch::signals::send_signal(
-                pid,
-                nix::sys::signal::Signal::SIGINT,
-            );
-        }
-        let exited = session
-            .wait_with_timeout(crate::launch::signals::GRACEFUL_SIGINT_INTERVAL)
-            .await?;
-        if exited.is_none() {
-            #[cfg(unix)]
+        {
+            let pid = session.pid().map(|p| p as i32);
             if let Some(pid) = pid {
                 let _ = crate::launch::signals::send_signal(
                     pid,
                     nix::sys::signal::Signal::SIGINT,
                 );
             }
-            let exited2 = session
+            let exited = session
                 .wait_with_timeout(crate::launch::signals::GRACEFUL_SIGINT_INTERVAL)
                 .await?;
-            if exited2.is_none() {
-                #[cfg(unix)]
+            if exited.is_none() {
                 if let Some(pid) = pid {
                     let _ = crate::launch::signals::send_signal(
                         pid,
-                        nix::sys::signal::Signal::SIGTERM,
+                        nix::sys::signal::Signal::SIGINT,
                     );
                 }
-                let exited3 = session
-                    .wait_with_timeout(crate::launch::signals::GRACEFUL_SIGTERM_WAIT)
+                let exited2 = session
+                    .wait_with_timeout(crate::launch::signals::GRACEFUL_SIGINT_INTERVAL)
                     .await?;
-                if exited3.is_none() {
-                    let _ = session.kill().await;
+                if exited2.is_none() {
+                    if let Some(pid) = pid {
+                        let _ = crate::launch::signals::send_signal(
+                            pid,
+                            nix::sys::signal::Signal::SIGTERM,
+                        );
+                    }
+                    let exited3 = session
+                        .wait_with_timeout(crate::launch::signals::GRACEFUL_SIGTERM_WAIT)
+                        .await?;
+                    if exited3.is_none() {
+                        let _ = session.kill().await;
+                    }
                 }
             }
+        }
+        #[cfg(not(unix))]
+        {
+            // Non-Unix: no graceful escalation path available — request
+            // termination immediately. The PTY drainer will surface
+            // Exited with signal=None / exit_code as the child reports.
+            let _ = session.kill().await;
         }
     }
 

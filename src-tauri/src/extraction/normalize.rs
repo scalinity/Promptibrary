@@ -3,8 +3,14 @@
 //! Steps:
 //! 1. Collapse intra-line whitespace runs (preserve code-fence content
 //!    verbatim, preserve paragraph breaks).
-//! 2. Cap text at the user-configured `source_cap` (default 60k standard,
-//!    160k deep — both editable via Settings since SCA-906).
+//! 2. Cap text at the user-configured `source_cap_bytes` (default 60k
+//!    standard, 160k deep — both editable via Settings since SCA-906).
+//!    SCA-916 (W3): the cap is measured in BYTES, not characters. Spec
+//!    §6 originally said "chars"; the implementation has always used
+//!    `String::len` (byte length). On byte-heavy sources (CJK, emoji)
+//!    the effective character count is lower than the byte budget —
+//!    intentional, because the cap exists to protect the model's
+//!    token budget, not to give predictable character counts.
 //! 3. If over cap, summarize structurally: preserve titles/headings,
 //!    numbered step lists (workflows), fenced code, lines that look like
 //!    constraints/warnings; drop low-density prose first.
@@ -14,12 +20,12 @@ use super::types::{ExtractionInput, ExtractionMode, FetchedSourceContent};
 pub fn normalize_for_extraction(
     content: FetchedSourceContent,
     mode: ExtractionMode,
-    cap: usize,
+    cap_bytes: usize,
     model_id: String,
 ) -> ExtractionInput {
     let normalized = normalize_text(&content.text);
-    let capped = if normalized.len() > cap {
-        summarize_structurally(&normalized, cap)
+    let capped = if normalized.len() > cap_bytes {
+        summarize_structurally(&normalized, cap_bytes)
     } else {
         normalized
     };
@@ -118,9 +124,9 @@ fn collapse_intra_line(line: &str) -> String {
 /// Score-and-trim summarization: walks the text paragraph-by-paragraph,
 /// keeps paragraphs that look structural (headings, fenced code, numbered
 /// step lists, warning/note lines), drops low-density prose until we fit
-/// under `cap` chars.
-pub fn summarize_structurally(text: &str, cap: usize) -> String {
-    if text.len() <= cap {
+/// under `cap_bytes`.
+pub fn summarize_structurally(text: &str, cap_bytes: usize) -> String {
+    if text.len() <= cap_bytes {
         return text.to_string();
     }
 
@@ -139,7 +145,7 @@ pub fn summarize_structurally(text: &str, cap: usize) -> String {
     for (idx, _prio) in priorities {
         let p = &paragraphs[idx];
         let added = p.text.len() + 2; // paragraph separator
-        if size + added <= cap {
+        if size + added <= cap_bytes {
             kept[idx] = true;
             size += added;
         }
