@@ -1000,14 +1000,28 @@
    so users can't move the window. Mark the topbar background as a
    drag region; opt every interactive control back out so they still
    receive clicks. CSS app-region is a no-op in plain browsers, so the
-   canonical mockup bundle doesn't need the same rule. */
-.topbar { -webkit-app-region: drag; }
+   canonical mockup bundle doesn't need the same rule.
+
+   user-select: none is required even though drag region is set:
+   without it, clicking on the brand text inside the topbar triggers
+   browser text-selection instead of the OS window-drag, and the gesture
+   never reaches AppKit. */
+.topbar {
+  -webkit-app-region: drag;
+  -webkit-user-select: none;
+  user-select: none;
+  cursor: default;
+}
 .topbar button,
 .topbar input,
 .topbar select,
 .topbar .search,
 .topbar .icon-btn,
-.topbar .kbd { -webkit-app-region: no-drag; }
+.topbar .kbd {
+  -webkit-app-region: no-drag;
+  -webkit-user-select: auto;
+  user-select: auto;
+}
 
 /* SCA-908 — hover-visible delete glyph on prompt rows. Sits in the
    top-right corner of the .row, dimmed until hover. Click runs the
