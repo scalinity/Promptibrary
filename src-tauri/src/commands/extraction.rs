@@ -186,7 +186,27 @@ pub async fn extract_prompt_candidates(
     services: State<'_, ManagedState>,
 ) -> Result<ExtractCandidatesResult> {
     emit_progress(&app, ExtractPhase::Normalizing, "normalizing source");
-    let extraction_input = normalize_for_extraction(input.content, input.extraction_mode);
+    // SCA-906 — resolve extraction model + source cap from settings so
+    // the user-tunable defaults flow into the LLM call. Loading local
+    // settings is a small disk read; doing it inline here keeps the
+    // hot path readable.
+    let local = crate::commands::settings::load_persisted_local(&services.app_data_dir);
+    let (model_id, cap) = match input.extraction_mode {
+        crate::extraction::types::ExtractionMode::Standard => (
+            local.extraction_model.as_wire().to_string(),
+            local.source_cap_standard as usize,
+        ),
+        crate::extraction::types::ExtractionMode::Deep => (
+            local.deep_extraction_model.as_wire().to_string(),
+            local.source_cap_deep as usize,
+        ),
+    };
+    let extraction_input = normalize_for_extraction(
+        input.content,
+        input.extraction_mode,
+        cap,
+        model_id,
+    );
 
     emit_progress(&app, ExtractPhase::CallingModel, "calling anthropic");
     let (_, db) = current_vault_db(&services).await?;

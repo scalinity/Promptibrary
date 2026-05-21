@@ -317,6 +317,10 @@ const baseSettings: AppSettings = {
     versionHistory: { renameDetectionWindow: 200 },
     recentPromptIds: [],
     recentRunIds: [],
+    extractionModel: "claude-sonnet-4-6",
+    deepExtractionModel: "claude-opus-4-7",
+    sourceCapStandard: 60_000,
+    sourceCapDeep: 160_000,
   },
   vault: { tagColors: {} },
   effective: {
@@ -330,6 +334,10 @@ const baseSettings: AppSettings = {
     versionHistory: { renameDetectionWindow: 200 },
     recentPromptIds: [],
     recentRunIds: [],
+    extractionModel: "claude-sonnet-4-6",
+    deepExtractionModel: "claude-opus-4-7",
+    sourceCapStandard: 60_000,
+    sourceCapDeep: 160_000,
     vaultSettings: { tagColors: {} },
   },
 };

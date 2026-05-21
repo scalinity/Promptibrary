@@ -156,6 +156,20 @@ pub struct ExtractionInput {
     pub chunks: Vec<SourceChunk>,
     pub max_candidate_count: u32,
     pub extraction_mode: ExtractionMode,
+    /// SCA-906 — resolved model identifier for this extraction call.
+    /// Populated from `LocalSettings.extraction_model` / `deep_extraction_model`
+    /// at the IPC boundary. Old serializations without this field fall
+    /// back to the default for the extraction mode via serde.
+    #[serde(default = "default_model_id")]
+    pub model_id: String,
+}
+
+fn default_model_id() -> String {
+    // Falls back to the standard-mode default. Callers that route by
+    // mode populate this explicitly via the IPC layer.
+    crate::domain::prompt::ClaudeModelId::ClaudeSonnet46
+        .as_wire()
+        .to_string()
 }
 
 impl ExtractionInput {
@@ -172,6 +186,7 @@ impl ExtractionInput {
             text: content.text,
             chunks: content.chunks,
             max_candidate_count,
+            model_id: mode.model().as_wire().to_string(),
             extraction_mode: mode,
         }
     }

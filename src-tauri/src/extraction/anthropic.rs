@@ -276,7 +276,9 @@ impl AnthropicClient {
         cache_pool: Option<&SqlitePool>,
     ) -> Result<std::result::Result<ExtractionResponse, ExtractionFailure>> {
         let kind = source_kind_label(&input);
-        let model = input.extraction_mode.model().as_wire().to_string();
+        // SCA-906 — model comes from settings-resolved input.model_id
+        // populated by the IPC layer, not the mode-default lookup.
+        let model = input.model_id.clone();
         let canonical_url = input.url.clone();
         let mode = input.extraction_mode;
 
@@ -403,7 +405,7 @@ impl AnthropicClient {
 
 fn build_request(input: &ExtractionInput) -> AnthropicRequest {
     AnthropicRequest {
-        model: input.extraction_mode.model().as_wire().to_string(),
+        model: input.model_id.clone(),
         max_tokens: input.extraction_mode.max_tokens(),
         temperature: 0.2,
         system: EXTRACTION_SYSTEM_PROMPT.to_string(),
@@ -444,7 +446,7 @@ fn build_repair_request(
         "Your previous response did not pass validation. Return ONLY valid JSON matching the schema; no markdown, no commentary.\n\nValidation errors:\n{error_lines}\n\nYour previous response was:\n{invalid_raw}\n\nReturn the corrected JSON now."
     );
     AnthropicRequest {
-        model: input.extraction_mode.model().as_wire().to_string(),
+        model: input.model_id.clone(),
         // Cap repair budget at half of the original. The repair user
         // message is much smaller than the original payload and we want
         // a faster + cheaper second attempt — if the model can't produce
@@ -504,6 +506,7 @@ mod tests {
             }],
             max_candidate_count: 4,
             extraction_mode: ExtractionMode::Standard,
+            model_id: "claude-sonnet-4-6".into(),
         }
     }
 
@@ -677,6 +680,10 @@ mod tests {
     async fn request_uses_opus_47_in_deep_mode() {
         let mut deep = input();
         deep.extraction_mode = ExtractionMode::Deep;
+        // SCA-906 — model_id is now decoupled from the mode at the data
+        // structure level; the IPC layer derives it from settings. This
+        // test still asserts the deep-mode default mapping (opus 4.7).
+        deep.model_id = "claude-opus-4-7".into();
         let mock = Arc::new(MockAnthropicTransport::new(vec![Ok(good_response())]));
         let client = AnthropicClient::new(mock.clone());
         client.extract_candidates(deep, false, None).await.unwrap().unwrap();

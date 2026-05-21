@@ -42,6 +42,30 @@ pub struct LocalSettings {
     pub version_history: VersionHistorySettings,
     pub recent_prompt_ids: Vec<PromptId>,
     pub recent_run_ids: Vec<RunId>,
+    /// SCA-906 — extraction model + source-cap fields are now user-tunable.
+    /// Older settings.json files (pre-SCA-906) don't have these keys, so
+    /// each carries a serde default matching the original spec §13 const.
+    #[serde(default = "default_extraction_model")]
+    pub extraction_model: ClaudeModelId,
+    #[serde(default = "default_deep_extraction_model")]
+    pub deep_extraction_model: ClaudeModelId,
+    #[serde(default = "default_source_cap_standard")]
+    pub source_cap_standard: u32,
+    #[serde(default = "default_source_cap_deep")]
+    pub source_cap_deep: u32,
+}
+
+fn default_extraction_model() -> ClaudeModelId {
+    ClaudeModelId::ClaudeSonnet46
+}
+fn default_deep_extraction_model() -> ClaudeModelId {
+    ClaudeModelId::ClaudeOpus47
+}
+fn default_source_cap_standard() -> u32 {
+    60_000
+}
+fn default_source_cap_deep() -> u32 {
+    160_000
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

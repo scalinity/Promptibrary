@@ -33,6 +33,14 @@ export interface LocalSettings {
   };
   recentPromptIds: PromptId[];
   recentRunIds: RunId[];
+  // SCA-906 — extraction model + source-cap promoted from compile-time
+  // constants to user-tunable settings. Defaults match the former
+  // EXTRACTION_MODEL / DEEP_EXTRACTION_MODEL constants and the spec §13
+  // 60k/160k source caps.
+  extractionModel: ClaudeModelId;
+  deepExtractionModel: ClaudeModelId;
+  sourceCapStandard: number;
+  sourceCapDeep: number;
 }
 
 export interface VaultSettings {

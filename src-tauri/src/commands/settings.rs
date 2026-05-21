@@ -210,6 +210,12 @@ fn default_local(vault_paths: Option<&VaultPaths>) -> LocalSettings {
         },
         recent_prompt_ids: vec![],
         recent_run_ids: vec![],
+        // SCA-906 — extraction model + source-cap defaults match the
+        // former spec §13 constants. User can edit via the Settings UI.
+        extraction_model: ClaudeModelId::ClaudeSonnet46,
+        deep_extraction_model: ClaudeModelId::ClaudeOpus47,
+        source_cap_standard: 60_000,
+        source_cap_deep: 160_000,
     }
 }
 

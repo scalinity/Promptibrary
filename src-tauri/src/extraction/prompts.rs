@@ -152,6 +152,7 @@ mod tests {
             chunks,
             max_candidate_count: 4,
             extraction_mode: ExtractionMode::Standard,
+            model_id: "claude-sonnet-4-6".into(),
         }
     }
 

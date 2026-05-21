@@ -3,7 +3,8 @@
 //! Steps:
 //! 1. Collapse intra-line whitespace runs (preserve code-fence content
 //!    verbatim, preserve paragraph breaks).
-//! 2. Cap text at `extraction_mode.source_char_cap()` (60k standard, 160k deep).
+//! 2. Cap text at the user-configured `source_cap` (default 60k standard,
+//!    160k deep — both editable via Settings since SCA-906).
 //! 3. If over cap, summarize structurally: preserve titles/headings,
 //!    numbered step lists (workflows), fenced code, lines that look like
 //!    constraints/warnings; drop low-density prose first.
@@ -13,10 +14,12 @@ use super::types::{ExtractionInput, ExtractionMode, FetchedSourceContent};
 pub fn normalize_for_extraction(
     content: FetchedSourceContent,
     mode: ExtractionMode,
+    cap: usize,
+    model_id: String,
 ) -> ExtractionInput {
     let normalized = normalize_text(&content.text);
-    let capped = if normalized.len() > mode.source_char_cap() {
-        summarize_structurally(&normalized, mode.source_char_cap())
+    let capped = if normalized.len() > cap {
+        summarize_structurally(&normalized, cap)
     } else {
         normalized
     };
@@ -35,6 +38,7 @@ pub fn normalize_for_extraction(
         chunks: content.chunks,
         max_candidate_count,
         extraction_mode: mode,
+        model_id,
     }
 }
 
@@ -320,7 +324,12 @@ mod tests {
     #[test]
     fn small_text_untouched_under_cap() {
         let input = fetched("Hello world.\n\nSecond paragraph.");
-        let out = normalize_for_extraction(input, ExtractionMode::Standard);
+        let out = normalize_for_extraction(
+            input,
+            ExtractionMode::Standard,
+            60_000,
+            "claude-sonnet-4-6".to_string(),
+        );
         assert_eq!(out.text, "Hello world.\n\nSecond paragraph.");
         assert_eq!(out.max_candidate_count, 4);
         assert_eq!(out.extraction_mode, ExtractionMode::Standard);
@@ -352,7 +361,12 @@ mod tests {
     #[test]
     fn deep_mode_keeps_higher_cap() {
         let big = "x".repeat(120_000);
-        let out = normalize_for_extraction(fetched(&big), ExtractionMode::Deep);
+        let out = normalize_for_extraction(
+            fetched(&big),
+            ExtractionMode::Deep,
+            160_000,
+            "claude-opus-4-7".to_string(),
+        );
         // Single paragraph of "x" * 120k fits in deep cap (160k) but
         // not in standard cap (60k).
         assert!(out.text.len() <= 160_000);
