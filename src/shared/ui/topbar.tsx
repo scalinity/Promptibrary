@@ -6,11 +6,18 @@
 import { useNavigate } from "react-router-dom";
 import { useHotkeys } from "react-hotkeys-hook";
 
+import { useCreatePrompt } from "@/features/library/hooks/use-create-prompt";
 import { useSearchStore } from "@/features/search/stores/search-store";
 
 export function Topbar(): React.JSX.Element {
   const navigate = useNavigate();
   const openPalette = useSearchStore((s) => s.open);
+  const createPromptMutation = useCreatePrompt();
+
+  const handleNewPrompt = () => {
+    if (createPromptMutation.isPending) return;
+    createPromptMutation.mutate(undefined);
+  };
 
   useHotkeys(
     "meta+k, ctrl+k",
@@ -36,6 +43,15 @@ export function Topbar(): React.JSX.Element {
       e.preventDefault();
       navigate("/import");
     },
+  );
+
+  useHotkeys(
+    "meta+n, ctrl+n",
+    (e) => {
+      e.preventDefault();
+      handleNewPrompt();
+    },
+    { enableOnFormTags: true },
   );
 
   useHotkeys(
@@ -87,7 +103,8 @@ export function Topbar(): React.JSX.Element {
         <button
           type="button"
           className="btn"
-          onClick={() => navigate("/")}
+          onClick={handleNewPrompt}
+          disabled={createPromptMutation.isPending}
           title="New prompt"
         >
           new <span className="kbd">⌘N</span>
