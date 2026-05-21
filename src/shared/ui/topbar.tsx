@@ -72,19 +72,28 @@ export function Topbar(): React.JSX.Element {
   );
 
   return (
-    <div className="topbar">
-      <div className="brand">
-        <span className="brand-name">
+    // SCA-930 — Tauri 2 window-drag handle. The runtime injects a
+    // document-level mousedown listener that walks up the DOM looking
+    // for data-tauri-drag-region; anywhere this attribute is present
+    // (and no closer ancestor opted out via data-tauri-drag-region="false")
+    // calls startDragging() instead of selecting text. CSS app-region
+    // is the Electron/Chromium convention and is silently ignored by
+    // WKWebView, which is why the previous CSS-only attempt did
+    // nothing.
+    <div className="topbar" data-tauri-drag-region>
+      <div className="brand" data-tauri-drag-region>
+        <span className="brand-name" data-tauri-drag-region>
           Promptibrary<span className="dot">.</span>
         </span>
-        <span className="brand-tag">// agentic operator console</span>
+        <span className="brand-tag" data-tauri-drag-region>// agentic operator console</span>
       </div>
-      <div className="center">
+      <div className="center" data-tauri-drag-region>
         <button
           type="button"
           className="search"
           onClick={() => openPalette("")}
           aria-label="Search prompts, tags, history"
+          data-tauri-drag-region="false"
         >
           <span className="glyph">⌕</span>
           <span
@@ -101,11 +110,12 @@ export function Topbar(): React.JSX.Element {
           <span className="kbd">⌘K</span>
         </button>
       </div>
-      <div className="actions">
+      <div className="actions" data-tauri-drag-region>
         <button
           type="button"
           className="btn"
           onClick={() => navigate("/import")}
+          data-tauri-drag-region="false"
         >
           import <span className="kbd">⌘I</span>
         </button>
@@ -115,6 +125,7 @@ export function Topbar(): React.JSX.Element {
           onClick={handleNewPrompt}
           disabled={createPromptMutation.isPending}
           title="New prompt"
+          data-tauri-drag-region="false"
         >
           new <span className="kbd">⌘N</span>
         </button>
@@ -123,6 +134,7 @@ export function Topbar(): React.JSX.Element {
           className="icon-btn"
           aria-label="Settings"
           onClick={() => navigate("/settings")}
+          data-tauri-drag-region="false"
         >
           ⚙
         </button>

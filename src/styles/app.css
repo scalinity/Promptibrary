@@ -995,19 +995,15 @@
    need this rule (no padding-left shim there), so it stays runtime-only. */
 .topbar .brand-tag { white-space: nowrap; }
 
-/* SCA-929 — Tauri window-drag region. With titleBarStyle "Overlay" +
-   hiddenTitle (SCA-893), the OS has no default title-bar drag handle,
-   so users can't move the window. Mark the topbar background as a
-   drag region; opt every interactive control back out so they still
-   receive clicks. CSS app-region is a no-op in plain browsers, so the
-   canonical mockup bundle doesn't need the same rule.
-
-   user-select: none is required even though drag region is set:
-   without it, clicking on the brand text inside the topbar triggers
-   browser text-selection instead of the OS window-drag, and the gesture
-   never reaches AppKit. */
+/* SCA-930 — topbar prepares for Tauri 2 window-drag.
+   The actual drag mechanism is data-tauri-drag-region attributes on the
+   React elements (see src/shared/ui/topbar.tsx). CSS app-region is the
+   Electron convention and is ignored by Tauri's WKWebView/WebKitGTK
+   backends, so the previous CSS-only attempt was inert.
+   user-select: none + cursor: default stay because they help regardless
+   of drag mechanism: no text caret, no accidental text selection if
+   the user clicks faster than Tauri's mousedown listener fires. */
 .topbar {
-  -webkit-app-region: drag;
   -webkit-user-select: none;
   user-select: none;
   cursor: default;
@@ -1016,9 +1012,7 @@
 .topbar input,
 .topbar select,
 .topbar .search,
-.topbar .icon-btn,
-.topbar .kbd {
-  -webkit-app-region: no-drag;
+.topbar .icon-btn {
   -webkit-user-select: auto;
   user-select: auto;
 }
