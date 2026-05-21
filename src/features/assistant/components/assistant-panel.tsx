@@ -21,6 +21,11 @@ import { useAssistant } from "@/features/assistant/hooks/use-assistant";
 import { AssistantPatternSelector } from "@/features/assistant/components/pattern-selector";
 import { StreamingText } from "@/features/assistant/components/streaming-text";
 import { Patterns } from "@/features/assistant/constants";
+import {
+  ASSISTANT_TOOL_DEFINITIONS,
+  buildToolDispatcher,
+} from "@/features/assistant/tools/registry";
+import { usePrompt } from "@/features/prompt/hooks/use-prompt";
 import type { PromptId } from "@/shared/types/ids";
 
 interface Props {
@@ -45,13 +50,17 @@ export function AssistantPanel({ promptId }: Props): React.JSX.Element | null {
 
   const messages = useAssistantStore((s) => conversationFor(s, promptId));
 
+  const promptQuery = usePrompt(promptId);
+  const prompt = promptQuery.data ?? null;
+  const dispatchTool = useMemo(() => buildToolDispatcher(prompt), [prompt]);
+
   const { send } = useAssistant({
     promptId,
     systemPrompt: patternDef.systemPrompt,
     pattern,
     model: settingsModel,
-    tools: [], // SCA-XXX (#10) wires the three concrete tools.
-    dispatchTool: async () => null,
+    tools: ASSISTANT_TOOL_DEFINITIONS,
+    dispatchTool,
   });
 
   const isStreaming = status.kind === "streaming" || status.kind === "tool_dispatch";
