@@ -985,3 +985,12 @@
    render in a browser with no native title bar, so this override lives in the
    runtime bundle only — keep `Promptibrary Design System/app.css` clean. */
 .topbar .brand { padding-left: 64px; }
+
+/* SCA-899 — keep the brand tag on one line.
+   `.brand` is inline-flex, but the tag's text content can still soft-wrap
+   inside the brand-column when the SCA-893 padding-left squeezes the
+   available width. `nowrap` lets the tag run flat; if it overflows the
+   grid column it bleeds into empty space in the centered search column
+   rather than producing a two-line brand. The canonical mockup doesn't
+   need this rule (no padding-left shim there), so it stays runtime-only. */
+.topbar .brand-tag { white-space: nowrap; }
