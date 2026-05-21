@@ -34,6 +34,43 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(services)
+        // SCA-894 — replace Tauri's default macOS menu so ⌘N isn't bound
+        // anywhere in the chrome. The default menu's File > New Window item
+        // captures ⌘N at the AppKit layer before keydown reaches the WKWebView,
+        // making react-hotkeys-hook's binding inert. We only need an App
+        // submenu (for ⌘Q / About / Hide) and an Edit submenu (so ⌘C / ⌘V /
+        // ⌘X / ⌘A keep working inside native inputs + CodeMirror).
+        .setup(|app| {
+            use tauri::menu::{MenuBuilder, SubmenuBuilder};
+
+            let app_submenu = SubmenuBuilder::new(app, "Promptibrary")
+                .about(None)
+                .separator()
+                .services()
+                .separator()
+                .hide()
+                .hide_others()
+                .show_all()
+                .separator()
+                .quit()
+                .build()?;
+
+            let edit_submenu = SubmenuBuilder::new(app, "Edit")
+                .undo()
+                .redo()
+                .separator()
+                .cut()
+                .copy()
+                .paste()
+                .select_all()
+                .build()?;
+
+            let menu = MenuBuilder::new(app)
+                .items(&[&app_submenu, &edit_submenu])
+                .build()?;
+            app.set_menu(menu)?;
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             // commands::vault
             commands::vault::select_vault,
