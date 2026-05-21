@@ -8,13 +8,39 @@
 //     table AND deletes transcript files.
 
 import { useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { useSettings } from "@/features/settings/hooks/use-settings";
+import {
+  clearTelemetryCache,
+  deleteAllRunHistory,
+  updateSettings,
+  type ClearTelemetryCacheResult,
+  type DeleteAllRunHistoryResult,
+} from "@/shared/api/ipc";
+import { runKeys, settingsKeys } from "@/shared/api/queryKeys";
+import type { AppSettings } from "@/shared/types/settings";
 import { useToast } from "@/shared/ui/use-toast";
 
 export function TelemetrySettings(): React.JSX.Element {
   const settings = useSettings();
-  const enabled = settings.data?.local.telemetryEnabled ?? false;
+  const queryClient = useQueryClient();
+  const current = settings.data;
+  const enabled = current?.local.telemetryEnabled ?? false;
+  const update = useMutation({
+    mutationFn: (next: AppSettings) => updateSettings({ settings: next }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: settingsKeys.all() });
+    },
+  });
+
+  const toggleTelemetry = (): void => {
+    if (current == null) return;
+    update.mutate({
+      ...current,
+      local: { ...current.local, telemetryEnabled: !enabled },
+    });
+  };
 
   return (
     <section id="telemetry" aria-labelledby="telemetry-h">
@@ -34,25 +60,17 @@ export function TelemetrySettings(): React.JSX.Element {
           fontFamily: "var(--font-ui)",
           fontSize: "12.5px",
           color: "var(--ink-primary)",
+          cursor: current == null ? "not-allowed" : "pointer",
         }}
       >
         <input
           type="checkbox"
           checked={enabled}
-          disabled
+          disabled={current == null || update.isPending}
+          onChange={toggleTelemetry}
           style={{ accentColor: "var(--accent)" }}
         />
         record run telemetry locally (count, duration, exit code)
-        <span
-          style={{
-            marginLeft: "auto",
-            fontFamily: "var(--font-mono)",
-            fontSize: "10.5px",
-            color: "var(--ink-tertiary)",
-          }}
-        >
-          editing activates in L5
-        </span>
       </label>
 
       <div className="section-label" style={{ marginTop: 24 }}>
@@ -67,23 +85,51 @@ export function TelemetrySettings(): React.JSX.Element {
 }
 
 function ClearCacheAction(): React.JSX.Element {
+  const queryClient = useQueryClient();
   const { toast, showToast } = useToast(2400);
+  const mutation = useMutation({
+    mutationFn: () => clearTelemetryCache(),
+    onSuccess: (result: ClearTelemetryCacheResult) => {
+      queryClient.invalidateQueries({ queryKey: runKeys.all() });
+      showToast(`cleared ${result.eventsDeleted} telemetry events`);
+    },
+    onError: (err) => {
+      console.error("clearTelemetryCache failed:", err);
+      showToast("clear failed; see console");
+    },
+  });
   return (
     <DestructiveCard
       label="clear telemetry cache"
       body="Drops aggregated counts. Run records and transcripts are kept."
-      confirmLabel="clear cache"
+      confirmLabel={mutation.isPending ? "clearing…" : "clear cache"}
       kind="warn"
       toast={toast}
-      onConfirm={() => showToast("available in L5 — UI scaffold only")}
+      disabled={mutation.isPending}
+      onConfirm={() => mutation.mutate()}
     />
   );
 }
 
 function DeleteHistoryAction(): React.JSX.Element {
+  const queryClient = useQueryClient();
   const [typed, setTyped] = useState("");
-  const { toast, showToast } = useToast(2400);
-  const armed = typed === "delete";
+  const { toast, showToast } = useToast(2800);
+  const mutation = useMutation({
+    mutationFn: () => deleteAllRunHistory({ confirmation: "delete" }),
+    onSuccess: (result: DeleteAllRunHistoryResult) => {
+      queryClient.invalidateQueries({ queryKey: runKeys.all() });
+      setTyped("");
+      showToast(
+        `deleted ${result.runsDeleted} runs · ${result.transcriptFilesDeleted} transcripts`,
+      );
+    },
+    onError: (err) => {
+      console.error("deleteAllRunHistory failed:", err);
+      showToast("delete failed; see console");
+    },
+  });
+  const armed = typed === "delete" && !mutation.isPending;
   return (
     <div
       style={{
@@ -124,17 +170,15 @@ function DeleteHistoryAction(): React.JSX.Element {
           value={typed}
           onChange={(e) => setTyped(e.target.value)}
           placeholder='type "delete"'
+          disabled={mutation.isPending}
         />
         <button
           type="button"
           className="btn-stop"
           disabled={!armed}
-          onClick={() => {
-            showToast("available in L5 — UI scaffold only");
-            setTyped("");
-          }}
+          onClick={() => mutation.mutate()}
         >
-          delete history
+          {mutation.isPending ? "…" : "delete"}
         </button>
       </div>
       {toast != null && (
@@ -159,6 +203,7 @@ function DestructiveCard({
   confirmLabel,
   kind,
   toast,
+  disabled,
   onConfirm,
 }: {
   label: string;
@@ -166,6 +211,7 @@ function DestructiveCard({
   confirmLabel: string;
   kind: "warn" | "danger";
   toast: string | null;
+  disabled?: boolean;
   onConfirm: () => void;
 }): React.JSX.Element {
   const borderColor =
@@ -204,7 +250,12 @@ function DestructiveCard({
         {body}
       </p>
       <div>
-        <button type="button" className="btn" onClick={onConfirm}>
+        <button
+          type="button"
+          className="btn"
+          disabled={disabled}
+          onClick={onConfirm}
+        >
           {confirmLabel}
         </button>
       </div>
