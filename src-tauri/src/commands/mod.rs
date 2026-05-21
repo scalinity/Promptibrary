@@ -49,6 +49,7 @@ pub mod extraction;
 pub mod settings;
 pub mod git;
 pub mod system;
+pub mod assistant;
 
 use crate::error::{AppError, Result};
 

@@ -203,6 +203,8 @@ pub fn run() {
             commands::system::probe_dependencies,
             commands::system::reveal_in_terminal,
             commands::system::open_path,
+            // commands::assistant
+            commands::assistant::assistant_stream_turn,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
