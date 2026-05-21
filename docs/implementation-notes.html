@@ -33,6 +33,14 @@
 <h1>Promptibrary — implementation notes</h1>
 <p class="lede">Things the reviewer should know that the spec, Linear tickets, and commit messages don't already capture.</p>
 
+<article data-date="2026-05-21" data-layer="L5" data-ticket="SCA-920">
+  <header>2026-05-21 · L5 · SCA-920</header>
+  <h3>Assistant agent loop runs in the frontend; Rust is a streaming proxy. API key stays in Rust.</h3>
+  <p><strong>Context:</strong> the L5 assistant feature is a tool-using Claude Agent that lives in a right-side drawer on <code>/prompt/:id</code>. The user chats; Claude can read the open prompt and write back via tool calls. Two reasonable shapes for the agent loop: (a) Rust drives the multi-turn loop end to end and bridges tool calls to the frontend via paired IPC + event channels, (b) the frontend orchestrates the loop, calling a Rust streaming-proxy IPC once per turn. Tools that mutate editor state (Zustand draft body, CodeMirror) live naturally in TS; tools that just need vault writes go through the existing <code>updatePrompt</code> IPC.</p>
+  <p><strong>Decision / change / tradeoff:</strong> took (b). <code>commands::assistant::assistant_stream_turn</code> issues one streaming <code>/v1/messages</code> call per turn, emits <code>assistant:chunk</code> Tauri events for each parsed <code>AssistantStreamEvent</code>, and returns the terminal <code>stop_reason</code>. <code>useAssistant</code> (TS) builds messages, listens for events, accumulates partial JSON for <code>tool_use</code> blocks, dispatches tools against the live editor store, appends a <code>tool_result</code> user message, and loops until <code>stop_reason == end_turn</code> (bounded by <code>maxIterations</code>, default 8). The Anthropic API key resolves via <code>SecretStore</code> inside the streaming transport — it never crosses the IPC boundary. This satisfies CLAUDE.md's "API keys never leave Rust" invariant while keeping tool dispatch ergonomic.</p>
+  <p><strong>Impact:</strong> turn state lives in one place (the Zustand <code>useAssistantStore</code>), tools are pure TS functions with full type access to React state, and the Rust side stays stateless per call (one HTTP request, one channel, return). The cost is that frontend ↔ Rust crosses once per turn (negligible since the streaming response dominates latency). If we ever need to dispatch tools that touch Rust-only state mid-stream (e.g. a tool that reads the live <code>RunRow</code> table), the architecture allows adding a Rust-side dispatch path without rewriting the loop. Watch-out: any new tool that wants to mutate Rust-only state should still go through an existing IPC, not invent a new tool-dispatch channel.</p>
+</article>
+
 <article data-date="2026-05-18" data-layer="L2" data-ticket="SCA-621">
   <header>2026-05-18 · L2 · SCA-621</header>
   <h3>L2 imports the canonical <code>app.css</code> by reference, not by re-implementing patterns inline</h3>
