@@ -332,7 +332,7 @@ fn decode_event(name: &str, data: &str) -> Result<AssistantStreamEvent, SseParse
         "content_block_start" => {
             let p: ContentBlockStartPayload = serde_json::from_str(data).map_err(to_err)?;
             let block = match p.content_block {
-                ContentBlockHeaderRaw::Text { .. } => ContentBlockHeader::Text,
+                ContentBlockHeaderRaw::Text => ContentBlockHeader::Text,
                 ContentBlockHeaderRaw::ToolUse { id, name } => {
                     ContentBlockHeader::ToolUse { id, name }
                 }
@@ -409,7 +409,7 @@ struct ContentBlockStartPayload {
 #[derive(Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 enum ContentBlockHeaderRaw {
-    Text { #[serde(default)] _ignored: serde_json::Value },
+    Text,
     ToolUse { id: String, name: String },
     #[serde(other)]
     Other,
