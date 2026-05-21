@@ -36,6 +36,10 @@ import type {
 } from "@/shared/types/launch";
 import type { Run } from "@/shared/types/run";
 import type { Variable, VariableType, SelectOption } from "@/shared/types/variable";
+import type {
+  AssistantStreamTurnInput,
+  AssistantStreamTurnOutput,
+} from "@/shared/types/assistant";
 
 export type IpcCommand = string;
 
@@ -609,3 +613,12 @@ export interface DeleteAllRunHistoryResult {
 
 export const deleteAllRunHistory = (args: DeleteAllRunHistoryArgs) =>
   invoke<DeleteAllRunHistoryResult>("delete_all_run_history", { input: args });
+
+// ─── assistant ────────────────────────────────────────────────────────────
+//
+// SCA-932 — streaming Anthropic proxy. The IPC POSTs once and returns when
+// the stream completes; AssistantStreamEvent frames arrive via the
+// `assistant:chunk` Tauri event tagged with this turn's `turnId`.
+
+export const assistantStreamTurn = (args: AssistantStreamTurnInput) =>
+  invoke<AssistantStreamTurnOutput>("assistant_stream_turn", { input: args });
