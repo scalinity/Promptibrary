@@ -994,3 +994,37 @@
    rather than producing a two-line brand. The canonical mockup doesn't
    need this rule (no padding-left shim there), so it stays runtime-only. */
 .topbar .brand-tag { white-space: nowrap; }
+
+/* SCA-908 — hover-visible delete glyph on prompt rows. Sits in the
+   top-right corner of the .row, dimmed until hover. Click runs the
+   same confirm + deletePrompt flow that the swipe-revealed panel uses
+   (see prompt-card.tsx). */
+.prompt-row-wrapper .prompt-row-delete-glyph {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  color: var(--ink-tertiary);
+  font-size: 11px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--motion-snap), color var(--motion-snap), border-color var(--motion-snap);
+}
+.prompt-row-wrapper:hover .prompt-row-delete-glyph {
+  opacity: 1;
+}
+.prompt-row-delete-glyph:hover {
+  color: var(--status-error);
+  border-color: var(--status-error-dim);
+}
+.prompt-row-delete-glyph:disabled {
+  cursor: wait;
+  color: var(--ink-dim);
+}

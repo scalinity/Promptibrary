@@ -64,6 +64,15 @@ export function PromptCard({
     if (e.button !== 0) return;
     startX.current = e.clientX;
     draggedDistance.current = 0;
+    // SCA-908 — without setPointerCapture, fast or off-axis pointer
+    // moves drop out of the row's hit area and pointermove/up stop
+    // firing mid-drag. Capturing keeps the event stream on this row.
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {
+      // Safari/older browsers may throw; non-fatal — drag still works
+      // for short in-bounds moves.
+    }
   };
 
   const onPointerMove = (e: React.PointerEvent<HTMLDivElement>): void => {
@@ -102,6 +111,7 @@ export function PromptCard({
   return (
     <div
       ref={rowRef}
+      className="prompt-row-wrapper"
       style={{ position: "relative", overflow: "hidden" }}
       data-testid="prompt-row-wrapper"
     >
@@ -179,6 +189,23 @@ export function PromptCard({
             <span>{prompt.summary || prompt.slug}</span>
           )}
         </div>
+        {/* SCA-908 — hover-visible ✕ for desktop users who don't think
+            to swipe. Stops propagation so it doesn't fire the row's
+            pointer-handlers. */}
+        <button
+          type="button"
+          className="prompt-row-delete-glyph"
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            confirmDelete();
+          }}
+          disabled={deleteMutation.isPending}
+          aria-label={`Delete ${prompt.title}`}
+          title="Delete prompt"
+        >
+          ✕
+        </button>
       </div>
     </div>
   );

@@ -8,6 +8,7 @@ import { TagFilterBar } from "@/features/library/components/tag-filter-bar";
 import { TelemetryMiniStats } from "@/features/library/components/telemetry-mini-stats";
 import { usePrompt } from "@/features/prompt/hooks/use-prompt";
 import { useLaunchDraftStore } from "@/features/launch/stores/launch-draft-store";
+import { defaultMessage, isAppError } from "@/shared/api/errors";
 import { EmptyState } from "@/shared/ui/empty-state";
 import type { PromptId } from "@/shared/types/ids";
 import { LoadingSpinner } from "@/shared/ui/loading-spinner";
@@ -42,6 +43,26 @@ export function LibraryDetailPane({
           glyph="⌖"
           title="Select a prompt"
           body="The library shows every prompt in the active vault. Pick one to see its variables, body, and launch profile."
+        />
+      </section>
+    );
+  }
+
+  if (promptQuery.isError) {
+    // SCA-908 — prior to this fix the failure was indistinguishable from a
+    // pending load because the loading branch below catches `data == null`
+    // too. Show the underlying error so the user knows the prompt file
+    // can't be opened (most common cause: vault file deleted or moved).
+    const err = promptQuery.error;
+    const message = isAppError(err)
+      ? defaultMessage(err.kind)
+      : "Could not load this prompt.";
+    return (
+      <section className="detail-pane" aria-label="Prompt detail">
+        <EmptyState
+          glyph="⚠"
+          title="Failed to load prompt"
+          body={`${message} Try selecting another prompt or rebuilding the index from Settings.`}
         />
       </section>
     );
