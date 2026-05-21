@@ -246,6 +246,11 @@ export function PromptBodyEditor({
         value={value}
         height="100%"
         minHeight="280px"
+        // SCA-897 — @uiw/react-codemirror defaults `theme` to "light" which
+        // injects a light-mode wrapper that beats our PROMPTIBRARY_THEME on
+        // specificity (white editor surface inside the dark page). "none"
+        // disables the built-in wrapper so our token-driven theme wins.
+        theme="none"
         extensions={extensions}
         editable={!readOnly}
         readOnly={readOnly}
