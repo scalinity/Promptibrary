@@ -53,6 +53,11 @@ export interface LocalSettings {
   // calls use `assistantModel`.
   assistantDefaultPattern: AssistantPattern;
   assistantModel: ClaudeModelId;
+  /** SCA-958 — max output tokens for one assistant turn. Default 4096. */
+  assistantMaxTokens: number;
+  /** SCA-958 — sampling temperature for assistant turns. Default 0.3
+   * (low; the Fabric system prompts reward determinism). */
+  assistantTemperature: number;
 }
 
 export interface VaultSettings {

@@ -345,6 +345,8 @@ const baseSettings: AppSettings = {
     sourceCapDeep: 160_000,
     assistantDefaultPattern: "improve_prompt",
     assistantModel: "claude-sonnet-4-6",
+    assistantMaxTokens: 4096,
+    assistantTemperature: 0.3,
   },
   vault: { tagColors: {} },
   effective: {
@@ -364,6 +366,8 @@ const baseSettings: AppSettings = {
     sourceCapDeep: 160_000,
     assistantDefaultPattern: "improve_prompt",
     assistantModel: "claude-sonnet-4-6",
+    assistantMaxTokens: 4096,
+    assistantTemperature: 0.3,
     vaultSettings: { tagColors: {} },
   },
 };

@@ -221,6 +221,9 @@ fn default_local(vault_paths: Option<&VaultPaths>) -> LocalSettings {
         // user picks otherwise in Settings.
         assistant_default_pattern: crate::assistant::patterns::AssistantPattern::ImprovePrompt,
         assistant_model: ClaudeModelId::ClaudeSonnet46,
+        // SCA-958 — assistant turn budget + sampling temperature.
+        assistant_max_tokens: 4096,
+        assistant_temperature: 0.3,
     }
 }
 

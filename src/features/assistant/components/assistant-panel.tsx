@@ -48,6 +48,8 @@ export function AssistantPanel({ promptId }: Props): React.JSX.Element {
     settings.data?.local.assistantDefaultPattern ?? "improve_prompt";
   const settingsModel =
     settings.data?.local.assistantModel ?? "claude-sonnet-4-6";
+  const settingsMaxTokens = settings.data?.local.assistantMaxTokens ?? 4096;
+  const settingsTemperature = settings.data?.local.assistantTemperature ?? 0.3;
   const pattern = selectedPattern ?? settingsPattern;
   const patternDef = Patterns[pattern] ?? Patterns.improve_prompt;
 
@@ -63,6 +65,8 @@ export function AssistantPanel({ promptId }: Props): React.JSX.Element {
     model: settingsModel,
     tools: ASSISTANT_TOOL_DEFINITIONS,
     dispatchTool,
+    maxTokens: settingsMaxTokens,
+    temperature: settingsTemperature,
   });
 
   const isStreaming =

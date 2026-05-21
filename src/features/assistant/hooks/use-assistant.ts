@@ -69,6 +69,10 @@ export interface UseAssistantOptions {
    * coerced tool-use sequence; raise per-call if a workflow genuinely
    * needs more hops. */
   maxIterations?: number;
+  /** SCA-958 — Anthropic per-turn output budget. Default 4096. */
+  maxTokens?: number;
+  /** SCA-958 — sampling temperature [0, 1]. Default 0.3. */
+  temperature?: number;
 }
 
 /** Result the hook surfaces to the component. */
@@ -111,6 +115,8 @@ export function useAssistant(opts: UseAssistantOptions): UseAssistantApi {
     tools,
     dispatchTool,
     maxIterations = 3,
+    maxTokens = 4096,
+    temperature = 0.3,
   } = opts;
   const appendMessage = useAssistantStore((s) => s.appendMessage);
   const updateMessage = useAssistantStore((s) => s.updateMessage);
@@ -159,6 +165,8 @@ export function useAssistant(opts: UseAssistantOptions): UseAssistantApi {
           tools,
           dispatchTool,
           maxIterations,
+          maxTokens,
+          temperature,
           turnContextRef,
           getConversation: () =>
             conversationFor(storeRef.current(), promptId).map(toWireMessage),
@@ -183,6 +191,8 @@ export function useAssistant(opts: UseAssistantOptions): UseAssistantApi {
       tools,
       dispatchTool,
       maxIterations,
+      maxTokens,
+      temperature,
       appendMessage,
       updateMessage,
       setStatus,
@@ -199,6 +209,8 @@ interface RunArgs {
   tools: ToolDefinition[];
   dispatchTool: ToolDispatcher;
   maxIterations: number;
+  maxTokens: number;
+  temperature: number;
   turnContextRef: TurnContextRef;
   getConversation: () => AssistantMessage[];
   appendMessage: (m: UiMessage) => void;
@@ -325,8 +337,8 @@ async function runAgentLoop(args: RunArgs): Promise<void> {
         messages: conversationSnapshot,
         tools,
         model,
-        maxTokens: 4096,
-        temperature: 0.3,
+        maxTokens: args.maxTokens,
+        temperature: args.temperature,
       });
     } finally {
       // SCA-946 — clear the active turn so any late-delivered events

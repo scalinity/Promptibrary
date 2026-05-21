@@ -59,6 +59,8 @@ function buildArgs(overrides: Partial<RunArgs> = {}): RunArgs {
     tools: [],
     dispatchTool: async () => null,
     maxIterations: 3,
+    maxTokens: 4096,
+    temperature: 0.3,
     turnContextRef,
     getConversation: () =>
       conversationFor(store(), PROMPT_ID).map((m) => ({

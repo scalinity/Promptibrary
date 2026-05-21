@@ -66,6 +66,16 @@ pub struct LocalSettings {
     /// model they launch Claude Code with.
     #[serde(default = "default_assistant_model")]
     pub assistant_model: ClaudeModelId,
+    /// SCA-958 — token budget for one assistant turn. Default 4096
+    /// covers a typical improve-prompt response with room to spare.
+    #[serde(default = "default_assistant_max_tokens")]
+    pub assistant_max_tokens: u32,
+    /// SCA-958 — sampling temperature for assistant turns. Default 0.3
+    /// — low enough that the model stays close to the system prompt
+    /// (Improve Prompt's prescriptive structure rewards low temp),
+    /// high enough to avoid mechanical repetition.
+    #[serde(default = "default_assistant_temperature")]
+    pub assistant_temperature: f32,
 }
 
 fn default_extraction_model() -> ClaudeModelId {
@@ -82,6 +92,12 @@ fn default_source_cap_deep() -> u32 {
 }
 fn default_assistant_model() -> ClaudeModelId {
     ClaudeModelId::ClaudeSonnet46
+}
+fn default_assistant_max_tokens() -> u32 {
+    4096
+}
+fn default_assistant_temperature() -> f32 {
+    0.3
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
