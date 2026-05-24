@@ -441,6 +441,10 @@ pub async fn fetch_youtube(
         author,
         text,
         chunks,
+        // YouTube transcripts carry the actionable content; we deliberately
+        // don't push video thumbnails through vision blocks (would burn
+        // tokens for no extraction value).
+        images: vec![],
         raw_metadata: Default::default(),
         content_hash,
         cached: false,

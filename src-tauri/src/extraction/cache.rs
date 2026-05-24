@@ -264,6 +264,7 @@ mod tests {
             author: None,
             text: "Hello body".into(),
             chunks: vec![],
+            images: vec![],
             raw_metadata: Default::default(),
             content_hash: "abc".into(),
             cached: false,

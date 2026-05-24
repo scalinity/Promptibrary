@@ -121,6 +121,23 @@ pub enum SourceChunkKind {
     Quote,
 }
 
+/// A discovered image URL attached to a fetched source. The extraction
+/// pipeline forwards these as Anthropic `image` content blocks so the
+/// model can read prompts that live inside screenshots / post media
+/// rather than only the surrounding text. (SCA-967.)
+///
+/// Hard rules:
+/// - URL must be `https://` and a publicly resolvable host (pre-validated
+///   at fetcher level; defense-in-depth in `anthropic::build_request`).
+/// - Caller caps the count before constructing the request — see
+///   `MAX_IMAGES_PER_REQUEST` in `anthropic.rs`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SourceImage {
+    pub url: String,
+    pub alt: Option<String>,
+}
+
 /// Output of the per-source fetchers (article / youtube / x_twitter), input
 /// to normalization + LLM extraction. Spec §6 *Fetched content model*.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -133,6 +150,12 @@ pub struct FetchedSourceContent {
     pub author: Option<String>,
     pub text: String,
     pub chunks: Vec<SourceChunk>,
+    /// Image URLs discovered alongside the textual content (OG meta tags,
+    /// inline `<img>` tags, post media). Forwarded to the LLM as vision
+    /// content blocks so prompts embedded in screenshots are extractable.
+    /// `#[serde(default)]` so pre-SCA-967 cache rows round-trip cleanly.
+    #[serde(default)]
+    pub images: Vec<SourceImage>,
     pub raw_metadata: serde_json::Map<String, serde_json::Value>,
     pub content_hash: String,
     /// `true` when this preview came from the SQLite cache rather than a
@@ -154,6 +177,10 @@ pub struct ExtractionInput {
     pub url: String,
     pub text: String,
     pub chunks: Vec<SourceChunk>,
+    /// SCA-967 — image URLs that get attached as Anthropic vision blocks.
+    /// `#[serde(default)]` for forward-compat with old test fixtures.
+    #[serde(default)]
+    pub images: Vec<SourceImage>,
     pub max_candidate_count: u32,
     pub extraction_mode: ExtractionMode,
     /// SCA-906 — resolved model identifier for this extraction call.
@@ -185,6 +212,7 @@ impl ExtractionInput {
             url: content.canonical_url,
             text: content.text,
             chunks: content.chunks,
+            images: content.images,
             max_candidate_count,
             model_id: mode.model().as_wire().to_string(),
             extraction_mode: mode,

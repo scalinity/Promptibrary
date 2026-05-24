@@ -52,6 +52,17 @@ export interface SourceChunk {
   timestampSeconds: number | null;
 }
 
+/**
+ * Image URL discovered alongside the textual content (OG meta tags, post
+ * media, inline `<img>` tags). Forwarded to the LLM as Anthropic
+ * `image` content blocks so prompts embedded in screenshots are
+ * extractable. SCA-967.
+ */
+export interface SourceImage {
+  url: string;
+  alt: string | null;
+}
+
 export interface FetchedSourceContent {
   source: Source;
   canonicalUrl: string;
@@ -60,6 +71,11 @@ export interface FetchedSourceContent {
   author: string | null;
   text: string;
   chunks: SourceChunk[];
+  /**
+   * Image URLs attached to this source. May be omitted on cache rows
+   * created before SCA-967 — treat absent / undefined as `[]`.
+   */
+  images?: SourceImage[];
   rawMetadata: Record<string, string | number | boolean | null>;
   contentHash: string;
   /** True when this preview came from the SQLite cache rather than a fresh fetch. */
@@ -75,6 +91,7 @@ export interface ExtractionInput {
   url: string;
   text: string;
   chunks: SourceChunk[];
+  images?: SourceImage[];
   maxCandidateCount: number;
   extractionMode: ExtractionMode;
 }

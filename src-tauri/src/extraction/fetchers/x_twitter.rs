@@ -20,14 +20,30 @@ use serde::Deserialize;
 
 use crate::domain::source::{Source, XTwitterSource};
 use crate::error::Result;
+use crate::extraction::fetchers::article::{is_safe_image_url, MAX_IMAGES_PER_SOURCE};
+use crate::extraction::ssrf::validate_url_for_outbound_fetch;
 use crate::extraction::types::{
-    ExtractionFailure, FetchedSourceContent, SourceChunk, SourceChunkKind,
+    ExtractionFailure, FetchedSourceContent, SourceChunk, SourceChunkKind, SourceImage,
 };
 use crate::settings::keychain::{get_secret, SecretKey};
 use crate::settings::secret_store::SecretStore;
+use futures::StreamExt;
 
 const OEMBED_URL_PREFIX: &str = "https://publish.twitter.com/oembed?omit_script=1&url=";
 const X_API_BASE: &str = "https://api.twitter.com/2";
+
+/// Cap the X-page HTML read at 2 MiB. The OG meta tags live in
+/// `<head>`, which is always near the top of the response. Going
+/// larger only buys us hostile-server attack surface.
+const X_PAGE_MAX_BYTES: usize = 2 * 1024 * 1024;
+
+/// User-Agent used for the augmenting fetch of the X canonical URL.
+/// X serves the meta-tag-bearing HTML for known social/crawler UAs;
+/// matching the social-card crawler pattern keeps the response shape
+/// stable. Falls back to text-only extraction if the response is the
+/// JS shell with no OG tags.
+const X_OG_CRAWLER_UA: &str =
+    "Mozilla/5.0 (compatible; Promptibrary/1.0; +https://promptibrary.app/bot)";
 
 /// X API v2 returns up to 100 tweets per page. Five pages = 500 tweets,
 /// which is enough to walk back through a prolific user's recent
@@ -131,6 +147,100 @@ pub async fn fetch_oembed(
         &text,
         body.author_name.as_deref(),
     )))
+}
+
+/// Best-effort: fetch the canonical x.com URL, scrape OG / Twitter
+/// card image meta tags, and populate `content.images`. Never fails
+/// hard — when the page returns a JS-shell with no meta tags, when
+/// the network is flaky, or when X serves a non-200, we leave images
+/// empty and let extraction proceed text-only. SCA-967.
+///
+/// Runs after `fetch_oembed` because oEmbed gives us the post text +
+/// author cheaply; this second fetch is purely to learn about media
+/// attached to the post.
+pub async fn augment_with_og_images(content: &mut FetchedSourceContent, http: &reqwest::Client) {
+    let canonical = content.canonical_url.clone();
+    let parsed_url = match url::Url::parse(&canonical) {
+        Ok(u) => u,
+        Err(_) => return,
+    };
+    if validate_url_for_outbound_fetch(&parsed_url).await.is_err() {
+        return;
+    }
+
+    let resp = match http
+        .get(parsed_url)
+        .header(reqwest::header::USER_AGENT, X_OG_CRAWLER_UA)
+        .header(reqwest::header::ACCEPT, "text/html,application/xhtml+xml")
+        .send()
+        .await
+    {
+        Ok(r) => r,
+        Err(_) => return,
+    };
+    if !resp.status().is_success() {
+        return;
+    }
+
+    let mut stream = resp.bytes_stream();
+    let mut buf: Vec<u8> = Vec::with_capacity(64 * 1024);
+    while let Some(chunk) = stream.next().await {
+        let chunk = match chunk {
+            Ok(c) => c,
+            Err(_) => return,
+        };
+        if buf.len().saturating_add(chunk.len()) > X_PAGE_MAX_BYTES {
+            // Past the cap: stop reading, but parse what we have —
+            // the OG tags are almost always within the first 64 KiB.
+            break;
+        }
+        buf.extend_from_slice(&chunk);
+    }
+    let html = String::from_utf8_lossy(&buf).into_owned();
+
+    let urls = parse_og_image_urls(&html);
+    content.images = urls
+        .into_iter()
+        .take(MAX_IMAGES_PER_SOURCE)
+        .map(|url| SourceImage { url, alt: None })
+        .collect();
+}
+
+/// Pure scraper: pull OG / Twitter image URLs out of an HTML head.
+/// Filters with `is_safe_image_url` (https + non-local hostname) and
+/// dedupes preserving first occurrence. Public so the article path
+/// can reuse the same predicate; X's HTML is generally meta-tag-heavy
+/// even when the rendered body is the JS shell.
+fn parse_og_image_urls(html: &str) -> Vec<String> {
+    use scraper::{Html, Selector};
+    // `scraper::Html::parse_document` tolerates partial HTML — we may
+    // have cut mid-body if the page exceeded our cap.
+    let doc = Html::parse_document(html);
+    let selectors = [
+        r#"meta[property="og:image"]"#,
+        r#"meta[property="og:image:secure_url"]"#,
+        r#"meta[name="twitter:image"]"#,
+        r#"meta[name="twitter:image:src"]"#,
+    ];
+    let mut out: Vec<String> = Vec::new();
+    for raw in selectors {
+        let sel = match Selector::parse(raw) {
+            Ok(s) => s,
+            Err(_) => continue,
+        };
+        for el in doc.select(&sel) {
+            if let Some(content) = el.value().attr("content") {
+                let trimmed = content.trim();
+                if !trimmed.is_empty()
+                    && !out.iter().any(|u| u == trimmed)
+                    && is_safe_image_url(trimmed)
+                {
+                    out.push(trimmed.to_string());
+                }
+            }
+        }
+    }
+    out
 }
 
 pub async fn fetch_thread_via_api(
@@ -299,6 +409,10 @@ pub async fn fetch_thread_via_api(
         author: author_name,
         text,
         chunks,
+        // Thread-API path: image discovery happens via OG scraping on the
+        // root post URL only; threading is text-dense and the model
+        // already understands the chain via chunk ordering.
+        images: vec![],
         raw_metadata: Default::default(),
         content_hash,
         cached: false,
@@ -455,6 +569,10 @@ fn build_oembed_source(
         author: author.map(str::to_string),
         text: text.to_string(),
         chunks,
+        // Image discovery happens in the IPC layer after `fetch_oembed`
+        // returns (`augment_with_og_images`); the oEmbed body itself
+        // never carries `<img>` references to post media.
+        images: vec![],
         raw_metadata: Default::default(),
         content_hash,
         cached: false,
@@ -552,6 +670,42 @@ mod tests {
         }
         let chain = build_thread_chain(root.clone(), replies);
         assert!(chain.len() <= 100);
+    }
+
+    #[test]
+    fn parse_og_image_urls_picks_first_og_image() {
+        // SCA-967 — typical X share-card HTML head. We accept https
+        // pbs.twimg.com URLs; deduplicate across og:image / twitter:image
+        // when they point at the same media; reject non-https or local.
+        let html = r#"
+            <!doctype html><html><head>
+              <meta property="og:image" content="https://pbs.twimg.com/media/abc.jpg">
+              <meta property="og:image:secure_url" content="https://pbs.twimg.com/media/abc.jpg">
+              <meta name="twitter:image" content="https://pbs.twimg.com/media/abc.jpg">
+              <meta name="twitter:image:src" content="https://pbs.twimg.com/media/def.png">
+              <meta property="og:image" content="http://insecure.example.com/a.jpg">
+              <meta property="og:image" content="https://localhost/private.jpg">
+            </head><body></body></html>
+        "#;
+        let urls = parse_og_image_urls(html);
+        // Order: og:image first (abc), then secure_url and twitter: are
+        // duplicates and dropped, then twitter:image:src adds def.
+        assert_eq!(
+            urls,
+            vec![
+                "https://pbs.twimg.com/media/abc.jpg".to_string(),
+                "https://pbs.twimg.com/media/def.png".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn parse_og_image_urls_empty_when_meta_absent() {
+        // JS-shell case: x.com returns a page with no OG meta tags
+        // (e.g. when the crawler UA isn't recognized). We return an
+        // empty vec, the caller proceeds text-only.
+        let html = r#"<!doctype html><html><head><title>x</title></head><body><div id="app"></div></body></html>"#;
+        assert!(parse_og_image_urls(html).is_empty());
     }
 
     #[test]

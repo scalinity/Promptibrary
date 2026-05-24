@@ -138,7 +138,16 @@ pub async fn fetch_source_preview(
             ..
         } => {
             let _permit = services.rate_limiter.acquire(Provider::XTwitter).await;
-            x_twitter::fetch_oembed(canonical_url, post_id, &services.http).await?
+            let mut outcome =
+                x_twitter::fetch_oembed(canonical_url, post_id, &services.http).await?;
+            // SCA-967 — best-effort vision augmentation. oEmbed gives us
+            // the post text + author but never carries media URLs;
+            // scraping OG meta tags on the canonical page is what
+            // surfaces image-embedded prompts.
+            if let Ok(ref mut content) = outcome {
+                x_twitter::augment_with_og_images(content, &services.http).await;
+            }
+            outcome
         }
         SourceDetection::Article { canonical_url, .. } => {
             let _permit = services.rate_limiter.acquire(Provider::Article).await;

@@ -47,7 +47,28 @@ pub struct AnthropicMessage {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum AnthropicContentBlock {
     Text { text: String },
+    /// Vision content. SCA-967 — added so prompts embedded in
+    /// screenshots and post media are extractable.
+    Image { source: AnthropicImageSource },
 }
+
+/// Mirrors the Anthropic Messages API `image.source` shape. V1 only
+/// emits the `url` variant (Anthropic fetches server-side, avoids
+/// base64 inflation in our outbound request). Base64 is intentionally
+/// not implemented yet — extend this enum when we need to send
+/// locally-rendered images.
+#[derive(Debug, Clone, Serialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum AnthropicImageSource {
+    Url { url: String },
+}
+
+/// Per-request cap on image blocks. Each image consumes vision tokens
+/// (typically 500-1500 each); 4 keeps the worst case bounded inside
+/// the existing 6k/12k max_tokens budget. Matches `MAX_IMAGES_PER_SOURCE`
+/// in the article fetcher — the IPC layer can never produce more than
+/// the fetcher emitted, but we re-clamp here for defense-in-depth.
+pub const MAX_IMAGES_PER_REQUEST: usize = 4;
 
 #[async_trait]
 pub trait AnthropicTransport: Send + Sync {
@@ -377,6 +398,23 @@ impl AnthropicClient {
 }
 
 fn build_request(input: &ExtractionInput) -> AnthropicRequest {
+    let mut content: Vec<AnthropicContentBlock> = Vec::new();
+    // Anthropic best practice for OCR / vision-augmented extraction:
+    // image blocks BEFORE the text block so the model "looks" at the
+    // imagery while reading the framing prompt below it. We also
+    // re-clamp the count here (defense-in-depth — the fetcher should
+    // never emit more than MAX_IMAGES_PER_SOURCE, but a hand-built
+    // ExtractionInput from a test or future codepath might).
+    for image in input.images.iter().take(MAX_IMAGES_PER_REQUEST) {
+        content.push(AnthropicContentBlock::Image {
+            source: AnthropicImageSource::Url {
+                url: image.url.clone(),
+            },
+        });
+    }
+    content.push(AnthropicContentBlock::Text {
+        text: build_user_payload(input),
+    });
     AnthropicRequest {
         model: input.model_id.clone(),
         max_tokens: input.extraction_mode.max_tokens(),
@@ -384,9 +422,7 @@ fn build_request(input: &ExtractionInput) -> AnthropicRequest {
         system: EXTRACTION_SYSTEM_PROMPT.to_string(),
         messages: vec![AnthropicMessage {
             role: "user".into(),
-            content: vec![AnthropicContentBlock::Text {
-                text: build_user_payload(input),
-            }],
+            content,
         }],
     }
 }
@@ -446,7 +482,7 @@ mod tests {
     use crate::domain::source::{ArticleSource, Source};
     use crate::extraction::types::{
         CandidateConfidence, CandidatePrompt, ExtractionMode, LaunchDefaultsPatch, SourceChunk,
-        SourceChunkKind,
+        SourceChunkKind, SourceImage,
     };
 
     fn input() -> ExtractionInput {
@@ -472,6 +508,7 @@ mod tests {
                 url: None,
                 timestamp_seconds: None,
             }],
+            images: vec![],
             max_candidate_count: 4,
             extraction_mode: ExtractionMode::Standard,
             model_id: "claude-sonnet-4-6".into(),
@@ -642,6 +679,79 @@ mod tests {
         assert_eq!(captured[0].model, "claude-sonnet-4-6");
         assert_eq!(captured[0].max_tokens, 6000);
         assert!(captured[0].system.contains("Promptibrary's extraction engine"));
+    }
+
+    #[tokio::test]
+    async fn images_become_image_content_blocks_before_text() {
+        // SCA-967 — when the fetched source carries image URLs, the
+        // request must emit one `image` content block per URL (capped
+        // at MAX_IMAGES_PER_REQUEST), in document order, before the
+        // single trailing `text` block.
+        let mut with_images = input();
+        with_images.images = vec![
+            SourceImage {
+                url: "https://pbs.twimg.com/media/a.jpg".into(),
+                alt: None,
+            },
+            SourceImage {
+                url: "https://pbs.twimg.com/media/b.jpg".into(),
+                alt: Some("second".into()),
+            },
+        ];
+        let mock = Arc::new(MockAnthropicTransport::new(vec![Ok(good_response())]));
+        let client = AnthropicClient::new(mock.clone());
+        client
+            .extract_candidates(with_images, false, None)
+            .await
+            .unwrap()
+            .unwrap();
+        let captured = mock.captured().await;
+        let blocks = &captured[0].messages[0].content;
+        assert_eq!(blocks.len(), 3, "two image blocks + one text block");
+        match &blocks[0] {
+            AnthropicContentBlock::Image {
+                source: AnthropicImageSource::Url { url },
+            } => assert_eq!(url, "https://pbs.twimg.com/media/a.jpg"),
+            other => panic!("expected image url block at index 0, got {other:?}"),
+        }
+        match &blocks[1] {
+            AnthropicContentBlock::Image {
+                source: AnthropicImageSource::Url { url },
+            } => assert_eq!(url, "https://pbs.twimg.com/media/b.jpg"),
+            other => panic!("expected image url block at index 1, got {other:?}"),
+        }
+        assert!(
+            matches!(blocks[2], AnthropicContentBlock::Text { .. }),
+            "text block must come last"
+        );
+    }
+
+    #[tokio::test]
+    async fn excessive_images_clamped_to_max_per_request() {
+        // Defense-in-depth: even if a future fetcher produces N > cap
+        // images, the Anthropic request must not exceed the per-call
+        // limit (cost protection).
+        let mut with_images = input();
+        with_images.images = (0..(MAX_IMAGES_PER_REQUEST + 3))
+            .map(|i| SourceImage {
+                url: format!("https://pbs.twimg.com/media/{i}.jpg"),
+                alt: None,
+            })
+            .collect();
+        let mock = Arc::new(MockAnthropicTransport::new(vec![Ok(good_response())]));
+        let client = AnthropicClient::new(mock.clone());
+        client
+            .extract_candidates(with_images, false, None)
+            .await
+            .unwrap()
+            .unwrap();
+        let captured = mock.captured().await;
+        let image_count = captured[0].messages[0]
+            .content
+            .iter()
+            .filter(|b| matches!(b, AnthropicContentBlock::Image { .. }))
+            .count();
+        assert_eq!(image_count, MAX_IMAGES_PER_REQUEST);
     }
 
     #[tokio::test]

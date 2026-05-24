@@ -16,10 +16,13 @@ use super::types::{ExtractionInput, SourceChunk, SourceChunkKind};
 pub const EXTRACTION_SYSTEM_PROMPT: &str =
     include_str!("../../../docs/spec-snippets/extraction-system-prompt.txt");
 
-/// Cache-busting version bumped whenever `EXTRACTION_SYSTEM_PROMPT` changes.
-/// Mixed into the candidate-cache key (see `extraction::cache`) so candidates
-/// produced under v1 don't get served when v2 lands.
-pub const EXTRACTION_PROMPT_VERSION: u32 = 1;
+/// Cache-busting version bumped whenever `EXTRACTION_SYSTEM_PROMPT` changes
+/// OR the input-content-block shape changes (e.g. images added). Mixed into
+/// the candidate-cache key (see `extraction::cache`) so candidates produced
+/// under v(N-1) don't get served when v(N) lands.
+///
+/// v2 (SCA-967): added prompt-recognition rule + image content blocks.
+pub const EXTRACTION_PROMPT_VERSION: u32 = 2;
 
 /// Build the user message per spec §6 *User message template*.
 pub fn build_user_payload(input: &ExtractionInput) -> String {
@@ -41,6 +44,12 @@ pub fn build_user_payload(input: &ExtractionInput) -> String {
         "- max_candidate_count: {}\n",
         input.max_candidate_count
     ));
+    // SCA-967 — give the model an explicit count of the images attached
+    // earlier in this message. Claude can already see the image blocks
+    // before this text block, but stating the count makes the
+    // "look at the screenshot" case unambiguous and lets the prompt-
+    // recognition rule cite "attached image 1".
+    out.push_str(&format!("- attached_images: {}\n", input.images.len()));
     out.push_str("\nSource chunks:\n");
     for chunk in &input.chunks {
         out.push_str(&format_chunk_header(chunk));
@@ -124,8 +133,11 @@ mod tests {
     }
 
     #[test]
-    fn prompt_version_starts_at_one() {
-        assert_eq!(EXTRACTION_PROMPT_VERSION, 1);
+    fn prompt_version_at_least_two_post_image_support() {
+        // SCA-967: prompt v2 added image-source + prompt-recognition rules.
+        // Future bumps must keep the cache invalidator monotonic — never
+        // reset to 1.
+        assert!(EXTRACTION_PROMPT_VERSION >= 2);
     }
 
     fn input_with_chunks(chunks: Vec<SourceChunk>) -> ExtractionInput {
@@ -145,6 +157,7 @@ mod tests {
             url: "https://example.com/x".into(),
             text: "ignored".into(),
             chunks,
+            images: vec![],
             max_candidate_count: 4,
             extraction_mode: ExtractionMode::Standard,
             model_id: "claude-sonnet-4-6".into(),

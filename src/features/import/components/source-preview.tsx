@@ -52,6 +52,12 @@ export function SourcePreview({
           {sourceKindLabel(content)}
           {content.cached ? " · cached" : ""}
         </span>
+        {content.images != null && content.images.length > 0 ? (
+          <span className="source-badge muted">
+            {content.images.length}{" "}
+            {content.images.length === 1 ? "image" : "images"} attached
+          </span>
+        ) : null}
         {candidateCount != null ? (
           <span className="source-badge muted">
             {candidateCount} candidate {candidateCount === 1 ? "prompt" : "prompts"}

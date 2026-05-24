@@ -29,7 +29,7 @@ use crate::domain::source::{ArticleSource, Source};
 use crate::error::{AppError, AppErrorKind, Result};
 use crate::extraction::ssrf::validate_url_for_outbound_fetch;
 use crate::extraction::types::{
-    ExtractionFailure, FetchedSourceContent, SourceChunk, SourceChunkKind,
+    ExtractionFailure, FetchedSourceContent, SourceChunk, SourceChunkKind, SourceImage,
 };
 use futures::StreamExt;
 
@@ -65,7 +65,15 @@ pub struct ParsedArticle {
     pub site_name: Option<String>,
     pub published_at_rfc3339: Option<String>,
     pub text: String,
+    /// Image URLs discovered in OG / Twitter meta tags. Pre-filtered to
+    /// `https://` only and capped at `MAX_IMAGES_PER_SOURCE`.
+    pub images: Vec<SourceImage>,
 }
+
+/// Cap on image URLs surfaced per article. Each image costs tokens on
+/// the LLM side; 4 is enough for the most common cases (lead image,
+/// inline diagram, alt-prompt screenshot, banner) without runaway cost.
+pub const MAX_IMAGES_PER_SOURCE: usize = 4;
 
 /// Fetch + parse `url`. Recoverable issues (paywall, oversize, network
 /// blip) come back as `Err(ExtractionFailure)` so the caller can render a
@@ -196,13 +204,94 @@ pub fn parse_html_article(html_text: &str) -> ParsedArticle {
         None => serialize_body_fallback(&doc),
     };
 
+    let images = collect_og_images(&doc);
+
     ParsedArticle {
         title,
         author,
         site_name,
         published_at_rfc3339,
         text,
+        images,
     }
+}
+
+/// Collect image URLs from OG / Twitter card meta tags. Filters to
+/// `https://` only and caps at `MAX_IMAGES_PER_SOURCE`. Returns an
+/// empty vec when nothing extractable is present — this is best-effort,
+/// not a hard requirement for the extraction to succeed.
+///
+/// Order: `og:image` > `og:image:secure_url` > `twitter:image` >
+/// `twitter:image:src`. Duplicates are deduped by URL.
+fn collect_og_images(doc: &Html) -> Vec<SourceImage> {
+    let mut urls: Vec<String> = Vec::new();
+
+    // Multi-image OG variants ship as repeated `<meta property="og:image">`
+    // tags; selector iteration walks all of them in document order.
+    let og_image_sel = selector(r#"meta[property="og:image"]"#);
+    let og_secure_sel = selector(r#"meta[property="og:image:secure_url"]"#);
+    let tw_image_sel = selector(r#"meta[name="twitter:image"]"#);
+    let tw_src_sel = selector(r#"meta[name="twitter:image:src"]"#);
+
+    let selectors = [&og_image_sel, &og_secure_sel, &tw_image_sel, &tw_src_sel];
+    for sel in selectors {
+        for el in doc.select(sel) {
+            if let Some(content) = el.value().attr("content") {
+                let trimmed = content.trim();
+                if !trimmed.is_empty()
+                    && !urls.iter().any(|u| u == trimmed)
+                    && is_safe_image_url(trimmed)
+                {
+                    urls.push(trimmed.to_string());
+                    if urls.len() >= MAX_IMAGES_PER_SOURCE {
+                        break;
+                    }
+                }
+            }
+        }
+        if urls.len() >= MAX_IMAGES_PER_SOURCE {
+            break;
+        }
+    }
+
+    urls.into_iter()
+        .map(|url| SourceImage { url, alt: None })
+        .collect()
+}
+
+/// Cheap pre-validation for image URLs we'll forward to Anthropic as
+/// `image.source.url` blocks. Anthropic fetches these server-side, so
+/// SSRF on OUR network is not the risk — but we still want to refuse
+/// schemes other than https, and obvious local/private hostnames the
+/// page might have injected.
+pub(super) fn is_safe_image_url(s: &str) -> bool {
+    let Ok(url) = url::Url::parse(s) else {
+        return false;
+    };
+    if url.scheme() != "https" {
+        return false;
+    }
+    let Some(host) = url.host_str() else {
+        return false;
+    };
+    let host_lc = host.to_ascii_lowercase();
+    if host_lc == "localhost"
+        || host_lc.ends_with(".localhost")
+        || host_lc.ends_with(".local")
+        || host_lc.ends_with(".internal")
+    {
+        return false;
+    }
+    // Reject literal private/loopback IPs without a DNS round-trip —
+    // SSRF policy handles DNS-bound hosts at the actual fetch site;
+    // here we only catch the obvious cases that can be checked without
+    // I/O.
+    if let Ok(ip) = host.parse::<std::net::IpAddr>() {
+        if crate::extraction::ssrf::is_private_or_special_ip(&ip) {
+            return false;
+        }
+    }
+    true
 }
 
 fn into_fetched(parsed: ParsedArticle, canonical_url: &str) -> FetchedSourceContent {
@@ -245,6 +334,7 @@ fn into_fetched(parsed: ParsedArticle, canonical_url: &str) -> FetchedSourceCont
         author: parsed.author,
         text: parsed.text,
         chunks,
+        images: parsed.images,
         raw_metadata: Default::default(),
         content_hash,
         cached: false,
