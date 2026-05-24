@@ -282,25 +282,32 @@ impl AnthropicClient {
             }
         }
 
-        let request = build_request(&input);
-        let raw = match self.transport.send(request.clone()).await {
+        let raw = match self.transport.send(build_request(&input)).await {
             Ok(s) => s,
-            Err(AnthropicTransportError::KeyMissing) => {
-                return Ok(Err(ExtractionFailure::AnthropicKeyMissing))
+            // SCA-967: a request carrying image blocks can hard-fail if
+            // Anthropic can't fetch/accept an image URL (>5 MB, unsupported
+            // type, transient fetch error). That surfaces as `Other`.
+            // Rather than fail the whole extraction, retry once text-only
+            // so the user still gets candidates from the post text. The
+            // special classes (key/auth/ratelimit/network) are not
+            // image-related and are surfaced directly.
+            Err(AnthropicTransportError::Other(m)) if !input.images.is_empty() => {
+                tracing::warn!(
+                    error = %m,
+                    "extraction request with images failed; retrying text-only"
+                );
+                match self
+                    .transport
+                    .send(build_request_with(&input, false))
+                    .await
+                {
+                    Ok(s) => s,
+                    Err(e) => {
+                        return classify_transport_error(e).map(Err);
+                    }
+                }
             }
-            Err(AnthropicTransportError::AuthInvalid) => {
-                return Ok(Err(ExtractionFailure::AnthropicAuthInvalid))
-            }
-            Err(AnthropicTransportError::RateLimited { reset_at }) => {
-                return Ok(Err(ExtractionFailure::RateLimited {
-                    provider: "anthropic".into(),
-                    reset_at,
-                }))
-            }
-            Err(AnthropicTransportError::Network(m)) => {
-                return Ok(Err(ExtractionFailure::NetworkUnavailable { message: m }))
-            }
-            Err(e) => return Err(e.into()),
+            Err(e) => return classify_transport_error(e).map(Err),
         };
 
         // Attempt 1: parse the raw response.
@@ -398,19 +405,29 @@ impl AnthropicClient {
 }
 
 fn build_request(input: &ExtractionInput) -> AnthropicRequest {
+    build_request_with(input, true)
+}
+
+/// Build the extraction request. `include_images` lets the caller emit
+/// a text-only variant for the SCA-967 graceful-fallback path (when an
+/// image-bearing request hard-fails, we retry without images rather
+/// than failing the whole extraction).
+fn build_request_with(input: &ExtractionInput, include_images: bool) -> AnthropicRequest {
     let mut content: Vec<AnthropicContentBlock> = Vec::new();
-    // Anthropic best practice for OCR / vision-augmented extraction:
-    // image blocks BEFORE the text block so the model "looks" at the
-    // imagery while reading the framing prompt below it. We also
-    // re-clamp the count here (defense-in-depth — the fetcher should
-    // never emit more than MAX_IMAGES_PER_SOURCE, but a hand-built
-    // ExtractionInput from a test or future codepath might).
-    for image in input.images.iter().take(MAX_IMAGES_PER_REQUEST) {
-        content.push(AnthropicContentBlock::Image {
-            source: AnthropicImageSource::Url {
-                url: image.url.clone(),
-            },
-        });
+    if include_images {
+        // Anthropic best practice for OCR / vision-augmented extraction:
+        // image blocks BEFORE the text block so the model "looks" at the
+        // imagery while reading the framing prompt below it. We also
+        // re-clamp the count here (defense-in-depth — the fetcher should
+        // never emit more than MAX_IMAGES_PER_SOURCE, but a hand-built
+        // ExtractionInput from a test or future codepath might).
+        for image in input.images.iter().take(MAX_IMAGES_PER_REQUEST) {
+            content.push(AnthropicContentBlock::Image {
+                source: AnthropicImageSource::Url {
+                    url: image.url.clone(),
+                },
+            });
+        }
     }
     content.push(AnthropicContentBlock::Text {
         text: build_user_payload(input),
@@ -424,6 +441,27 @@ fn build_request(input: &ExtractionInput) -> AnthropicRequest {
             role: "user".into(),
             content,
         }],
+    }
+}
+
+/// Classify a transport error into either a renderable `ExtractionFailure`
+/// (the "expected" classes the UI maps to a tailored panel) or a hard
+/// `AppError` to propagate. Centralizes the mapping that the send sites
+/// would otherwise duplicate.
+fn classify_transport_error(
+    e: AnthropicTransportError,
+) -> std::result::Result<ExtractionFailure, AppError> {
+    match e {
+        AnthropicTransportError::KeyMissing => Ok(ExtractionFailure::AnthropicKeyMissing),
+        AnthropicTransportError::AuthInvalid => Ok(ExtractionFailure::AnthropicAuthInvalid),
+        AnthropicTransportError::RateLimited { reset_at } => Ok(ExtractionFailure::RateLimited {
+            provider: "anthropic".into(),
+            reset_at,
+        }),
+        AnthropicTransportError::Network(m) => {
+            Ok(ExtractionFailure::NetworkUnavailable { message: m })
+        }
+        other @ AnthropicTransportError::Other(_) => Err(other.into()),
     }
 }
 
@@ -724,6 +762,59 @@ mod tests {
             matches!(blocks[2], AnthropicContentBlock::Text { .. }),
             "text block must come last"
         );
+    }
+
+    #[tokio::test]
+    async fn image_request_failure_retries_text_only() {
+        // SCA-967 W2 — when the image-bearing request hard-fails (e.g.
+        // Anthropic can't fetch the image URL), we must retry once
+        // text-only rather than failing the whole extraction. First
+        // transport call errors with Other; second (text-only) succeeds.
+        let mut with_images = input();
+        with_images.images = vec![SourceImage {
+            url: "https://pbs.twimg.com/media/toobig.jpg".into(),
+            alt: None,
+        }];
+        let mock = Arc::new(MockAnthropicTransport::new(vec![
+            Err(AnthropicTransportError::Other("image fetch failed: 400".into())),
+            Ok(good_response()),
+        ]));
+        let client = AnthropicClient::new(mock.clone());
+        let result = client
+            .extract_candidates(with_images, false, None)
+            .await
+            .unwrap();
+        result.expect("text-only retry should yield candidates");
+        let captured = mock.captured().await;
+        assert_eq!(captured.len(), 2, "one failed image request + one text-only retry");
+        // First request carried the image block.
+        assert!(captured[0]
+            .messages[0]
+            .content
+            .iter()
+            .any(|b| matches!(b, AnthropicContentBlock::Image { .. })));
+        // Retry dropped all image blocks.
+        assert!(
+            !captured[1]
+                .messages[0]
+                .content
+                .iter()
+                .any(|b| matches!(b, AnthropicContentBlock::Image { .. })),
+            "text-only retry must not carry image blocks"
+        );
+    }
+
+    #[tokio::test]
+    async fn text_only_failure_does_not_double_send() {
+        // Without images, an Other error propagates as a hard AppError —
+        // no retry (nothing to strip).
+        let mock = Arc::new(MockAnthropicTransport::new(vec![Err(
+            AnthropicTransportError::Other("boom".into()),
+        )]));
+        let client = AnthropicClient::new(mock.clone());
+        let res = client.extract_candidates(input(), false, None).await;
+        assert!(res.is_err(), "Other with no images is a hard error");
+        assert_eq!(mock.captured().await.len(), 1, "must not retry when no images");
     }
 
     #[tokio::test]

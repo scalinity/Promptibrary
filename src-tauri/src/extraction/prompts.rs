@@ -186,6 +186,20 @@ mod tests {
     }
 
     #[test]
+    fn user_payload_reports_attached_image_count() {
+        // SCA-967 S7 — the model gets an explicit count of the image
+        // blocks attached earlier in the message.
+        use crate::extraction::types::SourceImage;
+        let mut input = input_with_chunks(vec![]);
+        assert!(build_user_payload(&input).contains("attached_images: 0"));
+        input.images = vec![
+            SourceImage { url: "https://x/a.jpg".into(), alt: None },
+            SourceImage { url: "https://x/b.jpg".into(), alt: None },
+        ];
+        assert!(build_user_payload(&input).contains("attached_images: 2"));
+    }
+
+    #[test]
     fn user_payload_renders_null_for_missing_optionals() {
         let mut input = input_with_chunks(vec![]);
         input.title = None;

@@ -22,11 +22,22 @@ use crate::error::Result;
 const FETCHED_TTL_DAYS: i64 = 7;
 const CANDIDATES_TTL_DAYS: i64 = 30;
 
+/// Bump when the cached `FetchedSourceContent` shape changes in a way
+/// that should invalidate existing rows. SCA-967 (=2) added the
+/// `images` field; rows written before then carry no media, so we
+/// must not serve them once image discovery is live — otherwise a URL
+/// imported in the last 7 days (the FETCHED_TTL_DAYS window) returns
+/// image-less content and the vision fix appears not to work. Mixed
+/// into the key so old rows can never match a new key.
+const SOURCE_FETCH_SCHEMA_VERSION: u32 = 2;
+
 pub fn compute_source_cache_key(source_kind: &str, canonical_url: &str) -> String {
     let mut hasher = Sha256::new();
     hasher.update(source_kind.as_bytes());
     hasher.update(b"\x1f");
     hasher.update(canonical_url.as_bytes());
+    hasher.update(b"\x1f");
+    hasher.update(SOURCE_FETCH_SCHEMA_VERSION.to_string().as_bytes());
     hex(hasher.finalize())
 }
 

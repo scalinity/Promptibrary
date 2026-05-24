@@ -13,6 +13,7 @@
 //! token + connectivity are available.
 
 use std::sync::Arc;
+use std::time::Duration;
 
 use chrono::{DateTime, Utc};
 use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
@@ -172,6 +173,10 @@ pub async fn augment_with_og_images(content: &mut FetchedSourceContent, http: &r
         .get(parsed_url)
         .header(reqwest::header::USER_AGENT, X_OG_CRAWLER_UA)
         .header(reqwest::header::ACCEPT, "text/html,application/xhtml+xml")
+        // Per-request timeout: image discovery is best-effort and must
+        // never stall the preview for the shared client's full 120s
+        // window. A slow x.com just means no images, not a hung import.
+        .timeout(Duration::from_secs(8))
         .send()
         .await
     {
@@ -198,7 +203,13 @@ pub async fn augment_with_og_images(content: &mut FetchedSourceContent, http: &r
     }
     let html = String::from_utf8_lossy(&buf).into_owned();
 
-    let urls = parse_og_image_urls(&html);
+    // Parse off the async runtime — a 2 MiB document with pathological
+    // nesting can stall the executor otherwise (mirrors article.rs's
+    // spawn_blocking, SCA-915 W20).
+    let urls = match tokio::task::spawn_blocking(move || parse_og_image_urls(&html)).await {
+        Ok(u) => u,
+        Err(_) => return,
+    };
     content.images = urls
         .into_iter()
         .take(MAX_IMAGES_PER_SOURCE)

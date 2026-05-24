@@ -939,6 +939,67 @@ mod tests {
     }
 
     #[test]
+    fn collects_og_and_twitter_images_https_only_deduped() {
+        // SCA-967 W5 — lead image discovery from OG / Twitter card meta
+        // tags. https-only, dedup across og/twitter when identical,
+        // reject http + local hosts.
+        let html = r#"
+            <html><head>
+              <meta property="og:image" content="https://cdn.example.com/lead.jpg">
+              <meta property="og:image:secure_url" content="https://cdn.example.com/lead.jpg">
+              <meta name="twitter:image" content="https://cdn.example.com/card.png">
+              <meta property="og:image" content="http://cdn.example.com/insecure.jpg">
+              <meta property="og:image" content="https://localhost/secret.png">
+            </head><body><article><p>body body body</p></article></body></html>
+        "#;
+        let p = parse(html);
+        let urls: Vec<&str> = p.images.iter().map(|i| i.url.as_str()).collect();
+        assert_eq!(
+            urls,
+            vec![
+                "https://cdn.example.com/lead.jpg",
+                "https://cdn.example.com/card.png",
+            ]
+        );
+    }
+
+    #[test]
+    fn og_images_capped_at_max_per_source() {
+        let mut head = String::from("<html><head>");
+        for i in 0..(MAX_IMAGES_PER_SOURCE + 3) {
+            head.push_str(&format!(
+                r#"<meta property="og:image" content="https://cdn.example.com/{i}.jpg">"#
+            ));
+        }
+        head.push_str("</head><body><article><p>body body body</p></article></body></html>");
+        let p = parse(&head);
+        assert_eq!(p.images.len(), MAX_IMAGES_PER_SOURCE);
+    }
+
+    #[test]
+    fn is_safe_image_url_rejects_unsafe_targets() {
+        // SCA-967 S6 — security predicate for image URLs forwarded to
+        // Anthropic's server-side fetcher.
+        assert!(is_safe_image_url("https://pbs.twimg.com/media/a?format=jpg&name=large"));
+        assert!(is_safe_image_url("https://cdn.example.com/x.png"));
+        // Non-https.
+        assert!(!is_safe_image_url("http://cdn.example.com/x.png"));
+        assert!(!is_safe_image_url("ftp://example.com/x.png"));
+        assert!(!is_safe_image_url("data:image/png;base64,iVBOR"));
+        // Local / special hostnames.
+        assert!(!is_safe_image_url("https://localhost/x.png"));
+        assert!(!is_safe_image_url("https://foo.localhost/x.png"));
+        assert!(!is_safe_image_url("https://router.local/x.png"));
+        assert!(!is_safe_image_url("https://svc.internal/x.png"));
+        // Private / loopback IP literals.
+        assert!(!is_safe_image_url("https://127.0.0.1/x.png"));
+        assert!(!is_safe_image_url("https://10.0.0.5/x.png"));
+        assert!(!is_safe_image_url("https://169.254.169.254/x.png"));
+        // Garbage.
+        assert!(!is_safe_image_url("not a url"));
+    }
+
+    #[test]
     fn paywall_detection_triggers_on_short_text() {
         let html = r#"<html><body><article><p>Subscribe to read.</p></article><div class="tp-modal"></div></body></html>"#;
         assert!(looks_paywalled(html));
