@@ -15,6 +15,7 @@ import { VariableReferenceList } from "@/features/prompt/components/variable-ref
 import { LaunchProfilePanel } from "@/features/prompt/components/launch-profile-panel";
 import { PromptHistoryPanel } from "@/features/prompt/components/prompt-history-panel";
 import { ExportMenu } from "@/features/prompt/components/export-menu";
+import { EditableTitle } from "@/features/prompt/components/editable-title";
 import { usePromptEditorStore } from "@/features/prompt/stores/prompt-editor-store";
 import { useLaunchDraftStore } from "@/features/launch/stores/launch-draft-store";
 import { useAssistantStore } from "@/features/assistant/store/assistant-store";
@@ -144,17 +145,7 @@ export function PromptRoute(): React.JSX.Element {
             >
               editor
             </div>
-            <h1
-              style={{
-                fontFamily: "var(--font-display)",
-                fontWeight: 500,
-                fontSize: 22,
-                letterSpacing: "-0.02em",
-                margin: "4px 0 0",
-              }}
-            >
-              {prompt.title}
-            </h1>
+            <EditableTitle key={prompt.id} prompt={prompt} />
           </div>
           <div style={{ display: "flex", gap: 8 }}>
             <button
