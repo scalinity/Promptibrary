@@ -60,4 +60,4 @@ Filing as an L-numbered child would have falsely scoped it. Instead it's a coord
 
 - **Parent (retheme):** [SCA-866](https://linear.app/scalinity/issue/SCA-866) — commits `4ae8f9f..597d117` on `main` (13 commits, 12 sub-issues + 1 cleanup pass).
 - **Parent (review follow-ups):** [SCA-879](https://linear.app/scalinity/issue/SCA-879) — addresses every finding from `/review-2` against SCA-866. 10 sub-issues (SCA-880..SCA-889).
-- To replay: `git log --oneline 4ae8f9f^..main -- Promptibrary\ Design\ System .claude/skills/promptibrary-design src/styles src/index.css src/features/import/import.css src/shared/ui/app-shell.tsx docs/SPEC.md docs/notes/aesthetic-pivot.md docs/V2-CANDIDATES.md CLAUDE.md`
+- To replay: `git log --oneline 4ae8f9f^..main -- Promptibrary\ Design\ System .claude/skills/promptibrary-design skills/promptibrary-design src/styles src/index.css src/features/import/import.css src/shared/ui/app-shell.tsx docs/SPEC.md docs/notes/aesthetic-pivot.md docs/V2-CANDIDATES.md CLAUDE.md`

@@ -1,6 +1,6 @@
 /* Promptibrary /import — screen-local styles ported verbatim from
    `Promptibrary Design System/screens/03-import.html`'s inline <style>
-   block. The canonical design system at `.claude/skills/promptibrary-design/`
+   block. The canonical design system at `skills/promptibrary-design/`
    keeps the universal primitives (modal, btn, btn-launch, input, kbd,
    tag) in `app.css`; the import-specific classes were never promoted
    because they're screen-scoped, so we keep them here next to the
